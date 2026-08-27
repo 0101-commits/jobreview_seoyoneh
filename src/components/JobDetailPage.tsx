@@ -679,7 +679,7 @@ function EmptyMessage({ children }: { children: React.ReactNode }) {
   return <p className="rounded-md bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">{children}</p>;
 }
 
-function SkillGroup({ label, skills, accent }: { label: string; skills: { id: string; name: string }[]; accent: 'teal' | 'navy' }) {
+function SkillGroup({ label, skills, accent }: { label: string; skills: { id?: string; name: string }[]; accent: 'teal' | 'navy' }) {
   const chipClass = accent === 'teal'
     ? 'bg-[#edf8f7] text-[#247d7c] border-[#b8e5e2]'
     : 'bg-slate-100 text-[#182635] border-slate-200';
@@ -690,8 +690,8 @@ function SkillGroup({ label, skills, accent }: { label: string; skills: { id: st
         <p className="text-sm text-slate-400">등록된 {label}이 없습니다.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {skills.map((s) => (
-            <span key={s.id} className={`rounded-full border px-3 py-1.5 text-sm font-medium ${chipClass}`}>{s.name}</span>
+          {skills.map((s, i) => (
+            <span key={s.id ?? `${s.name}-${i}`} className={`rounded-full border px-3 py-1.5 text-sm font-medium ${chipClass}`}>{s.name}</span>
           ))}
         </div>
       )}

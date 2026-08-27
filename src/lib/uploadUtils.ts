@@ -111,7 +111,7 @@ export function validateStep1(rows: Step1Row[]): { errors: ValidationError[]; cl
   }
 
   // Check required columns — 회사 must be present
-  const firstRow = rows[0] as Record<string, unknown>;
+  const firstRow = rows[0] as unknown as Record<string, unknown>;
   if (!('회사' in firstRow)) {
     return {
       errors: [{ row: 0, message: "새로운 업로드 양식에서는 '회사' 컬럼이 필수입니다.\n최신 양식을 다운로드하여 사용해 주세요.", step: 1 }],
@@ -189,7 +189,7 @@ export function validateStep2(rows: Step2Row[]): { errors: ValidationError[]; cl
     return { errors: [{ row: 0, message: '데이터 행이 없습니다.', step: 2 }], cleaned: [] };
   }
 
-  const firstRow = rows[0] as Record<string, unknown>;
+  const firstRow = rows[0] as unknown as Record<string, unknown>;
   if (!('회사' in firstRow)) {
     return {
       errors: [{ row: 0, message: "새로운 업로드 양식에서는 '회사' 컬럼이 필수입니다.\n최신 양식을 다운로드하여 사용해 주세요.", step: 2 }],

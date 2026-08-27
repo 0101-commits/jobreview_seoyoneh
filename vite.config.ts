@@ -4,6 +4,8 @@ import { fileURLToPath, URL } from 'node:url';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // GitHub Pages serves the app from /<repo>/, dev server from /.
+  base: process.env.GITHUB_PAGES === 'true' ? '/jobreview_seoyoneh/' : '/',
   plugins: [react()],
   resolve: {
     alias: {

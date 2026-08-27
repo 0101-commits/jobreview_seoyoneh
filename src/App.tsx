@@ -1473,7 +1473,7 @@ function RequirementFeedback({ requirements, feedback, update }: { requirements:
     <div>
       <SectionHeading title="E. 수행요건 검토" />
       {fields.map(([key, label]) => {
-        const value = requirements ? (requirements as Record<string, string>)[key] || '' : '';
+        const value = requirements ? (requirements as unknown as Record<string, string>)[key] || '' : '';
         return (
           <div key={key} className="mb-6 rounded-md border border-slate-200 p-4 lg:p-5">
             <div className="flex items-start justify-between gap-4">

@@ -42,7 +42,7 @@ npm run build
 
 ## 테스트 계정
 
-화면 확인용 테스트 계정은 로그인 화면의 테스트 계정 버튼에서 사용할 수 있습니다.
+`supabase/seed.sql`을 SQL Editor에서 실행하면 화면 확인용 계정이 생성됩니다.
 
 - 관리자: `admin@jobreview.local` / `admin1234`
 - SME: `sme@jobreview.local` / `sme1234`
@@ -53,7 +53,7 @@ Supabase Auth를 사용하는 운영 계정은 이메일·비밀번호 방식으
 
 ## 데이터베이스
 
-Supabase에 `create_job_review_system` 마이그레이션이 적용되어 있습니다. 주요 테이블은 다음과 같습니다.
+새 Supabase 프로젝트에 연결할 때는 `supabase/migrations/`의 SQL을 파일 이름 순서대로 실행한 뒤, 데모 계정이 필요하면 `supabase/seed.sql`을 실행합니다. 계정 생성·삭제 화면은 `supabase/functions/admin-create-user` Edge Function이 배포되어 있어야 동작합니다. 주요 테이블은 다음과 같습니다.
 
 - `profiles`
 - `job_groups`, `job_series`, `jobs`
@@ -79,3 +79,13 @@ Supabase에 `create_job_review_system` 마이그레이션이 적용되어 있습
 - 관리자 기능은 ADMIN 역할로 서버 측에서 제한됩니다.
 - 제출 후에는 재검토 요청 상태에서만 수정할 수 있도록 확장할 수 있습니다.
 GitHub sync test
+
+## 배포
+
+`main` 브랜치에 푸시하면 `.github/workflows/deploy.yml`이 GitHub Pages로 배포합니다.
+빌드에 필요한 값은 저장소 Actions variables로 주입합니다.
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Pages는 하위 경로에서 서빙되므로 빌드 시 `GITHUB_PAGES=true`로 `base`를 `/jobreview_seoyoneh/`로 맞춥니다.
