@@ -30,6 +30,9 @@ jobs:
           GITHUB_PAGES: 'true'
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      # BrowserRouter: GitHub Pages는 /jobs/:id 같은 경로에 파일이 없으면 404를 준다.
+      # 404.html을 index.html 사본으로 두면 새로고침·직접 링크가 앱으로 들어온다.
+      - run: cp dist/index.html dist/404.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

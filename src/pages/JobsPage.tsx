@@ -1,0 +1,307 @@
+// 직무정보 관리 — 관리자(ADMIN) 화면. 직무 목록(표·검색·정렬)과 엑셀 내보내기, 행 클릭 시 상세로 전환.
+// 100건이 넘으면 카드로는 훑을 수 없어 표로 바꿨고, 상태를 읽지 않던 '활성' 하드코딩 배지는
+// 실제 검토 진행 상태 열로 대체했다.
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Download,
+  FileSpreadsheet,
+  RotateCw,
+  Search,
+} from 'lucide-react';
+import {
+  exportAllJobsToExcel,
+  fetchAllJobsResult,
+  fetchReviewStatusResult,
+  mapReviewStatus,
+  type JobListItem,
+} from '@/lib/jobApi';
+import { fetchFixedCompanyId } from '@/lib/integratedJobApi';
+import { JobDetailPage } from '@/components/JobDetailPage';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { Button } from '@/components/ui/Button';
+import type { Status } from '@/types';
+
+type ReviewLabel = Status | '미배정';
+
+interface JobRow extends JobListItem {
+  reviewLabel: ReviewLabel;
+  assigned: number;
+  submitted: number;
+}
+
+// 정렬용 순서 — 진행이 덜 된 직무를 먼저 보게 한다.
+const LABEL_RANK: Record<ReviewLabel, number> = {
+  미배정: 0,
+  미시작: 1,
+  '작성 중': 2,
+  '재검토 요청': 3,
+  '재제출 완료': 4,
+  '제출 완료': 5,
+};
+
+type SortKey = 'name' | 'group_name' | 'series_name' | 'review';
+
+const SORT_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: 'name', label: '직무명' },
+  { key: 'group_name', label: '직군' },
+  { key: 'series_name', label: '직렬' },
+  { key: 'review', label: '검토 진행 상태' },
+];
+
+export function JobsPage({
+  userId,
+  selectedJobId: controlledJobId,
+  onSelectJob,
+}: {
+  userId: string;
+  /** 라우터 연결(담당 2) 후에는 URL이 원천이 된다. 주지 않으면 내부 상태로 동작한다. */
+  selectedJobId?: string | null;
+  onSelectJob?: (jobId: string | null) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [rows, setRows] = useState<JobRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [statusWarning, setStatusWarning] = useState('');
+  const [fixedCompanyId, setFixedCompanyId] = useState<string | null>(null);
+  const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'name', asc: true });
+  const [internalJobId, setInternalJobId] = useState<string | null>(null);
+
+  const selectedJobId = controlledJobId !== undefined ? controlledJobId : internalJobId;
+  const selectJob = useCallback(
+    (jobId: string | null) => {
+      if (onSelectJob) onSelectJob(jobId);
+      if (controlledJobId === undefined) setInternalJobId(jobId);
+    },
+    [onSelectJob, controlledJobId],
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    setStatusWarning('');
+
+    let companyId: string;
+    try {
+      companyId = await fetchFixedCompanyId();
+    } catch (error) {
+      setFixedCompanyId(null);
+      setRows([]);
+      setLoadError(
+        error instanceof Error ? error.message : '회사 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
+      setLoading(false);
+      return;
+    }
+    setFixedCompanyId(companyId);
+
+    const jobs = await fetchAllJobsResult(companyId);
+    if (!jobs.ok) {
+      // 조회 실패를 '등록된 직무 0건'으로 보여 주지 않는다.
+      setRows([]);
+      setLoadError(`직무 목록을 불러오지 못했어요. (${jobs.error}) 잠시 후 다시 시도해 주세요.`);
+      setLoading(false);
+      return;
+    }
+
+    const statuses = await fetchReviewStatusResult(companyId);
+    const byJob = new Map<string, { assigned: number; submitted: number; started: number; rereview: number }>();
+    if (statuses.ok) {
+      for (const r of statuses.data) {
+        const acc = byJob.get(r.job_id) ?? { assigned: 0, submitted: 0, started: 0, rereview: 0 };
+        const label = mapReviewStatus(r.review_status);
+        acc.assigned++;
+        if (label === '제출 완료' || label === '재제출 완료') acc.submitted++;
+        if (label !== '미시작') acc.started++;
+        if (label === '재검토 요청') acc.rereview++;
+        byJob.set(r.job_id, acc);
+      }
+    } else {
+      setStatusWarning(`검토 진행 상태를 불러오지 못했어요. (${statuses.error}) 직무 목록만 표시합니다.`);
+    }
+
+    setRows(
+      jobs.data.map((j) => {
+        const acc = byJob.get(j.id);
+        let reviewLabel: ReviewLabel = '미배정';
+        if (acc && acc.assigned > 0) {
+          if (acc.rereview > 0) reviewLabel = '재검토 요청';
+          else if (acc.submitted === acc.assigned) reviewLabel = '제출 완료';
+          else if (acc.started > 0) reviewLabel = '작성 중';
+          else reviewLabel = '미시작';
+        }
+        return { ...j, reviewLabel, assigned: acc?.assigned ?? 0, submitted: acc?.submitted ?? 0 };
+      }),
+    );
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? rows.filter((j) => `${j.group_name}${j.series_name}${j.name}`.toLowerCase().includes(q))
+      : rows.slice();
+    list.sort((a, b) => {
+      const diff =
+        sort.key === 'review'
+          ? LABEL_RANK[a.reviewLabel] - LABEL_RANK[b.reviewLabel]
+          : String(a[sort.key]).localeCompare(String(b[sort.key]), 'ko');
+      return sort.asc ? diff : -diff;
+    });
+    return list;
+  }, [rows, query, sort]);
+
+  function toggleSort(key: SortKey) {
+    setSort((prev) => (prev.key === key ? { key, asc: !prev.asc } : { key, asc: true }));
+  }
+
+  if (selectedJobId)
+    return (
+      <JobDetailPage jobId={selectedJobId} onBack={() => selectJob(null)} userId={userId} companyId={fixedCompanyId} />
+    );
+
+  return (
+    <>
+      <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div>
+          <p className="mb-1 text-sm text-foreground-subtle">
+            총 {rows.length}개 직무{query && ` · 검색 결과 ${visible.length}개`}
+          </p>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">직무정보 관리</h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => fixedCompanyId && exportAllJobsToExcel(fixedCompanyId)}
+            disabled={!fixedCompanyId || loading}
+          >
+            <Download size={16} aria-hidden="true" /> 전체 직무정보 다운로드
+          </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 text-foreground-subtle" size={16} aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="직무명, 직군, 직렬 검색"
+              aria-label="직무 검색"
+              className="input w-full pl-9 md:w-72"
+            />
+          </div>
+        </div>
+      </div>
+
+      {statusWarning && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning"
+        >
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{statusWarning}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-sm text-foreground-subtle">
+          직무 목록을 불러오는 중…
+        </div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center gap-3 rounded-container border border-destructive-border bg-destructive-muted px-6 py-16 text-center">
+          <AlertTriangle size={24} className="text-destructive" aria-hidden="true" />
+          <p className="text-sm text-destructive">{loadError}</p>
+          <Button variant="secondary" size="sm" onClick={load}>
+            <RotateCw size={14} aria-hidden="true" /> 다시 불러오기
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-container border border-border bg-card shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-muted text-xs text-foreground-muted">
+                <tr>
+                  {SORT_COLUMNS.map((col) => {
+                    const activeSort = sort.key === col.key;
+                    const Icon = !activeSort ? ChevronsUpDown : sort.asc ? ArrowUp : ArrowDown;
+                    return (
+                      <th
+                        key={col.key}
+                        scope="col"
+                        className="px-5 py-3 font-medium"
+                        aria-sort={activeSort ? (sort.asc ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(col.key)}
+                          className="inline-flex items-center gap-1 rounded-inner transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                          {col.label}
+                          <Icon size={13} aria-hidden="true" className={activeSort ? 'text-primary' : 'opacity-50'} />
+                        </button>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {visible.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-16 text-center">
+                      <FileSpreadsheet size={28} className="mx-auto mb-3 text-foreground-subtle" aria-hidden="true" />
+                      <p className="text-sm text-foreground-muted">
+                        {query ? '검색 조건에 맞는 직무가 없어요.' : '등록된 직무가 없어요.'}
+                      </p>
+                      {!query && (
+                        <p className="mt-1 text-xs text-foreground-subtle">
+                          관리자 메뉴의 '직무정보 업로드'에서 Excel 파일로 직무를 등록할 수 있어요.
+                        </p>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  visible.map((j) => (
+                    <tr key={j.id} className="border-t border-border transition hover:bg-primary-subtle/60">
+                      <th scope="row" className="px-5 py-3 text-left font-medium">
+                        <button
+                          type="button"
+                          onClick={() => selectJob(j.id)}
+                          className="min-h-11 text-left text-[15px] font-semibold text-foreground transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                          {j.name}
+                        </button>
+                      </th>
+                      <td className="px-5 py-3 text-foreground-muted">{j.group_name}</td>
+                      <td className="px-5 py-3 text-foreground-muted">{j.series_name}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {j.reviewLabel === '미배정' ? (
+                            <span className="whitespace-nowrap rounded-inner bg-muted px-2 py-1 text-[11px] font-medium text-foreground-muted">
+                              미배정
+                            </span>
+                          ) : (
+                            <StatusBadge status={j.reviewLabel} />
+                          )}
+                          {j.assigned > 0 && (
+                            <span className="text-xs text-foreground-subtle">
+                              제출 {j.submitted}/{j.assigned}명
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
