@@ -1,9 +1,78 @@
+/* 한글 웹폰트: 동적 서브셋(unicode-range) — 실제 쓰이는 글자 구간만 내려받습니다. */
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+  디자인 토큰. Tailwind v3이므로 @theme(v4 문법)은 쓸 수 없고,
+  :root CSS 변수 + tailwind.config.js의 theme.extend 참조가 유일한 경로입니다.
+  색상 값은 반드시 "공백 구분 RGB 채널"로 적습니다.
+  hex로 적으면 bg-white/95, bg-slate-900/40 같은 투명도 유틸이 전부 깨집니다.
+  토큰명에 명도를 넣지 않습니다(역할 기반). 배경 토큰은 전경 토큰과 쌍으로만 추가합니다.
+*/
+:root {
+  /* 표면 */
+  --background: 245 246 248;   /* #f5f6f8 현행 캔버스 */
+  --card: 255 255 255;         /* #ffffff */
+  --muted: 248 250 252;        /* #f8fafc */
+  --border: 226 232 240;       /* #e2e8f0 */
+
+  /* 텍스트 */
+  --foreground: 30 41 59;          /* #1e293b */
+  --foreground-muted: 100 116 139; /* #64748b */
+  --foreground-subtle: 148 163 184;/* #94a3b8 */
+
+  /* 브랜드 */
+  --primary: 36 125 124;         /* #247d7c */
+  --primary-hover: 31 104 103;   /* #1f6867 (#1d6867 혼용을 이 값으로 통일) */
+  --primary-subtle: 237 248 247; /* #edf8f7 */
+  --primary-border: 184 229 226; /* #b8e5e2 */
+  --primary-foreground: 255 255 255;
+
+  /* 상태 — rose/red 혼용을 destructive 하나로 통일 */
+  --success: 4 120 87;             /* #047857 */
+  --success-muted: 236 253 245;    /* #ecfdf5 */
+  --success-border: 167 243 208;   /* #a7f3d0 */
+  --success-foreground: 255 255 255;
+
+  --warning: 180 83 9;             /* #b45309 */
+  --warning-muted: 255 251 235;    /* #fffbeb */
+  --warning-border: 253 230 138;   /* #fde68a */
+  --warning-foreground: 255 255 255;
+
+  --destructive: 190 18 60;          /* #be123c */
+  --destructive-muted: 255 241 242;  /* #fff1f2 */
+  --destructive-border: 254 205 211; /* #fecdd3 */
+  --destructive-foreground: 255 255 255;
+
+  /* 반경 */
+  --radius-inner: 4px;
+  --radius-element: 6px;   /* 현행 rounded-md 121곳과 같은 값 */
+  --radius-container: 10px;
+  --radius-page: 16px;
+
+  /* 컨트롤 높이 3단 */
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 48px;
+}
+
 @layer base {
-  :root { font-family: Pretendard, 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1e293b; background: #f5f6f8; font-synthesis: none; }
+  :root {
+    /*
+      'Pretendard Variable'이 패키지가 싣는 실제 family 이름입니다.
+      'Pretendard'는 로컬 설치본, 'Malgun Gothic'/'맑은 고딕'은 폰트 로드가
+      통째로 실패했을 때의 한글 안전망입니다.
+      font-synthesis는 걸지 않습니다 — 폴백 폰트에 실제 굵기 파일이 없을 때
+      bold 합성까지 막혀 굵기 차이가 사라집니다.
+    */
+    font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR', -apple-system,
+      BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', '맑은 고딕', sans-serif;
+    color: rgb(var(--foreground));
+    background: rgb(var(--background));
+  }
   * { box-sizing: border-box; }
   body { margin: 0; min-width: 320px; }
   button, input, select, textarea { font: inherit; }
@@ -11,9 +80,9 @@
 }
 
 @layer components {
-  .label { @apply mb-2 block text-xs font-medium text-slate-600; }
-  .input { @apply w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-[#2e9b9a] focus:ring-2 focus:ring-[#2e9b9a]/10; }
-  .textarea { @apply w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-[#2e9b9a] focus:ring-2 focus:ring-[#2e9b9a]/10; }
+  .label { @apply mb-2 block text-xs font-medium text-foreground-muted; }
+  .input { @apply w-full rounded-element border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; }
+  .textarea { @apply w-full resize-y rounded-element border border-border bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; }
 }
 
 @media (prefers-reduced-motion: reduce) {
