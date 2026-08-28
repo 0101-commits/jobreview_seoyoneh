@@ -26,7 +26,8 @@
      2. New query 를 누르고 이 파일 전체를 복사해 붙여넣는다.
      3. Run 을 누른다. 전체가 한 번에 실행된다.
         - 전부 CREATE OR REPLACE / IF NOT EXISTS / DROP POLICY IF EXISTS 라 두 번 실행해도 안전하다.
-        - 테이블·행을 지우는 문장은 한 줄도 없다.
+        - 이 스크립트를 실행하는 시점에는 데이터가 지워지지 않는다. 만드는 것은 함수·정책·인덱스뿐이다.
+          (함수 본문 안의 DELETE 는 나중에 그 함수가 호출될 때 동작하는 것이고, 지금 실행되지 않는다.)
      4. 아래 「적용 후 확인」 쿼리를 새 쿼리 창에서 실행한다.
 
    ▣ 적용 전 실측(선택이지만 권장) — 결과에 따라 뒤처리가 달라진다
@@ -98,7 +99,7 @@
        -- 원복:  ALTER ROLE authenticated RESET statement_timeout;
 
    ▣ 되돌리는 법
-     이 스크립트는 테이블·행을 지우거나 바꾸지 않는다. 되돌림도 함수/정책/인덱스 수준이다.
+     이 스크립트는 실행 시점에 테이블·행을 지우거나 바꾸지 않는다. 되돌림도 함수/정책/인덱스 수준이다.
 
        -- 1) 새로 만든 함수 4개 제거
        DROP FUNCTION IF EXISTS public.save_integrated_job_data(uuid, text, jsonb, jsonb);
