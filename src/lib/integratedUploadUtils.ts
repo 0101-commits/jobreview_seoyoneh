@@ -7,14 +7,7 @@ export const FIXED_COMPANY_NAME = '서연이화';
 export const JOB_SHEET_NAME = '직무 및 과업 정보';
 export const SKILL_SHEET_NAME = 'Skill 및 수행요건';
 
-export const JOB_HEADERS = [
-  '직군',
-  '직렬',
-  '직무',
-  '직무정의',
-  '주요과업',
-  '세부활동',
-] as const;
+export const JOB_HEADERS = ['직군', '직렬', '직무', '직무정의', '주요과업', '세부활동'] as const;
 
 export const SKILL_HEADERS = [
   '직군',
@@ -53,6 +46,9 @@ export interface IntegratedValidationResult {
   warnings: string[];
   jobRows: IntegratedJobRow[];
   skillRows: IntegratedSkillRow[];
+  /** jobRows/skillRows와 같은 순서의 엑셀 행 번호(미리보기·오류 표시용). */
+  jobRowNumbers: number[];
+  skillRowNumbers: number[];
   jobCount: number;
   taskCount: number;
   activityCount: number;
@@ -61,8 +57,12 @@ export interface IntegratedValidationResult {
   matchedJobCount: number;
   jobErrorCount: number;
   skillErrorCount: number;
+  /** 필수값 누락 건수(선택 항목 공백 경고는 포함하지 않습니다). */
   jobMissingCount: number;
   skillMissingCount: number;
+  /** 업로드를 막지 않는 확인 필요 건수. */
+  jobWarningCount: number;
+  skillWarningCount: number;
   duplicateJobRowCount: number;
   duplicateSkillRowCount: number;
 }
@@ -95,10 +95,7 @@ function headersEqual(actual: string[], expected: readonly string[]): boolean {
   return actual.length === expected.length && expected.every((header, index) => actual[index] === header);
 }
 
-function sheetToRows<T extends Record<string, unknown>>(
-  wb: XLSX.WorkBook,
-  sheetName: string,
-): NumberedSheetRow<T>[] {
+function sheetToRows<T extends Record<string, unknown>>(wb: XLSX.WorkBook, sheetName: string): NumberedSheetRow<T>[] {
   const sheet = wb.Sheets[sheetName];
   if (!sheet) return [];
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
@@ -111,12 +108,26 @@ function sheetToRows<T extends Record<string, unknown>>(
   return matrix
     .slice(1)
     .map((cells, index) => {
-      const data = Object.fromEntries(
-        headers.map((header, columnIndex) => [header, cells[columnIndex] ?? '']),
-      ) as T;
+      const data = Object.fromEntries(headers.map((header, columnIndex) => [header, cells[columnIndex] ?? ''])) as T;
       return { rowNumber: index + 2, data };
     })
     .filter(({ data }) => Object.values(data).some((value) => normalize(value) !== ''));
+}
+
+/** 한글이 아닌 항목명은 읽는 소리를 등록해 두고 그 받침으로 판정합니다. */
+const READING: Record<string, string> = { skill: '스킬' };
+
+function hasBatchim(word: string): boolean {
+  const last = word.trim().slice(-1);
+  const code = last.charCodeAt(0);
+  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 !== 0;
+  const reading = READING[word.trim().toLowerCase()];
+  return reading ? hasBatchim(reading) : false;
+}
+
+/** 「직군이 / 직무가 / Skill이」처럼 받침 유무로 조사를 고릅니다. */
+export function withJosa(word: string, withBatchim: string, withoutBatchim: string): string {
+  return `${word}${hasBatchim(word) ? withBatchim : withoutBatchim}`;
 }
 
 function addRequiredError(
@@ -127,7 +138,7 @@ function addRequiredError(
   value: string,
 ): number {
   if (value) return 0;
-  errors.push(formatMessage(sheet, row, `${field}이(가) 입력되지 않았습니다.`));
+  errors.push(formatMessage(sheet, row, `${withJosa(field, '이', '가')} 입력되지 않았습니다.`));
   return 1;
 }
 
@@ -146,6 +157,8 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
     warnings,
     jobRows: [],
     skillRows: [],
+    jobRowNumbers: [],
+    skillRowNumbers: [],
     jobCount: 0,
     taskCount: 0,
     activityCount: 0,
@@ -156,6 +169,8 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
     skillErrorCount: errors.filter((message) => message.startsWith(SKILL_SHEET_NAME)).length,
     jobMissingCount,
     skillMissingCount,
+    jobWarningCount: warnings.filter((message) => message.startsWith(JOB_SHEET_NAME)).length,
+    skillWarningCount: warnings.filter((message) => message.startsWith(SKILL_SHEET_NAME)).length,
     duplicateJobRowCount: 0,
     duplicateSkillRowCount: 0,
   });
@@ -187,10 +202,14 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
   }
 
   if (!headersEqual(jobHeaders, JOB_HEADERS)) {
-    errors.push(formatMessage(JOB_SHEET_NAME, 1, `헤더가 올바르지 않습니다. ${JOB_HEADERS.join(', ')} 순서로 입력해 주세요.`));
+    errors.push(
+      formatMessage(JOB_SHEET_NAME, 1, `헤더가 올바르지 않습니다. ${JOB_HEADERS.join(', ')} 순서로 입력해 주세요.`),
+    );
   }
   if (!headersEqual(skillHeaders, SKILL_HEADERS)) {
-    errors.push(formatMessage(SKILL_SHEET_NAME, 1, `헤더가 올바르지 않습니다. ${SKILL_HEADERS.join(', ')} 순서로 입력해 주세요.`));
+    errors.push(
+      formatMessage(SKILL_SHEET_NAME, 1, `헤더가 올바르지 않습니다. ${SKILL_HEADERS.join(', ')} 순서로 입력해 주세요.`),
+    );
   }
   if (errors.length > 0) return emptyResult();
 
@@ -205,6 +224,7 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
   }
 
   const jobRows: IntegratedJobRow[] = [];
+  const jobRowNumbers: number[] = [];
   const jobDefinitions = new Map<string, { value: string; row: number }>();
   const jobRowKeys = new Set<string>();
   let duplicateJobRowCount = 0;
@@ -229,7 +249,9 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
     const jobKey = makeJobKey(row.직군, row.직렬, row.직무);
     const priorDefinition = jobDefinitions.get(jobKey);
     if (row.직무정의 && priorDefinition && priorDefinition.value !== row.직무정의) {
-      errors.push(formatMessage(JOB_SHEET_NAME, excelRow, `동일 직무의 직무정의가 ${priorDefinition.row}행과 다릅니다.`));
+      errors.push(
+        formatMessage(JOB_SHEET_NAME, excelRow, `동일 직무의 직무정의가 ${priorDefinition.row}행과 다릅니다.`),
+      );
     } else if (row.직무정의 && !priorDefinition) {
       jobDefinitions.set(jobKey, { value: row.직무정의, row: excelRow });
     }
@@ -242,15 +264,14 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
     }
     jobRowKeys.add(rowKey);
     jobRows.push(row);
+    jobRowNumbers.push(excelRow);
   });
 
   const availableJobs = new Set(jobRows.map((row) => makeJobKey(row.직군, row.직렬, row.직무)));
   const skillRows: IntegratedSkillRow[] = [];
+  const skillRowNumbers: number[] = [];
   const skillRowKeys = new Set<string>();
-  const requirementByJob = new Map<
-    string,
-    { education: string; major: string; certifications: string; row: number }
-  >();
+  const requirementByJob = new Map<string, { education: string; major: string; certifications: string; row: number }>();
   let duplicateSkillRowCount = 0;
 
   rawSkillRows.forEach(({ data: raw, rowNumber: excelRow }) => {
@@ -277,17 +298,27 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
 
     const jobKey = makeJobKey(row.직군, row.직렬, row.직무);
     if (!availableJobs.has(jobKey)) {
-      errors.push(formatMessage(SKILL_SHEET_NAME, excelRow, `‘${row.직군} > ${row.직렬} > ${row.직무}’ 직무가 ${JOB_SHEET_NAME} Sheet에 없습니다.`));
+      errors.push(
+        formatMessage(
+          SKILL_SHEET_NAME,
+          excelRow,
+          `‘${row.직군} > ${row.직렬} > ${row.직무}’ 직무가 ${JOB_SHEET_NAME} Sheet에 없습니다.`,
+        ),
+      );
     }
 
     const emptyRequirementFields = [
       ['요구 학력', row['요구 학력']],
       ['관련 전공', row['관련 전공']],
       ['관련 자격증/면허', row['관련 자격증/면허']],
-    ].filter(([, value]) => !value).map(([field]) => field);
+    ]
+      .filter(([, value]) => !value)
+      .map(([field]) => field);
+    // 선택 항목 공백은 업로드를 막지 않으므로 '누락'이 아니라 '확인 필요'로만 셉니다.
     if (emptyRequirementFields.length > 0) {
-      skillMissingCount += emptyRequirementFields.length;
-      warnings.push(formatMessage(SKILL_SHEET_NAME, excelRow, `${emptyRequirementFields.join(', ')} 항목이 비어 있습니다.`));
+      warnings.push(
+        formatMessage(SKILL_SHEET_NAME, excelRow, `${emptyRequirementFields.join(', ')} 항목이 비어 있습니다.`),
+      );
     }
 
     const currentRequirement = {
@@ -306,7 +337,13 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
         ['관련 자격증/면허', priorRequirement.certifications, currentRequirement.certifications],
       ].filter(([, prior, current]) => prior !== current);
       if (conflicts.length > 0) {
-        errors.push(formatMessage(SKILL_SHEET_NAME, excelRow, `동일 직무의 ${conflicts.map(([field]) => field).join(', ')} 값이 ${priorRequirement.row}행과 다릅니다.`));
+        errors.push(
+          formatMessage(
+            SKILL_SHEET_NAME,
+            excelRow,
+            `동일 직무의 ${conflicts.map(([field]) => field).join(', ')} 값이 ${priorRequirement.row}행과 다릅니다.`,
+          ),
+        );
       }
     }
 
@@ -318,12 +355,11 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
     }
     skillRowKeys.add(skillKey);
     skillRows.push(row);
+    skillRowNumbers.push(excelRow);
   });
 
   const jobCount = new Set(jobRows.map((row) => makeJobKey(row.직군, row.직렬, row.직무))).size;
-  const taskCount = new Set(
-    jobRows.map((row) => `${makeJobKey(row.직군, row.직렬, row.직무)}|${row.주요과업}`),
-  ).size;
+  const taskCount = new Set(jobRows.map((row) => `${makeJobKey(row.직군, row.직렬, row.직무)}|${row.주요과업}`)).size;
   const requirementCount = new Set(
     skillRows
       .filter((row) => row['요구 학력'] || row['관련 전공'] || row['관련 자격증/면허'])
@@ -336,6 +372,8 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
     warnings,
     jobRows,
     skillRows,
+    jobRowNumbers,
+    skillRowNumbers,
     jobCount,
     taskCount,
     activityCount: jobRows.length,
@@ -350,6 +388,8 @@ export async function parseAndValidateIntegratedWorkbook(file: File): Promise<In
     skillErrorCount: errors.filter((message) => message.startsWith(SKILL_SHEET_NAME)).length,
     jobMissingCount,
     skillMissingCount,
+    jobWarningCount: warnings.filter((message) => message.startsWith(JOB_SHEET_NAME)).length,
+    skillWarningCount: warnings.filter((message) => message.startsWith(SKILL_SHEET_NAME)).length,
     duplicateJobRowCount,
     duplicateSkillRowCount,
   };
@@ -400,12 +440,16 @@ export function downloadIntegratedTemplate(): void {
 
   const jobSheet = XLSX.utils.json_to_sheet(jobData, { header: [...JOB_HEADERS] });
   const skillSheet = XLSX.utils.json_to_sheet(skillData, { header: [...SKILL_HEADERS] });
-  jobSheet['!cols'] = [
-    { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 52 }, { wch: 28 }, { wch: 42 },
-  ];
+  jobSheet['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 52 }, { wch: 28 }, { wch: 42 }];
   skillSheet['!cols'] = [
-    { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 14 },
-    { wch: 24 }, { wch: 18 }, { wch: 28 }, { wch: 28 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 24 },
+    { wch: 18 },
+    { wch: 28 },
+    { wch: 28 },
   ];
 
   const wb = XLSX.utils.book_new();

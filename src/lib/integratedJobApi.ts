@@ -1,9 +1,5 @@
 import { supabase } from './supabase';
-import {
-  FIXED_COMPANY_NAME,
-  type IntegratedJobRow,
-  type IntegratedSkillRow,
-} from './integratedUploadUtils';
+import { FIXED_COMPANY_NAME, type IntegratedJobRow, type IntegratedSkillRow } from './integratedUploadUtils';
 
 export type UploadMode = 'append' | 'replace';
 
@@ -40,6 +36,24 @@ export async function fetchFixedCompanyId(): Promise<string> {
     throw new Error(`회사 정보 ‘${FIXED_COMPANY_NAME}’를 찾을 수 없습니다. companies 테이블을 확인해 주세요.`);
   }
   return company.id;
+}
+
+/**
+ * 전체 교체 전 화면에 보여줄 "현재 등록된 직무 수".
+ * 실패하면 null을 돌려주고, 호출부는 건수 대신 안내 문구를 보여 줍니다.
+ */
+export async function fetchCurrentJobCount(companyId: string): Promise<number | null> {
+  if (!supabase) return null;
+  const { count, error } = await supabase
+    .from('jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .eq('active', true);
+  if (error) {
+    console.error(`[integratedJobApi] 현재 직무 수 조회 실패: ${error.message}`);
+    return null;
+  }
+  return count ?? 0;
 }
 
 export async function saveIntegratedJobData(params: {
