@@ -81,7 +81,8 @@
 
 @layer components {
   .label { @apply mb-2 block text-xs font-medium text-foreground-muted; }
-  .input { @apply w-full rounded-element border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; }
+  /* 좁은 화면에서는 손가락이 닿는 높이(44px)를 보장한다 — sm 이상에서는 표 밀도를 위해 그대로 둔다. */
+  .input { @apply w-full min-h-control-lg rounded-element border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; }
   .textarea { @apply w-full resize-y rounded-element border border-border bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; }
 }
 
