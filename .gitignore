@@ -24,3 +24,6 @@ dist-ssr
 
 # OMC runtime state
 .omc/
+
+# Supabase CLI 임시 파일
+supabase/.temp/
