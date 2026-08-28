@@ -42,6 +42,31 @@ export interface JobDetail {
   requirements: JobRequirementRow | null;
 }
 
+// ── 조회 결과 타입 ──────────────────────────────────────────────────
+//
+// 기존 조회 함수들은 `if (error || !data) return []` 로 실패를 "데이터 0건"으로 위장하고 있었다.
+// 화면이 "등록된 직무가 없습니다"와 "불러오지 못했습니다"를 구분할 수 있도록 `*Result` 함수를 함께 제공한다.
+// 기존 함수는 호출부를 깨지 않도록 시그니처를 유지하되, 실패를 최소한 콘솔에 남긴다.
+// 화면 쪽에서는 새로 만드는 코드부터 `*Result` 함수를 쓰면 된다.
+
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+function ok<T>(data: T): ApiResult<T> {
+  return { ok: true, data };
+}
+
+function fail<T>(where: string, message: string): ApiResult<T> {
+  console.error(`[jobApi] ${where} 실패: ${message}`);
+  return { ok: false, error: message };
+}
+
+/** 기존 호출부 호환용. 실패하면 빈 값을 돌려준다(오류는 fail()이 이미 콘솔에 남겼다). */
+function orEmpty<T>(result: ApiResult<T>, empty: T): T {
+  return result.ok ? result.data : empty;
+}
+
+const NO_DB = '데이터베이스에 연결되어 있지 않습니다. 환경설정(.env)을 확인해 주세요.';
+
 // ── Fetch companies ─────────────────────────────────────────────────
 
 export interface Company {
@@ -51,21 +76,29 @@ export interface Company {
   active: boolean;
 }
 
-export async function fetchCompanies(): Promise<Company[]> {
-  if (!supabase) return [];
+export async function fetchCompaniesResult(): Promise<ApiResult<Company[]>> {
+  if (!supabase) return fail('회사 목록 조회', NO_DB);
   const { data, error } = await supabase
     .from('companies')
     .select('id, name, code, active')
     .eq('active', true)
     .order('sort_order');
-  if (error || !data) return [];
-  return data as Company[];
+  if (error) return fail('회사 목록 조회', error.message);
+  return ok((data || []) as Company[]);
+}
+
+export async function fetchCompanies(): Promise<Company[]> {
+  return orEmpty(await fetchCompaniesResult(), []);
 }
 
 // ── Fetch job masters for matching ──────────────────────────────────
 
 export async function fetchJobMasters(): Promise<JobMaster[]> {
-  if (!supabase) return [];
+  return orEmpty(await fetchJobMastersResult(), []);
+}
+
+export async function fetchJobMastersResult(): Promise<ApiResult<JobMaster[]>> {
+  if (!supabase) return fail('직무 마스터 조회', NO_DB);
   const { data, error } = await supabase
     .from('jobs')
     .select(`
@@ -79,21 +112,22 @@ export async function fetchJobMasters(): Promise<JobMaster[]> {
       companies!left(name)
     `)
     .eq('active', true);
-  if (error || !data) return [];
-  return data.map((j: Record<string, unknown>) => ({
+  if (error) return fail('직무 마스터 조회', error.message);
+  return ok((data || []).map((j: Record<string, unknown>) => ({
     id: j.id as string,
     companyName: ((j['companies'] as Record<string, string>) || { name: '' }).name || '',
     groupName: (j['job_groups'] as Record<string, string>).name,
     seriesName: (j['job_series'] as Record<string, string>).name,
     jobName: j.name as string,
-  }));
+  })));
 }
 
 // ── Check if any job master exists ──────────────────────────────────
 
 export async function hasJobMasters(): Promise<boolean> {
   if (!supabase) return false;
-  const { count } = await supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('active', true);
+  const { count, error } = await supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('active', true);
+  if (error) { console.error(`[jobApi] 직무 마스터 존재 확인 실패: ${error.message}`); return false; }
   return (count ?? 0) > 0;
 }
 
@@ -331,7 +365,11 @@ export async function saveStep2Data(
 // ── Fetch full job detail for SME review ────────────────────────────
 
 export async function fetchJobDetail(jobId: string): Promise<JobDetail | null> {
-  if (!supabase) return null;
+  return orEmpty(await fetchJobDetailResult(jobId), null);
+}
+
+export async function fetchJobDetailResult(jobId: string): Promise<ApiResult<JobDetail | null>> {
+  if (!supabase) return fail('직무 상세 조회', NO_DB);
 
   const { data: job, error } = await supabase
     .from('jobs')
@@ -344,30 +382,33 @@ export async function fetchJobDetail(jobId: string): Promise<JobDetail | null> {
     .eq('id', jobId)
     .eq('active', true)
     .maybeSingle();
-  if (error || !job) return null;
+  if (error) return fail('직무 상세 조회', error.message);
+  if (!job) return ok(null);
 
   const j = job as Record<string, unknown>;
   const groupName = (j['job_groups'] as Record<string, string>).name;
   const seriesName = (j['job_series'] as Record<string, string>).name;
   const companyName = ((j['companies'] as Record<string, string>) || { name: '' }).name || '';
 
-  const { data: tasks } = await supabase
+  const { data: tasks, error: taskError } = await supabase
     .from('job_tasks')
     .select('id, name, description, sort_order')
     .eq('job_id', jobId)
     .eq('active', true)
     .order('sort_order');
+  if (taskError) return fail('주요과업 조회', taskError.message);
   const taskRows = tasks || [];
   const taskIds = taskRows.map((t: Record<string, unknown>) => t.id as string);
 
   let activities: Record<string, unknown>[] = [];
   if (taskIds.length > 0) {
-    const { data: acts } = await supabase
+    const { data: acts, error: actError } = await supabase
       .from('task_activities')
       .select('id, job_task_id, activity_name, sort_order')
       .in('job_task_id', taskIds)
       .eq('active', true)
       .order('sort_order');
+    if (actError) return fail('세부활동 조회', actError.message);
     activities = acts || [];
   }
 
@@ -381,12 +422,13 @@ export async function fetchJobDetail(jobId: string): Promise<JobDetail | null> {
       .map((a) => ({ id: a.id as string, activity_name: a.activity_name as string, sort_order: a.sort_order as number })),
   }));
 
-  const { data: skills } = await supabase
+  const { data: skills, error: skillError } = await supabase
     .from('job_skills')
     .select('id, name, skill_type, sort_order')
     .eq('job_id', jobId)
     .eq('active', true)
     .order('sort_order');
+  if (skillError) return fail('필요 Skill 조회', skillError.message);
   const skillRows: JobSkillRow[] = (skills || []).map((s: Record<string, unknown>) => ({
     id: s.id as string,
     name: s.name as string,
@@ -394,13 +436,14 @@ export async function fetchJobDetail(jobId: string): Promise<JobDetail | null> {
     sort_order: s.sort_order as number,
   }));
 
-  const { data: req } = await supabase
+  const { data: req, error: reqError } = await supabase
     .from('job_requirements')
     .select('id, education, major, certifications')
     .eq('job_id', jobId)
     .maybeSingle();
+  if (reqError) return fail('수행요건 조회', reqError.message);
 
-  return {
+  return ok({
     id: j.id as string,
     name: j.name as string,
     definition: (j.definition as string) || '',
@@ -413,7 +456,7 @@ export async function fetchJobDetail(jobId: string): Promise<JobDetail | null> {
     tasks: tasksWithActivities,
     skills: skillRows,
     requirements: req ? { id: (req as Record<string, unknown>).id as string, education: (req as Record<string, unknown>).education as string, major: (req as Record<string, unknown>).major as string, certifications: (req as Record<string, unknown>).certifications as string } : null,
-  };
+  });
 }
 
 // ── Fetch review status for admin dashboard/review table ─────────────
@@ -450,11 +493,15 @@ export function mapReviewStatus(dbStatus: string): Status {
   return STATUS_MAP[dbStatus] || '미시작';
 }
 
-export async function fetchReviewStatus(companyId?: string | null): Promise<ReviewStatusRow[]> {
-  if (!supabase) return [];
+export async function fetchReviewStatusResult(companyId?: string | null): Promise<ApiResult<ReviewStatusRow[]>> {
+  if (!supabase) return fail('검토 현황 조회', NO_DB);
   const { data, error } = await supabase.rpc('get_review_status', { p_company_id: companyId ?? null });
-  if (error || !data) return [];
-  return data as ReviewStatusRow[];
+  if (error) return fail('검토 현황 조회', error.message);
+  return ok((data || []) as ReviewStatusRow[]);
+}
+
+export async function fetchReviewStatus(companyId?: string | null): Promise<ReviewStatusRow[]> {
+  return orEmpty(await fetchReviewStatusResult(companyId), []);
 }
 
 // ── Fetch all job groups and series for edit dropdowns ──────────────
@@ -465,25 +512,31 @@ export interface GroupSeriesOption {
 }
 
 export async function fetchGroupSeriesOptions(companyId?: string | null): Promise<GroupSeriesOption> {
-  if (!supabase) return { groups: [], seriesByGroup: new Map() };
+  return orEmpty(await fetchGroupSeriesOptionsResult(companyId), { groups: [], seriesByGroup: new Map() });
+}
+
+export async function fetchGroupSeriesOptionsResult(companyId?: string | null): Promise<ApiResult<GroupSeriesOption>> {
+  if (!supabase) return fail('직군·직렬 목록 조회', NO_DB);
   let groupQuery = supabase.from('job_groups').select('id, name').eq('active', true).order('name');
   let seriesQuery = supabase.from('job_series').select('id, name, group_id').eq('active', true).order('name');
   if (companyId) {
     groupQuery = groupQuery.eq('company_id', companyId);
     seriesQuery = seriesQuery.eq('company_id', companyId);
   }
-  const { data: groups } = await groupQuery;
-  const { data: series } = await seriesQuery;
+  const { data: groups, error: groupError } = await groupQuery;
+  if (groupError) return fail('직군 목록 조회', groupError.message);
+  const { data: series, error: seriesError } = await seriesQuery;
+  if (seriesError) return fail('직렬 목록 조회', seriesError.message);
   const seriesByGroup = new Map<string, { id: string; name: string }[]>();
   for (const s of (series || []) as { id: string; name: string; group_id: string }[]) {
     const arr = seriesByGroup.get(s.group_id) || [];
     arr.push({ id: s.id, name: s.name });
     seriesByGroup.set(s.group_id, arr);
   }
-  return {
+  return ok({
     groups: (groups || []).map((g: Record<string, unknown>) => ({ id: g.id as string, name: g.name as string })),
     seriesByGroup,
-  };
+  });
 }
 
 // ── Check for duplicate job (same company+group+series+name, different id) ──
@@ -499,15 +552,21 @@ export async function checkDuplicateJob(groupId: string, seriesId: string, name:
     .eq('active', true)
     .neq('id', excludeJobId);
   if (companyId) query = query.eq('company_id', companyId);
-  const { count } = await query;
+  const { count, error } = await query;
+  if (error) { console.error(`[jobApi] 직무 중복 확인 실패: ${error.message}`); return false; }
   return (count ?? 0) > 0;
 }
 
 // ── Check if a task has SME feedback ────────────────────────────────
+//
+// 이 두 함수의 결과는 "삭제해도 되는가"를 판단하는 데 쓰인다(JobDetailPage의 삭제 경고).
+// 조회가 실패했을 때 false를 돌려주면 검토이력이 있는 항목을 경고 없이 지우게 되므로,
+// 실패 시에는 안전한 쪽(true = 이력이 있다고 간주하고 경고)으로 답한다.
 
 export async function hasTaskFeedback(taskId: string): Promise<boolean> {
   if (!supabase) return false;
-  const { count } = await supabase.from('task_feedback').select('id', { count: 'exact', head: true }).eq('task_id', taskId);
+  const { count, error } = await supabase.from('task_feedback').select('id', { count: 'exact', head: true }).eq('task_id', taskId);
+  if (error) { console.error(`[jobApi] 과업 검토이력 확인 실패: ${error.message}`); return true; }
   return (count ?? 0) > 0;
 }
 
@@ -515,7 +574,8 @@ export async function hasTaskFeedback(taskId: string): Promise<boolean> {
 
 export async function hasSkillFeedback(skillId: string): Promise<boolean> {
   if (!supabase) return false;
-  const { count } = await supabase.from('skill_feedback').select('id', { count: 'exact', head: true }).eq('skill_id', skillId);
+  const { count, error } = await supabase.from('skill_feedback').select('id', { count: 'exact', head: true }).eq('skill_id', skillId);
+  if (error) { console.error(`[jobApi] Skill 검토이력 확인 실패: ${error.message}`); return true; }
   return (count ?? 0) > 0;
 }
 
@@ -812,7 +872,11 @@ export interface JobListItem {
 }
 
 export async function fetchAllJobs(companyId?: string | null): Promise<JobListItem[]> {
-  if (!supabase) return [];
+  return orEmpty(await fetchAllJobsResult(companyId), []);
+}
+
+export async function fetchAllJobsResult(companyId?: string | null): Promise<ApiResult<JobListItem[]>> {
+  if (!supabase) return fail('직무 목록 조회', NO_DB);
   let query = supabase
     .from('jobs')
     .select(`
@@ -827,13 +891,13 @@ export async function fetchAllJobs(companyId?: string | null): Promise<JobListIt
     query = query.eq('company_id', companyId);
   }
   const { data, error } = await query;
-  if (error || !data) return [];
-  return data.map((j: Record<string, unknown>) => ({
+  if (error) return fail('직무 목록 조회', error.message);
+  return ok((data || []).map((j: Record<string, unknown>) => ({
     id: j.id as string,
     name: j.name as string,
     group_name: (j['job_groups'] as Record<string, string>).name,
     series_name: (j['job_series'] as Record<string, string>).name,
     company_id: (j.company_id as string) || null,
     company_name: ((j['companies'] as Record<string, string>) || { name: '' }).name || '',
-  }));
+  })));
 }
