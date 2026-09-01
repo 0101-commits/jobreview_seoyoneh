@@ -261,8 +261,6 @@ export async function saveStep2Data(
   rows: Step2Row[],
   matchResults: { row: number; status: string; jobId?: string }[],
   mode: 'append' | 'replace',
-  userId: string,
-  skipFailed: boolean,
 ): Promise<{ saved: number; error?: string }> {
   if (!supabase) return { saved: 0, error: '데이터베이스 연결이 없습니다.' };
 

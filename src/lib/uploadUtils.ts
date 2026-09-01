@@ -100,7 +100,6 @@ export function sheetToRows<T extends Record<string, unknown>>(wb: XLSX.WorkBook
 // ── Validation: STEP 1 ──────────────────────────────────────────────
 
 const STEP1_COLS = ['회사', '직군', '직렬', '직무', '직무정의', '주요과업', '세부활동'];
-const OLD_STEP1_COLS = ['직군', '직렬', '직무', '직무정의', '주요과업', '세부활동'];
 
 export function validateStep1(rows: Step1Row[]): { errors: ValidationError[]; cleaned: Step1Row[] } {
   const errors: ValidationError[] = [];
