@@ -25,9 +25,13 @@ import {
   type CellStatus,
   type OrgNode,
   type ProgressCell,
+  type ProgressCellReview,
   type ProgressMatrix,
 } from '@/lib/adminApi';
 import { fetchCompanies, type Company } from '@/lib/jobApi';
+import { fetchOperationSettings, type OperationSettings } from '@/lib/settingsApi';
+import { DEFAULT_TEMPLATES, type MailRecipient } from '@/lib/mailApi';
+import { MailSendPanel } from '@/pages/admin/MailSendPanel';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { Button } from '@/components/ui/Button';
 
@@ -119,6 +123,32 @@ export function isHiddenByCollapse(orgUnitId: string | null, orgMeta: OrgMeta, c
   return false;
 }
 
+// ── 발송 대상 ───────────────────────────────────────────────────────
+
+/**
+ * 고른 칸 → 리마인더 수신자. (SME, 직무) 한 쌍당 한 통이다.
+ *
+ * 같은 사람에게 같은 직무 안내가 두 번 나가면 그건 리마인더가 아니라 스팸이다(배정이 중복
+ * 등록된 경우 한 칸 안에 같은 (SME, 직무)가 두 줄로 들어올 수 있다).
+ * 반대로 한 사람이 두 직무를 맡았으면 직무별로 한 통씩 간다 — 안내 문구의 {{직무}}가 다르다.
+ */
+export function toRecipients(
+  cells: ProgressCell[],
+  targetsOf: (cell: ProgressCell) => ProgressCellReview[],
+): MailRecipient[] {
+  const out: MailRecipient[] = [];
+  const seen = new Set<string>();
+  for (const cell of cells) {
+    for (const r of targetsOf(cell)) {
+      const key = `${r.smeId}::${cell.jobId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ id: r.smeId, name: r.smeName, jobName: cell.jobName, orgName: cell.orgName });
+    }
+  }
+  return out;
+}
+
 // ── 화면 ────────────────────────────────────────────────────────────
 
 export function ProgressMatrixPage({
@@ -139,10 +169,38 @@ export function ProgressMatrixPage({
   const [showEmptyOrgs, setShowEmptyOrgs] = useState(false);
   /** 리마인더 대상으로 고른 칸. 키는 progressCellKey. */
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** 발송 패널을 펼쳤는가. 문구를 고치는 자리라 항상 펼쳐 두면 표가 화면 밖으로 밀린다. */
+  const [mailOpen, setMailOpen] = useState(false);
+  /**
+   * 템플릿 치환에 쓰는 운영 설정(마감일·예상 소요·문의 담당).
+   * survey_settings는 회사당 한 행이라 '전체 회사'에서는 어느 행인지 정해지지 않는다 —
+   * 그때는 조회하지 않고 null로 둔다(mailApi가 '미정'으로 치환한다). 숫자를 지어내지 않는다.
+   */
+  const [settings, setSettings] = useState<OperationSettings | null>(null);
+  /** 설정 조회 실패. 값이 없는 것(미설정)과 못 읽은 것을 화면에서 구분하기 위해 따로 든다. */
+  const [settingsError, setSettingsError] = useState('');
 
   useEffect(() => {
     fetchCompanies().then(setCompanies);
   }, []);
+
+  useEffect(() => {
+    if (companyFilter === 'all') {
+      setSettings(null);
+      setSettingsError('');
+      return;
+    }
+    let cancelled = false;
+    void fetchOperationSettings(companyFilter).then((res) => {
+      if (cancelled) return;
+      // 못 읽은 것을 '미설정'으로 위장하지 않는다 — 그대로 두면 마감일 없는 메일이 조용히 나간다.
+      setSettings(res.ok ? res.data : null);
+      setSettingsError(res.ok ? '' : res.error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +226,7 @@ export function ProgressMatrixPage({
   // 조건이 바뀌면 선택은 무효다(보이지 않는 칸이 선택된 채 남으면 건수가 거짓이 된다).
   useEffect(() => {
     setSelected(new Set());
+    setMailOpen(false);
   }, [companyFilter, filter, reloadKey]);
 
   const orgMeta = useMemo(() => buildOrgMeta(matrix?.orgRoots ?? []), [matrix]);
@@ -274,6 +333,33 @@ export function ProgressMatrixPage({
     }
     return { reviews, smes: smes.size };
   }, [selected, selectableKeys, matrix, targetsIn]);
+
+  /** 발송 대상. selection과 똑같이 "지금 보이면서 선택된 칸"만 센다(접힌 칸은 대상이 아니다). */
+  const recipients = useMemo(() => {
+    const cells: ProgressCell[] = [];
+    for (const key of selectableKeys) {
+      if (!selected.has(key)) continue;
+      const cell = matrix?.cells.get(key);
+      if (cell) cells.push(cell);
+    }
+    return toRecipients(cells, targetsIn);
+  }, [selected, selectableKeys, matrix, targetsIn]);
+
+  /*
+   * 저장된 리마인더 템플릿(운영 설정 §6-3 ⓓ). 제목·본문을 각각 따로 폴백한다.
+   * 둘 다 있을 때만 넘기면, 제목만 저장한 관리자의 제목이 조용히 버려지고 기본 문구가 그대로 나간다
+   * (설정 화면은 두 칸을 각각 저장할 수 있고, 안내문도 "비워 두면 기본 문구가 쓰입니다"라는 칸 단위 약속이다).
+   * useMemo 로 묶는 이유: 매 렌더 새 객체가 되면 패널의 문구 동기화가 쉬지 않고 돈다.
+   */
+  const mailTemplates = useMemo(
+    () => ({
+      REMINDER: {
+        subject: settings?.reminder_subject || DEFAULT_TEMPLATES.REMINDER.subject,
+        body: settings?.reminder_body_md || DEFAULT_TEMPLATES.REMINDER.body,
+      },
+    }),
+    [settings],
+  );
 
   const toggleCell = (key: string) =>
     setSelected((prev) => {
@@ -391,12 +477,63 @@ export function ProgressMatrixPage({
               선택 <b className="font-semibold text-foreground">{selection.reviews}건</b> · SME{' '}
               <b className="font-semibold text-foreground">{selection.smes}명</b>
             </p>
-            <Button variant="secondary" size="sm" disabled title="메일 발송은 운영 설정에서 연결됩니다">
-              <Mail size={14} /> 리마인더 발송
+            <Button
+              variant="secondary"
+              size="sm"
+              // 패널이 열려 있는 동안에는 잠그지 않는다 — 대상이 0이 되어도 닫을 수는 있어야 한다.
+              disabled={recipients.length === 0 && !mailOpen}
+              aria-expanded={mailOpen}
+              aria-controls="reminder-mail-panel"
+              title={recipients.length === 0 && !mailOpen ? '먼저 보낼 대상을 선택해 주세요' : undefined}
+              onClick={() => setMailOpen((v) => !v)}
+            >
+              <Mail size={14} aria-hidden="true" /> 리마인더 발송
             </Button>
-            <p className="text-xs text-foreground-subtle">메일 발송은 운영 설정에서 연결됩니다</p>
+            {recipients.length === 0 && (
+              <p className="text-xs text-foreground-subtle">보낼 대상을 먼저 선택해 주세요</p>
+            )}
           </div>
         </div>
+
+        {/*
+          발송 패널(§11-2 Phase 4 3번). 문구 편집·미리보기·발송·이력은 전부 MailSendPanel이 한다.
+          대상 수를 조건에 넣지 않는다: 선택이 0이 되는 순간 패널이 언마운트되면 고쳐 쓰던 본문과
+          방금 받은 발송 결과(실패자 다시 보내기 목록 포함)가 경고 없이 사라진다. 대상이 없을 때의
+          빈 상태와 발송 버튼 잠금은 패널이 이미 스스로 그린다.
+        */}
+        {mailOpen && (
+          <div id="reminder-mail-panel" className="border-b border-border p-4">
+            {settingsError && (
+              <p
+                role="alert"
+                className="mb-3 flex items-start gap-2 border border-destructive-border bg-destructive-muted p-3 text-xs leading-5 text-destructive"
+              >
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>
+                  {settingsError} 마감일·예상 소요·문의 담당이 &lsquo;미정&rsquo;으로 나갑니다. 값을 채워 보내려면
+                  새로고침한 뒤 다시 시도해 주세요.
+                </span>
+              </p>
+            )}
+            {companyFilter === 'all' && (
+              <p className="mb-3 flex items-start gap-2 border border-border bg-muted p-3 text-xs leading-5 text-foreground-muted">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>
+                  계열사가 &lsquo;전체&rsquo;라 마감일·예상 소요·문의 담당을 어느 회사 설정에서 가져올지 정할 수
+                  없습니다. 해당 문구는 &lsquo;미정&rsquo;으로 나갑니다 — 계열사를 하나 고르면 그 회사의 운영 설정이
+                  들어갑니다.
+                </span>
+              </p>
+            )}
+            <MailSendPanel
+              recipients={recipients}
+              dueDate={settings?.due_date ?? null}
+              expectedMinutes={settings?.expected_minutes ?? null}
+              inquiryContact={settings?.inquiry_contact ?? null}
+              templates={mailTemplates}
+            />
+          </div>
+        )}
 
         {/* 표 컨테이너 안에서만 가로로 스크롤한다. 첫 열(조직명)은 고정. */}
         <div className="overflow-x-auto">
