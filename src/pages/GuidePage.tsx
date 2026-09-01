@@ -47,6 +47,10 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
   // 관리자 설정값(survey_settings.expected_minutes). 없으면 null 그대로 둔다 —
   // copy.ts가 소요 문장을 통째로 빼 준다. 앱이 숫자를 지어내면 착수보고 11면의 근거가 사라진다.
   const [expectedMinutes, setExpectedMinutes] = useState<number | null>(null);
+  // 관리자가 /settings에 적어 둔 추가 안내(survey_settings.guide_md).
+  // §6-1 고정 문언 4장을 대체하지 않고 마지막 카드 아래에 덧붙인다 —
+  // 원칙 P1이 착수보고 문언을 그대로 쓰라고 못박아, 통째로 갈아치울 수 있으면 이행 증빙이 무너진다.
+  const [guideMd, setGuideMd] = useState('');
   // 재열람 여부. 계약 props(GuidePageProps)에 통과 여부가 없어 본인 프로필에서 직접 읽는다.
   // 읽기는 profile_self_or_admin_select 정책으로 열려 있다.
   const [reopened, setReopened] = useState(false);
@@ -84,7 +88,10 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
 
       try {
         const settings = user.company_id ? await fetchSurveySettings(user.company_id) : null;
-        if (alive) setExpectedMinutes(settings?.expected_minutes ?? null);
+        if (alive) {
+          setExpectedMinutes(settings?.expected_minutes ?? null);
+          setGuideMd(settings?.guide_md ?? '');
+        }
       } catch (e) {
         // 설정값을 못 읽은 것과 설정값이 없는 것은 화면에서 같다 — 소요 문장을 뺀다.
         console.error(`[GuidePage] 조사 설정을 불러오지 못했습니다. ${e instanceof Error ? e.message : e}`);
@@ -225,6 +232,21 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
             </ul>
           )}
         </section>
+
+        {/*
+          추가 안내(§6-3 ⓒ 설정의 '가이드 문구'). 마지막 카드에서만 보여 준다 — 회차마다 달라지는
+          운영 공지라 고정 문언 카드 안에 섞으면 §6-1의 문언이 어디까지인지 흐려진다.
+          마크다운 렌더러는 들이지 않는다. 줄바꿈만 살려 원문 그대로 보여 준다(새 의존성 금지).
+        */}
+        {isLast && guideMd.trim() && (
+          <section
+            aria-label="추가 안내"
+            className="mt-4 rounded-container border border-border bg-muted p-5 text-sm leading-relaxed text-foreground-muted"
+          >
+            <h2 className="mb-2 text-sm font-semibold text-foreground">추가 안내</h2>
+            <p className="whitespace-pre-line">{guideMd}</p>
+          </section>
+        )}
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <Button variant="ghost" size="md" onClick={() => move(-1)} disabled={index === 0 || saving}>

@@ -19,6 +19,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Clock3,
+  Download,
   FileSpreadsheet,
   Inbox,
   LayoutDashboard,
@@ -26,6 +27,8 @@ import {
   LogOut,
   Menu,
   MessageSquareText,
+  PieChart,
+  Settings,
   Upload,
   Users,
   UserCog,
@@ -48,6 +51,9 @@ import { ProgressMatrixPage } from '@/pages/ProgressMatrixPage';
 import { WorkbenchPage } from '@/pages/WorkbenchPage';
 import { JobComparePage } from '@/pages/workbench/compare';
 import { InquiryInboxPage } from '@/pages/InquiryInboxPage';
+import { FteAnalyticsPage } from '@/pages/FteAnalyticsPage';
+import { ExportsPage } from '@/pages/ExportsPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { GUIDE_REOPEN_LINK } from '@/pages/sme-review/copy';
 import type { StepNo } from '@/pages/sme-review/wizardTypes';
 import type { Role, User } from '@/types';
@@ -62,11 +68,14 @@ const adminNav: NavItem[] = [
   // §5-2 라우트 표의 문언을 그대로 쓴다(진행 현황 · 검토 워크벤치 · 문의 인박스).
   { to: '/progress', label: '진행 현황', sub: '조직×직무 매트릭스 · 리마인더', Icon: LayoutGrid },
   { to: '/workbench', label: '검토 워크벤치', sub: '제출 큐 · SME 비교 · 승인/반려', Icon: ClipboardCheck },
+  { to: '/analytics/fte', label: 'FTE 분포', sub: '직무·조직별 투입 비중 집계', Icon: PieChart },
   { to: '/inbox', label: '문의 인박스', sub: '문의 답변·상태 관리', Icon: Inbox },
   { to: '/jobs', label: '직무정보 관리', sub: '등록된 직무정보를 관리하세요', Icon: FileSpreadsheet },
   { to: '/upload', label: '직무정보 업로드', sub: 'Excel 파일로 일괄 등록', Icon: Upload },
   { to: '/users', label: 'SME 계정 관리', sub: 'SME 계정을 등록·관리하세요', Icon: Users },
   { to: '/admin-users', label: '관리자 계정 관리', sub: '관리자 계정을 등록·관리하세요', Icon: UserCog },
+  { to: '/exports', label: '산출물 내보내기', sub: '계약 산출물 E1~E5 · 스냅샷', Icon: Download },
+  { to: '/settings', label: '운영 설정', sub: '마감일 · 안내문 · 예상 소요 · 문의 담당', Icon: Settings },
 ];
 
 const smeNav: NavItem[] = [
@@ -87,11 +96,14 @@ const titles: [string, string][] = [
   ['/progress', '진행 현황'],
   // '/workbench'가 '/workbench/:jobId'(비교 뷰)까지 함께 잡는다 — titleOf가 startsWith로도 본다.
   ['/workbench', '검토 워크벤치'],
+  ['/analytics/fte', 'FTE 분포'],
   ['/inbox', '문의 인박스'],
   ['/jobs', '직무정보 관리'],
   ['/upload', '직무정보 업로드'],
   ['/users', 'SME 계정 관리'],
   ['/admin-users', '관리자 계정 관리'],
+  ['/exports', '산출물 내보내기'],
+  ['/settings', '운영 설정'],
   ['/assignments', '내 검토 목록'],
   ['/review', '직무정보 검토'],
   ['/history', '검토 이력'],
@@ -392,6 +404,22 @@ function Shell({
                     element={<UsersPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
                   />
                   <Route path="/admin-users" element={<AdminUsersPage currentUser={user} />} />
+                  <Route
+                    path="/analytics/fte"
+                    element={<FteAnalyticsPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                  />
+                  <Route
+                    path="/exports"
+                    element={
+                      <ExportsPage user={user} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <SettingsPage user={user} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
+                  />
                 </>
               ) : (
                 <>
