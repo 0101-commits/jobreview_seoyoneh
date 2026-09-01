@@ -1,9 +1,20 @@
 // 앱 셸 — 세션 부팅·구독 / 로그인·로그아웃 / 역할(ADMIN·SME) 분기 / 사이드바·헤더 / 라우팅만 담당한다.
 // 각 화면의 실제 내용은 src/pages/ 아래에 있다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  BrowserRouter,
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   BarChart3,
+  BookOpen,
   ChevronRight,
   ClipboardCheck,
   ClipboardList,
@@ -12,6 +23,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquareText,
   Upload,
   Users,
   UserCog,
@@ -28,6 +40,10 @@ import { UsersPage } from '@/pages/SmeUsersPage';
 import { ReviewWorkspace } from '@/pages/SmeReviewPage';
 import { HistoryPage } from '@/pages/ReviewHistoryPage';
 import { MyAssignmentsPage } from '@/pages/MyAssignmentsPage';
+import { GuidePage } from '@/pages/GuidePage';
+import { MyInquiriesPage } from '@/pages/MyInquiriesPage';
+import { GUIDE_REOPEN_LINK } from '@/pages/sme-review/copy';
+import type { StepNo } from '@/pages/sme-review/wizardTypes';
 import type { Role, User } from '@/types';
 
 // ── 라우트 정의 ─────────────────────────────────────────────────────
@@ -46,6 +62,9 @@ const adminNav: NavItem[] = [
 const smeNav: NavItem[] = [
   { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList },
   { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3 },
+  { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText },
+  // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
+  { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen },
 ];
 
 const adminHome = '/dashboard';
@@ -62,6 +81,8 @@ const titles: [string, string][] = [
   ['/assignments', '내 검토 목록'],
   ['/review', '직무정보 검토'],
   ['/history', '검토 이력'],
+  ['/guide', '시작 가이드'],
+  ['/inquiries', '내 문의'],
 ];
 
 function titleOf(pathname: string) {
@@ -123,6 +144,9 @@ async function loadUser(authUserId: string): Promise<User> {
     // 없는 컬럼 때문에 앱 전체가 로그인 불가가 되는 편보다 "변경 불필요"로 보고 통과시키는 편이 안전하다
     // — 컬럼이 생기면 default true가 그대로 들어와 강제 변경이 곧바로 작동한다.
     must_change_password: profile.must_change_password === true,
+    // 컬럼이 없는 DB(Phase 1 마이그레이션 미적용)에서는 undefined가 되어 가이드 게이트가 꺼진다.
+    // 통과 시각을 기록할 곳이 없는데 가이드를 강제하면 SME가 앱에 영영 들어오지 못한다.
+    guide_completed_at: 'guide_completed_at' in profile ? profile.guide_completed_at || null : undefined,
   };
 }
 
@@ -225,9 +249,21 @@ function App() {
       />
     );
 
+  // 시작 가이드 게이트(§6-1) — SME는 최초 1회 반드시 통과한다. 순서는 비밀번호 변경이 먼저다(위 게이트).
+  // Routes를 아예 걸지 않으므로 직접 URL을 쳐도 어떤 화면에도 닿지 못한다(비밀번호 게이트와 같은 방식).
+  // 다만 BrowserRouter 안쪽에 둔다 — 가이드 화면도 링크·이동을 쓸 수 있어야 하기 때문이다.
+  const needsGuide = user.role === 'sme' && user.guide_completed_at === null;
+
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <Shell user={user} onLogout={logout} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+      {needsGuide ? (
+        <GuidePage
+          user={user}
+          onDone={() => setUser((prev) => (prev ? { ...prev, guide_completed_at: new Date().toISOString() } : prev))}
+        />
+      ) : (
+        <Shell user={user} onLogout={logout} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+      )}
     </BrowserRouter>
   );
 }
@@ -333,8 +369,11 @@ function Shell({
               ) : (
                 <>
                   <Route path="/assignments" element={<MyAssignmentsPage user={user} />} />
-                  <Route path="/review" element={<ReviewRoute user={user} />} />
+                  {/* 직무 없이 들어온 /review는 배정 목록으로 돌려보낸다 — 검토할 직무는 배정이 정한다(§5-1). */}
+                  <Route path="/review" element={<Navigate to={smeHome} replace />} />
                   <Route path="/review/:jobId" element={<ReviewRoute user={user} />} />
+                  <Route path="/guide" element={<GuideRoute user={user} />} />
+                  <Route path="/inquiries" element={<MyInquiriesPage user={user} />} />
                   <Route path="/history" element={<HistoryPage user={user} />} />
                 </>
               )}
@@ -478,25 +517,69 @@ function JobsRoute({ userId }: { userId: string }) {
   );
 }
 
+// 마법사 단계는 URL(?step=1..5)이 진실이다. 새로고침·직접 링크·뒤로가기가 모두 같은 단계를 연다(§10 P2 DoD 3).
+const toStepNo = (raw: string | null): StepNo | null => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 5 ? (n as StepNo) : null;
+};
+
+/** 직무별 마지막 단계. 배정 목록에서 다시 들어올 때는 URL에 단계가 없어 이 값으로 이어 간다. */
+const lastStepKey = (jobId: string) => `jobreview:last-step:${jobId}`;
+
+const readLastStep = (jobId: string): StepNo | null => {
+  try {
+    return toStepNo(window.localStorage.getItem(lastStepKey(jobId)));
+  } catch {
+    return null; // 저장소가 막힌 브라우저(사생활 보호 모드 등). 단계 기억만 못 할 뿐 검토는 그대로 된다.
+  }
+};
+
 function ReviewRoute({ user }: { user: User }) {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const { setDirty, confirmLeave } = React.useContext(DirtyContext);
 
   // 검토 화면을 벗어나면 가드를 반드시 푼다(제출 후 남아 있으면 다른 화면에서도 확인창이 뜬다).
   useEffect(() => () => setDirty(false), [setDirty]);
 
+  const urlStep = toStepNo(params.get('step'));
+  const step = urlStep ?? (jobId ? readLastStep(jobId) : null) ?? 1;
+
+  // URL에 단계가 없으면 이어서 볼 단계를 URL에 적어 둔다. 이 한 번만 replace다 —
+  // 뒤로가기가 "단계 없는 같은 주소"로 되돌아오는 고리를 만들지 않기 위해서다.
+  useEffect(() => {
+    if (urlStep === null) setParams({ step: String(step) }, { replace: true });
+  }, [urlStep, step, setParams]);
+
+  if (!jobId) return <Navigate to={smeHome} replace />;
+
   return (
     <ReviewWorkspace
       user={user}
       jobId={jobId}
+      step={step}
+      onStepChange={(next) => {
+        try {
+          window.localStorage.setItem(lastStepKey(jobId), String(next));
+        } catch {
+          // 저장소가 막혀 있어도 단계 이동 자체는 막지 않는다.
+        }
+        // push다(replace 아님) — 브라우저 뒤로가기로 이전 단계에 돌아갈 수 있어야 한다(§10 P2 DoD 3).
+        setParams({ step: String(next) });
+      }}
       onDirtyChange={setDirty}
       onBack={() => {
         if (confirmLeave()) navigate(smeHome);
       }}
-      onSelectJob={(next) => navigate(`/review/${next}`, { replace: true })}
     />
   );
+}
+
+/** 가이드 재열람(/guide). 다 보면 배정 목록으로 돌아간다 — 이때는 통과 기록이 이미 있다. */
+function GuideRoute({ user }: { user: User }) {
+  const navigate = useNavigate();
+  return <GuidePage user={user} onDone={() => navigate(smeHome)} />;
 }
 
 export default App;
