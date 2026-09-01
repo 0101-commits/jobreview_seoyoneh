@@ -34,12 +34,15 @@ import {
 import {
   endReviewSession,
   fetchFteAllocations,
+  fetchMyInquiries,
   saveFteAllocations,
   startReviewSession,
   type FteAllocationInput,
+  type Inquiry,
 } from '@/lib/surveyApi';
 import type { Feedback, User } from '@/types';
 import { SectionHeading } from './sme-review/controls';
+import { AnsweredInquiryBanner, RecheckBanner } from './sme-review/recheck';
 import {
   FeedbackSection,
   RequirementFeedback,
@@ -175,6 +178,7 @@ export function ReviewWorkspace({
   onStepChange,
   onBack,
   onDirtyChange,
+  onOpenInquiries,
 }: {
   user: User;
   /** URL(/review/:jobId)이 지정한 직무. 배정 목록·검토 이력에서만 들어온다. */
@@ -186,6 +190,8 @@ export function ReviewWorkspace({
   onBack: () => void;
   /** 미저장 변경 여부를 부모(라우터)에게 알린다. 라우트 이탈 가드가 이 값을 본다. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** 문의 답변 배너(§6-3 ⓒ)의 '내 문의에서 확인'. 이동 가드는 라우터가 건다. */
+  onOpenInquiries?: () => void;
 }) {
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null);
   const [detailError, setDetailError] = useState('');
@@ -194,6 +200,11 @@ export function ReviewWorkspace({
 
   const [review, setReview] = useState<ReviewState | null>(null);
   const [reviewError, setReviewError] = useState('');
+  // 반려 사유(§6-3 ⓑ). review와 따로 두는 이유는 ReviewState.rejected_reason 주석에 적혀 있다 —
+  // 임시저장 RPC 반환에는 이 값이 없어서, review를 갱신할 때마다 사유가 사라져 버린다.
+  const [rejectedReason, setRejectedReason] = useState('');
+  /** 답변이 도착한 내 문의(§6-3 ⓒ). 검토 대상 직무와 무관하게 SME 본인 기준이다. */
+  const [answeredInquiries, setAnsweredInquiries] = useState<Inquiry[]>([]);
 
   const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
   const [newTasks, setNewTasks] = useState<SuggestionInput[]>([]);
@@ -239,6 +250,7 @@ export function ReviewWorkspace({
     setDetailError('');
     setReviewError('');
     setReview(null);
+    setRejectedReason('');
     setFeedback({});
     setNewTasks([]);
     setNewSkills([]);
@@ -271,6 +283,7 @@ export function ReviewWorkspace({
         ]);
         if (cancelled) return;
         setReview(state);
+        setRejectedReason(state.rejected_reason);
         setFeedback(toFeedbackState(saved));
         setNewTasks(saved.newTasks);
         setNewSkills(saved.newSkills);
@@ -287,6 +300,25 @@ export function ReviewWorkspace({
       cancelled = true;
     };
   }, [jobId, user.id, detailReload]);
+
+  // ── 답변이 도착한 내 문의(§6-3 ⓒ "답변 시 SME 화면 배너로 노출") ──
+  // 검토 로드와 분리한다 — 부가 알림이라 이 조회가 실패해도 검토 화면은 그대로 열려야 한다.
+  // 실패를 화면에 띄우지 않는 것은 이 배너가 문의의 진실이 아니기 때문이다. 목록과 오류·재시도는
+  // '내 문의'(/inquiries)가 책임지고, 여기서는 도착 사실만 알린다. 원인은 콘솔에 남긴다.
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyInquiries(user.id)
+      .then((rows) => {
+        if (!cancelled) setAnsweredInquiries(rows.filter((q) => q.status === 'ANSWERED'));
+      })
+      .catch((e) => {
+        if (!cancelled) setAnsweredInquiries([]);
+        console.warn('[SmeReviewPage] 문의 답변 배너를 위한 조회 실패 — 배너만 생략한다.', e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
 
   // ── FTE 배분 대상(§6-2 STEP 3 "대상 목록") ────────────────────────
   // STEP 2 결과가 그대로 반영된다: 유지 Task + 이름이 채워진 신규 제안 Task. 삭제 제안 Task는 빼고 건수만 센다.
@@ -618,6 +650,9 @@ export function ReviewWorkspace({
 
       setMissing([]);
       setReview(res.state);
+      // 서버가 재제출 시 rejected_reason을 비운다(submit_review). 화면도 같이 지워야 지난 사이클의
+      // 반려 사유가 새 제출본 위에 계속 붙어 있지 않는다.
+      setRejectedReason('');
       revRef.current += 1;
       setSaveState('saved');
       setSaveError('');
@@ -742,6 +777,18 @@ export function ReviewWorkspace({
                 </p>
               </div>
             )}
+
+            {/*
+              반려 사유 배너(§6-3 ⓑ · §10 P3 DoD ①). REVIEW_REQUESTED = 관리자가 반려해 SME에게
+              되돌아온 상태다. 사유는 화면 진입 때 읽은 값만 믿는다(rejectedReason 주석 참고).
+
+              단계 힌트(step·onGoToStep)는 넘기지 않는다. 반려가 겨눈 단계를 저장하는 컬럼이 없어
+              "어느 단계" 를 지어내야 하기 때문이다 — 실제로도 이 상태에서는 5단계 전부가 다시 열린다.
+            */}
+            {review?.status === 'REVIEW_REQUESTED' && <RecheckBanner reason={rejectedReason} />}
+
+            {/* 문의 답변 도착 배너(§6-3 ⓒ). 이동 경로가 없으면(라우터가 안 넘기면) 띄우지 않는다. */}
+            {onOpenInquiries && <AnsweredInquiryBanner inquiries={answeredInquiries} onOpen={onOpenInquiries} />}
 
             {/* §6-1 핵심 동작 — 각 단계 상단의 축약 가이드. 접이식이라 익숙해진 뒤에는 접어 둘 수 있다. */}
             <Disclosure summary={STEP_GUIDE_SUMMARY}>{STEP_GUIDES[step - 1]}</Disclosure>
