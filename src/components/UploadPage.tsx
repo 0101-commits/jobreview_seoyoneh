@@ -29,15 +29,20 @@ import { ModalShell } from './ui/ModalShell';
 import { Toast, useToast } from './ui/Toast';
 import {
   JOB_SHEET_NAME,
+  ORG_SHEET_NAME,
   SKILL_SHEET_NAME,
+  SME_SHEET_NAME,
   downloadIntegratedTemplate,
+  downloadNormalizedSmeRoster,
   parseAndValidateIntegratedWorkbook,
   type IntegratedValidationResult,
 } from '@/lib/integratedUploadUtils';
 import {
   fetchCurrentJobCount,
+  fetchExistingJobNames,
   fetchFixedCompanyId,
   saveIntegratedJobData,
+  saveOrgUnits,
   type IntegratedSaveResult,
   type UploadMode,
 } from '@/lib/integratedJobApi';
@@ -53,6 +58,11 @@ const STEPS = [
 
 /** 저장은 서버 RPC 한 번으로 끝나므로 건별 진행률 대신 두 단계로만 알립니다. */
 const SAVE_PHASES = ['회사 정보 확인 중', '직무정보 전송 및 반영 중'] as const;
+/** 조직 마스터 Sheet가 있을 때만 붙는 단계. 없으면 기존과 똑같이 2단계입니다. */
+const ORG_SAVE_PHASE = '조직 마스터 반영 중';
+
+/** 시트 ④의 범위 한계를 화면·코드 양쪽에 같은 문장으로 남깁니다. */
+const SME_SHEET_NOTICE = '명부는 검증만 수행하며 계정 생성은 SME 계정 관리 화면에서 합니다';
 
 export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -62,6 +72,7 @@ export function UploadPage() {
   const [mode, setMode] = useState<UploadMode>('append');
   const [savePhase, setSavePhase] = useState(0);
   const [saveResult, setSaveResult] = useState<IntegratedSaveResult | null>(null);
+  const [orgSavedCount, setOrgSavedCount] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [currentJobCount, setCurrentJobCount] = useState<number | null | undefined>(undefined);
@@ -74,6 +85,7 @@ export function UploadPage() {
     setParseError(null);
     setState('idle');
     setSaveResult(null);
+    setOrgSavedCount(0);
     setSaveError(null);
     if (inputRef.current) inputRef.current.value = '';
   }, []);
@@ -83,11 +95,15 @@ export function UploadPage() {
     setValidation(null);
     setParseError(null);
     setSaveResult(null);
+    setOrgSavedCount(0);
     setSaveError(null);
     setState('validating');
 
     try {
-      const checked = await parseAndValidateIntegratedWorkbook(selectedFile);
+      // 두 번째 인자는 SME 명부 Sheet가 있을 때만 호출됩니다. 기존 2시트 파일은 조회를 타지 않습니다.
+      const checked = await parseAndValidateIntegratedWorkbook(selectedFile, async () =>
+        fetchExistingJobNames(await fetchFixedCompanyId()),
+      );
       setValidation(checked);
     } catch (error) {
       setParseError(
@@ -108,6 +124,7 @@ export function UploadPage() {
     setSavePhase(0);
     setSaveError(null);
     setSaveResult(null);
+    setOrgSavedCount(0);
 
     try {
       const companyId = await fetchFixedCompanyId();
@@ -119,6 +136,22 @@ export function UploadPage() {
         companyId,
       });
       setSaveResult(result);
+      // 조직 마스터 Sheet가 있을 때만 이어서 저장합니다. SME 명부는 저장하지 않습니다(계정 생성은 별도 화면).
+      //
+      // 조직 마스터는 위 RPC(단일 트랜잭션) 밖의 별도 저장입니다. 여기서 실패해도 직무·과업·Skill은
+      // 이미 커밋된 뒤라, 전체 실패로 되돌리면 관리자는 아무것도 안 들어간 줄 알고 같은 파일을
+      // 처음부터 다시 올립니다. 그래서 실패해도 완료 요약은 그대로 띄우고 조직 실패만 따로 알립니다.
+      if (validation.orgRows.length > 0) {
+        setSavePhase(2);
+        try {
+          setOrgSavedCount(await saveOrgUnits({ companyId, rows: validation.orgRows }));
+        } catch (error) {
+          setSaveError(
+            `조직 마스터를 저장하지 못했어요. ${error instanceof Error ? error.message : ''} ` +
+              '직무·과업·Skill은 저장되었습니다. 조직 마스터만 다시 시도해 주세요.',
+          );
+        }
+      }
       setState('done');
     } catch (error) {
       setSaveError(
@@ -148,6 +181,11 @@ export function UploadPage() {
   }, [mode, runUpload, state, validation]);
 
   const canUpload = Boolean(validation?.valid) && (state === 'validated' || state === 'done');
+
+  const savePhases = useMemo(
+    () => (validation && validation.orgRows.length > 0 ? [...SAVE_PHASES, ORG_SAVE_PHASE] : [...SAVE_PHASES]),
+    [validation],
+  );
 
   const currentStep = useMemo(() => {
     if (state === 'saving' || state === 'done') return 4;
@@ -195,6 +233,7 @@ export function UploadPage() {
               ['주요과업', saveResult.taskCount],
               ['세부활동', saveResult.activityCount],
               ['Skill', saveResult.skillCount],
+              ...(orgSavedCount > 0 ? [['조직', orgSavedCount]] : []),
             ].map(([label, value]) => (
               <div key={label as string}>
                 <dt className="text-xs opacity-80">{label}</dt>
@@ -213,6 +252,9 @@ export function UploadPage() {
                 <h3 className="font-semibold text-foreground">통합 Excel 파일 업로드</h3>
                 <p className="mt-1 text-xs text-foreground-subtle">
                   Sheet 1 {JOB_SHEET_NAME} · Sheet 2 {SKILL_SHEET_NAME}
+                </p>
+                <p className="mt-1 text-xs text-foreground-subtle">
+                  Sheet 3 {ORG_SHEET_NAME} · Sheet 4 {SME_SHEET_NAME} (선택 — 없어도 업로드됩니다)
                 </p>
               </div>
               {file && (
@@ -297,7 +339,10 @@ export function UploadPage() {
 
           <div className="mt-4 flex gap-2 rounded-element bg-muted px-3 py-3 text-xs leading-5 text-foreground-muted">
             <Info size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-            <span>두 Sheet가 하나의 작업으로 검증되고 저장됩니다.</span>
+            <span>
+              두 Sheet가 하나의 작업으로 검증되고 저장됩니다. {ORG_SHEET_NAME} Sheet가 있으면 이어서 반영하고,{' '}
+              {SME_SHEET_NOTICE}.
+            </span>
           </div>
 
           <Button
@@ -314,8 +359,10 @@ export function UploadPage() {
           {state === 'saving' && validation && (
             <SaveProgress
               phase={savePhase}
+              phases={savePhases}
               jobRows={validation.jobRows.length}
               skillRows={validation.skillRows.length}
+              orgRows={validation.orgRows.length}
             />
           )}
 
@@ -389,30 +436,43 @@ function StepIndicator({ current, complete }: { current: number; complete: boole
   );
 }
 
-function SaveProgress({ phase, jobRows, skillRows }: { phase: number; jobRows: number; skillRows: number }) {
-  const label = SAVE_PHASES[Math.min(phase, SAVE_PHASES.length - 1)];
+function SaveProgress({
+  phase,
+  phases,
+  jobRows,
+  skillRows,
+  orgRows,
+}: {
+  phase: number;
+  phases: string[];
+  jobRows: number;
+  skillRows: number;
+  orgRows: number;
+}) {
+  const label = phases[Math.min(phase, phases.length - 1)];
   return (
     <div className="mt-4 rounded-element bg-muted px-4 py-3">
       <p className="flex items-center gap-2 text-xs font-medium text-foreground-muted">
         <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-        {phase + 1}/{SAVE_PHASES.length}단계 · {label}
+        {phase + 1}/{phases.length}단계 · {label}
       </p>
       <div
         role="progressbar"
         aria-valuemin={1}
-        aria-valuemax={SAVE_PHASES.length}
+        aria-valuemax={phases.length}
         aria-valuenow={phase + 1}
         aria-valuetext={`${phase + 1}단계 ${label}`}
         className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border"
       >
         <div
           className="h-full rounded-full bg-primary transition-all"
-          style={{ width: `${((phase + 1) / SAVE_PHASES.length) * 100}%` }}
+          style={{ width: `${((phase + 1) / phases.length) * 100}%` }}
         />
       </div>
       <p className="mt-2 text-[11px] leading-4 text-foreground-subtle">
-        직무·과업 {jobRows.toLocaleString()}행, Skill {skillRows.toLocaleString()}행을 한 번의 작업으로 저장합니다.
-        서버가 한 번에 처리하므로 건별 진행률은 표시되지 않아요.
+        직무·과업 {jobRows.toLocaleString()}행, Skill {skillRows.toLocaleString()}행
+        {orgRows > 0 ? `, 조직 ${orgRows.toLocaleString()}행` : ''}을 한 번의 작업으로 저장합니다. 서버가 한 번에
+        처리하므로 건별 진행률은 표시되지 않아요.
       </p>
     </div>
   );
@@ -563,9 +623,12 @@ function IntegratedFileDrop({
         <p className="text-sm font-medium text-foreground">
           {dragOver ? '여기에 놓으면 검증을 시작해요' : '파일을 끌어놓거나 클릭하여 선택'}
         </p>
-        <p className="mt-2 text-xs text-foreground-muted">xlsx · xls 파일 1개 · Sheet 2개</p>
+        <p className="mt-2 text-xs text-foreground-muted">xlsx · xls 파일 1개 · 필수 Sheet 2개</p>
         <p className="mt-1 text-xs text-foreground-subtle">
           {JOB_SHEET_NAME} · {SKILL_SHEET_NAME}
+        </p>
+        <p className="mt-1 text-xs text-foreground-subtle">
+          선택 {ORG_SHEET_NAME} · {SME_SHEET_NAME}
         </p>
         <input
           ref={inputRef}
@@ -638,7 +701,47 @@ function ValidationPanel({
             ['확인 필요', validation.skillWarningCount],
           ]}
         />
+        {validation.hasOrgSheet && (
+          <SheetValidationCard
+            sheetLabel="Sheet 3"
+            title={ORG_SHEET_NAME}
+            valid={validation.orgErrorCount === 0}
+            stats={[
+              ['조직', validation.orgCount],
+              ['상위조직 연결', validation.orgRows.filter((row) => row.상위조직코드).length],
+              ['오류', validation.orgErrorCount],
+              ['필수값 누락', validation.orgMissingCount],
+              ['확인 필요', validation.orgWarningCount],
+            ]}
+          />
+        )}
+        {validation.hasSmeSheet && (
+          <SheetValidationCard
+            sheetLabel="Sheet 4"
+            title={SME_SHEET_NAME}
+            valid={validation.smeErrorCount === 0}
+            stats={[
+              ['SME', validation.smeCount],
+              ['배정직무', validation.assignmentCount],
+              ['오류', validation.smeErrorCount],
+              ['필수값 누락', validation.smeMissingCount],
+              ['확인 필요', validation.smeWarningCount],
+            ]}
+          />
+        )}
       </div>
+
+      {validation.hasSmeSheet && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-element bg-muted px-4 py-3">
+          <Info size={15} className="shrink-0 text-primary" aria-hidden="true" />
+          <p className="min-w-0 flex-1 text-xs leading-5 text-foreground-muted">{SME_SHEET_NOTICE}.</p>
+          {validation.smeRows.length > 0 && (
+            <Button size="sm" variant="secondary" onClick={() => downloadNormalizedSmeRoster(validation.smeRows)}>
+              <Download size={13} aria-hidden="true" /> 명부 정규화 결과 내려받기
+            </Button>
+          )}
+        </div>
+      )}
 
       <p className="mt-3 text-xs leading-5 text-foreground-subtle">
         「필수값 누락」은 업로드를 막는 오류이고, 「확인 필요」는 선택 항목 공백·중복 제외처럼 업로드는 되는 안내입니다.
@@ -823,31 +926,70 @@ function errorRowNumbers(messages: string[], sheet: string): Set<number> {
   return rows;
 }
 
+type PreviewKey = 'job' | 'skill' | 'org' | 'sme';
+
 function PreviewPanel({ validation }: { validation: IntegratedValidationResult }) {
-  const [sheet, setSheet] = useState<'job' | 'skill'>('job');
+  const [sheet, setSheet] = useState<PreviewKey>('job');
   const [limit, setLimit] = useState(PREVIEW_ROWS);
 
-  const jobErrorRows = useMemo(() => errorRowNumbers(validation.errors, JOB_SHEET_NAME), [validation.errors]);
-  const skillErrorRows = useMemo(() => errorRowNumbers(validation.errors, SKILL_SHEET_NAME), [validation.errors]);
-
-  const isJob = sheet === 'job';
-  const total = isJob ? validation.jobRows.length : validation.skillRows.length;
-  const errorRows = isJob ? jobErrorRows : skillErrorRows;
-  const rowNumbers = isJob ? validation.jobRowNumbers : validation.skillRowNumbers;
-  const headers = isJob
-    ? ['직군', '직렬', '직무', '주요과업', '세부활동']
-    : ['직군', '직렬', '직무', 'Skill 구분', 'Skill', '요구 학력'];
-
-  const cells = useMemo(() => {
-    if (isJob) {
-      return validation.jobRows
-        .slice(0, limit)
-        .map((row) => [row.직군, row.직렬, row.직무, row.주요과업, row.세부활동]);
+  // 선택 시트는 파일에 있을 때만 탭으로 나옵니다. 없으면 기존과 같은 2개 탭입니다.
+  const tabs = useMemo(() => {
+    const list: { key: PreviewKey; sheetName: string; rows: number }[] = [
+      { key: 'job', sheetName: JOB_SHEET_NAME, rows: validation.jobRows.length },
+      { key: 'skill', sheetName: SKILL_SHEET_NAME, rows: validation.skillRows.length },
+    ];
+    if (validation.hasOrgSheet) {
+      list.push({ key: 'org', sheetName: ORG_SHEET_NAME, rows: validation.orgRows.length });
     }
-    return validation.skillRows
-      .slice(0, limit)
-      .map((row) => [row.직군, row.직렬, row.직무, row['Skill 구분'], row.Skill, row['요구 학력'] || '—']);
-  }, [isJob, limit, validation.jobRows, validation.skillRows]);
+    if (validation.hasSmeSheet) {
+      list.push({ key: 'sme', sheetName: SME_SHEET_NAME, rows: validation.smeRows.length });
+    }
+    return list;
+  }, [validation]);
+
+  // 다른 파일을 다시 고르면 선택 시트가 사라질 수 있으므로 항상 존재하는 탭으로 되돌립니다.
+  const active = tabs.find((tab) => tab.key === sheet) ?? tabs[0];
+
+  const errorRows = useMemo(
+    () => errorRowNumbers(validation.errors, active.sheetName),
+    [active.sheetName, validation.errors],
+  );
+
+  const view = useMemo(() => {
+    switch (active.key) {
+      case 'skill':
+        return {
+          headers: ['직군', '직렬', '직무', 'Skill 구분', 'Skill', '요구 학력'],
+          rowNumbers: validation.skillRowNumbers,
+          cells: validation.skillRows
+            .slice(0, limit)
+            .map((row) => [row.직군, row.직렬, row.직무, row['Skill 구분'], row.Skill, row['요구 학력'] || '—']),
+        };
+      case 'org':
+        return {
+          headers: ['조직코드', '조직명', '상위조직코드'],
+          rowNumbers: validation.orgRowNumbers,
+          cells: validation.orgRows.slice(0, limit).map((row) => [row.조직코드, row.조직명, row.상위조직코드 || '—']),
+        };
+      case 'sme':
+        return {
+          headers: ['성명', '이메일', '조직코드', '직급', '배정직무'],
+          rowNumbers: validation.smeRowNumbers,
+          cells: validation.smeRows
+            .slice(0, limit)
+            .map((row) => [row.성명, row.이메일, row.조직코드, row.직급 || '—', row.배정직무목록.join(', ') || '—']),
+        };
+      default:
+        return {
+          headers: ['직군', '직렬', '직무', '주요과업', '세부활동'],
+          rowNumbers: validation.jobRowNumbers,
+          cells: validation.jobRows.slice(0, limit).map((row) => [row.직군, row.직렬, row.직무, row.주요과업, row.세부활동]),
+        };
+    }
+  }, [active.key, limit, validation]);
+
+  const { headers, rowNumbers, cells } = view;
+  const total = active.rows;
 
   if (validation.jobRows.length === 0 && validation.skillRows.length === 0) return null;
 
@@ -857,31 +999,27 @@ function PreviewPanel({ validation }: { validation: IntegratedValidationResult }
         <h3 className="flex items-center gap-2 font-semibold text-foreground">
           <Table2 size={16} className="text-primary" aria-hidden="true" /> 파일 내용 미리보기
         </h3>
-        <div className="flex gap-2" role="group" aria-label="미리보기 Sheet 선택">
-          {(
-            [
-              ['job', `${JOB_SHEET_NAME} (${validation.jobRows.length.toLocaleString()}행)`],
-              ['skill', `${SKILL_SHEET_NAME} (${validation.skillRows.length.toLocaleString()}행)`],
-            ] as const
-          ).map(([key, label]) => (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="미리보기 Sheet 선택">
+          {tabs.map((tab) => (
             <Button
-              key={key}
+              key={tab.key}
               size="sm"
-              aria-pressed={sheet === key}
-              variant={sheet === key ? 'primary' : 'secondary'}
+              aria-pressed={active.key === tab.key}
+              variant={active.key === tab.key ? 'primary' : 'secondary'}
               onClick={() => {
-                setSheet(key);
+                setSheet(tab.key);
                 setLimit(PREVIEW_ROWS);
               }}
             >
-              {label}
+              {tab.sheetName} ({tab.rows.toLocaleString()}행)
             </Button>
           ))}
         </div>
       </div>
 
       <p className="mt-2 text-xs text-foreground-muted">
-        중복 제외 후 저장될 {total.toLocaleString()}행 중 상위 {Math.min(limit, total).toLocaleString()}행입니다.
+        {active.key === 'sme' ? '검증만 수행하는' : '중복 제외 후 저장될'} {total.toLocaleString()}행 중 상위{' '}
+        {Math.min(limit, total).toLocaleString()}행입니다.
         {errorRows.size > 0 && ` 오류가 있는 행은 붉게 표시했습니다.`}
       </p>
 
