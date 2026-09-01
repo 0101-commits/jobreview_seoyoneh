@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>서연이화 업무조사·SME 검증 플랫폼 개편 기획안 v1.0</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --paper:#F4F5F4; --surface:#FFFFFF; --ink:#1C2430; --muted:#5B6572;
+  --line:#DDE1E4; --line-soft:#EBEDEF;
+  --navy:#1E4E79; --navy-soft:#EAF1F7; --navy-line:#C8D8E6;
+  --amber:#8A5A00; --amber-soft:#F7EEDB;
+  --green:#2F6B45; --green-soft:#E8F1EB;
+  --red:#973B3B; --red-soft:#F9ECEC;
+  --gray-tag:#55606C; --gray-soft:#EEF0F1;
+  --mono:"SF Mono","Consolas","D2Coding",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{background:var(--paper);color:var(--ink);font-family:"Pretendard Variable",Pretendard,-apple-system,"Malgun Gothic",sans-serif;font-size:15px;line-height:1.72;-webkit-font-smoothing:antialiased}
+.wrap{display:grid;grid-template-columns:236px minmax(0,1fr);gap:0;max-width:1180px;margin:0 auto}
+/* ── 좌측 목차 ── */
+nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:36px 20px 36px 24px;border-right:1px solid var(--line)}
+nav.toc .doc-id{font-size:11.5px;color:var(--muted);letter-spacing:.02em;margin-bottom:14px;line-height:1.5}
+nav.toc .doc-id b{display:block;color:var(--ink);font-size:12.5px;font-weight:700;margin-bottom:2px}
+nav.toc a{display:block;padding:5px 8px;margin:1px -8px;font-size:12.5px;color:var(--muted);text-decoration:none;border-radius:4px;border-left:2px solid transparent}
+nav.toc a:hover{color:var(--ink);background:var(--gray-soft)}
+nav.toc a.on{color:var(--navy);border-left-color:var(--navy);background:var(--navy-soft);font-weight:600}
+nav.toc a .n{display:inline-block;width:22px;color:inherit;opacity:.55;font-variant-numeric:tabular-nums}
+/* ── 본문 ── */
+main{padding:40px 40px 90px;background:var(--surface);min-width:0}
+header.doc{padding-bottom:26px;border-bottom:2px solid var(--ink);margin-bottom:34px}
+header.doc .kind{font-size:12.5px;color:var(--navy);font-weight:700;margin-bottom:8px}
+header.doc h1{font-size:27px;line-height:1.35;font-weight:800;letter-spacing:-.01em;max-width:640px}
+header.doc h1 small{display:block;font-size:15px;font-weight:500;color:var(--muted);margin-top:6px}
+.meta{display:grid;grid-template-columns:110px 1fr;gap:3px 14px;margin-top:18px;font-size:12.8px}
+.meta dt{color:var(--muted)}
+.meta dd{color:var(--ink)}
+.meta dd code{font-family:var(--mono);font-size:11.8px;background:var(--gray-soft);padding:1px 5px;border-radius:3px}
+section{margin-bottom:52px}
+h2{font-size:20px;font-weight:800;letter-spacing:-.01em;padding:10px 0 10px 14px;border-left:4px solid var(--navy);background:linear-gradient(90deg,var(--navy-soft),transparent 70%);margin-bottom:18px}
+h2 .sn{color:var(--navy);margin-right:8px;font-variant-numeric:tabular-nums}
+h3{font-size:16px;font-weight:750;margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line-soft)}
+h4{font-size:14px;font-weight:700;margin:18px 0 8px;color:var(--ink)}
+p{margin:0 0 12px;max-width:760px}
+ul,ol{margin:0 0 14px 20px;max-width:760px}
+li{margin-bottom:5px}
+li>ul{margin-top:5px;margin-bottom:6px}
+strong{font-weight:700}
+em{font-style:normal;font-weight:600;color:var(--navy)}
+/* ── 결론 박스 ── */
+.verdict{border:1.5px solid var(--navy);border-radius:8px;overflow:hidden;margin:0 0 20px}
+.verdict .vh{background:var(--navy);color:#fff;font-size:13px;font-weight:700;padding:8px 16px}
+.verdict .vb{padding:16px 18px;background:var(--navy-soft)}
+.verdict .vb p{max-width:none;margin-bottom:10px}
+.verdict .vb p:last-child{margin-bottom:0}
+/* ── 표 ── */
+table{width:100%;border-collapse:collapse;font-size:13.2px;line-height:1.6;margin:12px 0 18px;background:#fff}
+th{background:var(--gray-soft);text-align:left;font-weight:700;padding:8px 10px;border:1px solid var(--line);vertical-align:top;white-space:nowrap}
+td{padding:8px 10px;border:1px solid var(--line);vertical-align:top}
+tr.hl td{background:var(--navy-soft)}
+td.c,th.c{text-align:center}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+table .sub{color:var(--muted);font-size:12.2px}
+/* ── 근거 칩 · 상태 태그 ── */
+.ref{display:inline-block;font-size:11px;font-weight:600;color:var(--navy);background:var(--navy-soft);border:1px solid var(--navy-line);border-radius:3px;padding:0 6px;margin:0 2px;line-height:1.7;white-space:nowrap;vertical-align:baseline}
+.ref.c{color:var(--amber);background:var(--amber-soft);border-color:#E4D2A8}
+.ref.f{font-family:var(--mono);font-size:10.5px;color:var(--gray-tag);background:var(--gray-soft);border-color:var(--line)}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:3px;padding:1px 7px;line-height:1.6;white-space:nowrap}
+.tag.new{color:#fff;background:var(--navy)}
+.tag.imp{color:var(--amber);background:var(--amber-soft);border:1px solid #E4D2A8}
+.tag.keep{color:var(--gray-tag);background:var(--gray-soft);border:1px solid var(--line)}
+.tag.sec{color:#fff;background:var(--red)}
+.tag.done{color:var(--green);background:var(--green-soft);border:1px solid #BFD8C8}
+/* ── 콜아웃 ── */
+.note,.warn{border-radius:0 6px 6px 0;padding:12px 16px;margin:14px 0 18px;font-size:13.6px;max-width:780px}
+.note{border-left:4px solid var(--navy);background:var(--navy-soft)}
+.warn{border-left:4px solid var(--red);background:var(--red-soft)}
+.note b,.warn b{display:block;margin-bottom:4px;font-size:12.5px}
+.note b{color:var(--navy)} .warn b{color:var(--red)}
+.note p,.warn p{max-width:none;margin-bottom:6px}
+.note p:last-child,.warn p:last-child{margin-bottom:0}
+/* ── 코드 블록 ── */
+pre{font-family:var(--mono);font-size:12.3px;line-height:1.65;background:#20262E;color:#DCE2E8;border-radius:8px;padding:16px 18px;overflow-x:auto;margin:12px 0 20px;white-space:pre}
+pre .cm{color:#7E8B99}
+code{font-family:var(--mono);font-size:.92em;background:var(--gray-soft);padding:1px 5px;border-radius:3px}
+pre code{background:none;padding:0}
+.pre-label{font-size:11.5px;font-weight:700;color:var(--gray-tag);margin:14px 0 -8px;display:flex;align-items:center;gap:6px}
+.pre-label::before{content:"";width:8px;height:8px;background:var(--navy);border-radius:2px}
+/* ── 와이어프레임 ── */
+.wire{border:1.5px solid var(--ink);border-radius:10px;background:#FBFCFC;padding:14px;margin:14px 0 8px;font-size:12px;line-height:1.5}
+.wire .cap{font-size:12px;color:var(--muted);margin:6px 2px 22px}
+.wf-bar{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:6px;background:#fff;padding:7px 12px;margin-bottom:10px;font-weight:600}
+.wf-bar .chip{font-size:11px;font-weight:600;color:var(--green);background:var(--green-soft);border:1px solid #BFD8C8;border-radius:99px;padding:1px 9px}
+.wf-grid{display:grid;grid-template-columns:150px 1fr 190px;gap:10px}
+.wf-steps{border:1px solid var(--line);border-radius:6px;background:#fff;padding:10px}
+.wf-steps div{padding:5px 7px;border-radius:4px;margin-bottom:3px;color:var(--muted)}
+.wf-steps div.on{background:var(--navy);color:#fff;font-weight:700}
+.wf-steps div.ok{color:var(--green)}
+.wf-main{border:1px solid var(--line);border-radius:6px;background:#fff;padding:12px}
+.wf-main .msg{background:var(--navy-soft);border:1px dashed var(--navy-line);border-radius:5px;padding:8px 10px;margin-bottom:10px;color:var(--navy);font-weight:600}
+.wf-row{display:grid;grid-template-columns:1fr 108px 56px;gap:8px;align-items:center;border:1px solid var(--line-soft);border-radius:5px;padding:7px 10px;margin-bottom:6px}
+.wf-row .t{font-weight:600}
+.wf-row .t small{display:block;font-weight:400;color:var(--muted);font-size:11px}
+.wf-row .stp{display:flex;align-items:center;gap:4px;justify-content:center;border:1px solid var(--line);border-radius:99px;padding:2px 6px;background:var(--gray-soft);font-weight:700;font-variant-numeric:tabular-nums}
+.wf-row .pct{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.wf-row .bar{grid-column:1/-1;height:5px;background:var(--gray-soft);border-radius:99px;overflow:hidden}
+.wf-row .bar i{display:block;height:100%;background:var(--navy)}
+.wf-row.sug{border-style:dashed;border-color:var(--navy-line)}
+.wf-row.sug .t::after{content:"신규 제안";font-size:10px;color:var(--navy);background:var(--navy-soft);border-radius:3px;padding:0 5px;margin-left:6px;font-weight:700}
+.wf-side{border:1px solid var(--line);border-radius:6px;background:#fff;padding:12px;text-align:center}
+.wf-ring{width:96px;height:96px;border-radius:50%;margin:6px auto 8px;display:flex;align-items:center;justify-content:center;background:conic-gradient(var(--navy) 0 95%,var(--gray-soft) 95% 100%);position:relative}
+.wf-ring i{width:72px;height:72px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal}
+.wf-ring i b{font-size:17px;font-variant-numeric:tabular-nums}
+.wf-ring i small{font-size:10px;color:var(--muted)}
+.wf-side .btn{display:block;border-radius:6px;padding:8px 0;font-weight:700;margin-top:8px;border:1px solid var(--line);color:var(--muted);background:var(--gray-soft)}
+.wf-side .btn.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+.wf-side .rem{font-size:11.5px;color:var(--red);font-weight:700;margin-top:6px}
+/* 워크벤치 와이어 */
+.wb{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.wb .col{border:1px solid var(--line);border-radius:6px;background:#fff;padding:10px}
+.wb .col h5{font-size:12px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line-soft)}
+.wb .li{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:4px;margin-bottom:3px;border:1px solid transparent}
+.wb .li.diff{background:var(--red-soft);border-color:#E7C9C9}
+.wb .li .v{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+/* ── 흐름도 ── */
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;margin:12px 0 6px}
+.flow .st{border:1.5px solid var(--navy);background:var(--navy-soft);border-radius:6px;padding:8px 10px;font-size:12.3px;font-weight:600;color:var(--navy);min-width:118px;flex:1}
+.flow .st small{display:block;font-weight:400;color:var(--muted);font-size:11px;margin-top:2px}
+.flow .ar{align-self:center;color:var(--muted);font-weight:700}
+.flow .st.g{border-color:var(--line);background:var(--gray-soft);color:var(--gray-tag)}
+.flow-cap{font-size:12px;color:var(--muted);margin-bottom:14px}
+/* ── 페이즈 카드 ── */
+.phase{border:1px solid var(--line);border-radius:8px;margin:0 0 14px;overflow:hidden}
+.phase .ph{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--gray-soft);border-bottom:1px solid var(--line)}
+.phase .ph .no{background:var(--navy);color:#fff;font-weight:800;border-radius:5px;padding:1px 9px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.phase .ph b{font-size:14px}
+.phase .ph .dur{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.phase .pb{padding:12px 16px}
+.phase .pb p{max-width:none}
+/* ── 체크리스트 ── */
+ul.chk{list-style:none;margin-left:0}
+ul.chk li{padding-left:24px;position:relative}
+ul.chk li::before{content:"";position:absolute;left:2px;top:7px;width:12px;height:12px;border:1.5px solid var(--navy);border-radius:3px}
+footer{margin-top:60px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+@media (max-width:1080px){
+  .wrap{grid-template-columns:1fr}
+  nav.toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:20px 24px}
+  nav.toc .links{display:flex;flex-wrap:wrap;gap:2px 10px}
+  main{padding:28px 20px 70px}
+  .wf-grid{grid-template-columns:1fr}
+  .wb{grid-template-columns:1fr}
+}
+@media print{
+  nav.toc{display:none}
+  .wrap{display:block}
+  body{background:#fff}
+  pre{white-space:pre-wrap}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc" aria-label="목차">
+  <div class="doc-id"><b>개편 기획안 v1.0</b>jobreview_seoyoneh<br>2026-08-31</div>
+  <div class="links">
+    <a href="#s1"><span class="n">1</span>결론 요약</a>
+    <a href="#s2"><span class="n">2</span>개편 배경·요구사항</a>
+    <a href="#s3"><span class="n">3</span>As-Is 진단</a>
+    <a href="#s4"><span class="n">4</span>To-Be 개편 방향</a>
+    <a href="#s5"><span class="n">5</span>정보구조·사용자 흐름</a>
+    <a href="#s6"><span class="n">6</span>화면별 상세 기획</a>
+    <a href="#s7"><span class="n">7</span>데이터 모델 변경</a>
+    <a href="#s8"><span class="n">8</span>보안·개인정보</a>
+    <a href="#s9"><span class="n">9</span>산출물 연계(Export)</a>
+    <a href="#s10"><span class="n">10</span>구현 로드맵</a>
+    <a href="#s11"><span class="n">11</span>Claude CLI 작업 지시</a>
+    <a href="#s12"><span class="n">12</span>오픈 이슈·확인 사항</a>
+  </div>
+</nav>
+
+<main>
+
+<header class="doc">
+  <div class="kind">웹 플랫폼 개편 기획안 · Claude CLI 작업 명세 겸용</div>
+  <h1>서연이화 업무조사·SME 검증 플랫폼 개편
+    <small>착수보고 v1.7 수정안(2026-08-31) 정합 기준 — 기능·화면·컴포넌트·UX/UI·데이터·보안 전면 개편</small>
+  </h1>
+  <dl class="meta">
+    <dt>개편 대상</dt><dd><code>github.com/0101-commits/jobreview_seoyoneh</code> (React 18 · Vite · Supabase · GitHub Pages)</dd>
+    <dt>참고 레포</dt><dd><code>github.com/0101-commits/job-analysis-seoyon</code> (패턴 이식 원천 — 스택 전환은 하지 않음)</dd>
+    <dt>기준 문서</dt><dd>착수보고 v1.7 슬라이드별 수정안(2026-08-31) · 계약서 산출물 18건 매핑표(동 문서 C장)</dd>
+    <dt>문서 용도</dt><dd>① 사용자 검토·의사결정 ② Claude CLI(Claude Code) 단계별 작업 지시서 — §11의 프롬프트를 그대로 사용</dd>
+    <dt>버전</dt><dd>v1.0 (2026-08-31)</dd>
+  </dl>
+</header>
+
+<!-- ═══════════════ 1. 결론 ═══════════════ -->
+<section id="s1">
+<h2><span class="sn">1</span>결론 요약</h2>
+
+<div class="verdict">
+  <div class="vh">핵심 결론 3가지</div>
+  <div class="vb">
+    <p><strong>① 현 플랫폼은 "SME 검증" 절반만 갖춘 상태로 분석됩니다.</strong> 직무정의·Task·Skill·수행요건에 대한 적합성 평가/의견/수정 제안, 자동 저장, 재검토 흐름, RLS 기반 권한 통제는 이미 구현되어 있으나, 착수보고 11면의 핵심 방법론인 <em>과업별 투입 비중(FTE) 배분(직무 단위 합계 100%)</em>이 기능·스키마·화면 어디에도 없습니다. 이 상태로는 계약 산출물 1-(4) 「조직별 업무량·업무분장 분석」과 3-(4) 「적정 인력 산정 모델」의 원천 데이터를 생산할 수 없습니다.</p>
+    <p><strong>② 개편은 "재작성"이 아니라 "5대 모듈 증축"으로 수행할 것을 권장합니다.</strong> 현 스택(Vite SPA + Supabase + GitHub Pages)을 유지하고, 참고 레포(job-analysis-seoyon)에서는 온보딩·단계형 마법사·검증 게이트·문의 채널·검토 워크벤치·운영(마감/리마인더) <em>패턴만 이식</em>합니다. 참고 레포의 스택(TanStack Start SSR·Cloudflare Workers)으로의 전환은 비개발자 유지보수와 CLI 작업 리스크를 키우므로 배제합니다.</p>
+    <p><strong>③ 이 플랫폼 자체가 착수보고·계약의 이행 증빙이 되도록 설계합니다.</strong> 화면 문구는 착수보고 수정안 문언을 그대로 사용하고(예: "업무량은 과업별 투입 비중 배분 방식이며 개인별 시간 실측이 아님"), Export는 계약 산출물 번호와 1:1로 매핑하며, 응답 소요 시간을 앱이 실측해 11면의 "직무당 약 ○○분(착수 후 확정)"을 채울 근거를 확보합니다.</p>
+  </div>
+</div>
+
+<h3>1-1. 개편 골자 — 5대 모듈</h3>
+<table>
+  <thead><tr><th style="width:34px" class="c">#</th><th style="width:190px">모듈</th><th>내용</th><th style="width:120px">근거</th><th style="width:64px" class="c">구분</th></tr></thead>
+  <tbody>
+    <tr class="hl"><td class="c">A</td><td><strong>업무조사(FTE) 모듈</strong></td><td>확정 Task 목록(유지+신규 제안)에 대한 과업별 투입 비중 배분 UI, 직무 단위 합계 100% 제출 게이트(서버 검증), 직무·조직별 분포 산출</td><td><span class="ref">11면</span><span class="ref">23면</span><span class="ref c">계약 1-(4)</span><span class="ref c">계약 3-(4)</span></td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td class="c">B</td><td><strong>검토 가이드·온보딩</strong></td><td>최초 진입 시 필수 가이드(조사 취지·방식·FTE 정의·예상 소요), 단계별 힌트·직군별 예시, 용어집(SME·FTE), 응답 소요 시간 실측</td><td><span class="ref">11면</span><span class="ref c">계약 1-(3)</span></td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td class="c">C</td><td><strong>SME 검증 마법사 재구성</strong></td><td>현행 단일 장문 폼 → 5단계 마법사(직무정의 → 과업 확인·보완 → FTE 배분 → Skill·수행요건 → 최종 확인) + 단계별 검증 게이트·저장 상태 표시</td><td><span class="ref">11면</span><span class="ref">12면</span></td><td class="c"><span class="tag imp">개선</span></td></tr>
+    <tr><td class="c">D</td><td><strong>관리자 운영·분석</strong></td><td>조직×직무 진행 매트릭스, 마감(D-day)·리마인더 메일, 검토 워크벤치(SME 1·2인 비교, 승인/반려), 워크숍 대상 직무 플래깅, FTE 분포 대시보드</td><td><span class="ref">13면</span><span class="ref">19면</span><span class="ref c">계약 1-(2)</span></td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td class="c">E</td><td><strong>보안·거버넌스</strong></td><td>noindex, 첫 로그인 비밀번호 변경 강제, 로그인 시도 제한, 감사 로그, 테스트 계정 제거 절차, 개인정보 최소 수집·파기 기준</td><td><span class="ref f">supabase/migrations</span></td><td class="c"><span class="tag sec">보안</span></td></tr>
+  </tbody>
+</table>
+
+<h3>1-2. 판단의 전제</h3>
+<ul>
+  <li><strong>방법론 일치가 최우선 기준입니다.</strong> 착수보고는 "HCG가 초안을 먼저 작성하고 SME가 확인·보완"하는 방식을 명시합니다<span class="ref">11면</span>. 현 레포는 이 패러다임(관리자 업로드 초안 → SME 검토)과 이미 일치하므로 유지·강화하고, 참고 레포의 "응답자가 처음부터 작성"하는 6단계 마법사는 <em>구조만 차용하고 내용은 검증형으로 재설계</em>합니다.</li>
+  <li><strong>실제 코드 수정은 Claude CLI가 수행합니다.</strong> 본 문서 §10~§11이 Phase 0~5의 작업 순서·완료 기준·복붙용 프롬프트를 제공하며, 각 요구사항에는 근거 칩(<span class="ref">착수보고 면</span> <span class="ref c">계약 산출물</span> <span class="ref f">레포 파일 경로</span>)을 달아 CLI가 원문·원본 코드를 직접 대조할 수 있게 했습니다.</li>
+  <li>공수 표기는 Claude CLI 작업 세션 기준의 <em>추정치</em>이며, 파일럿(Phase 5) 결과에 따라 조정이 필요합니다.</li>
+</ul>
+</section>
+
+<!-- ═══════════════ 2. 배경·요구사항 ═══════════════ -->
+<section id="s2">
+<h2><span class="sn">2</span>개편 배경·요구사항 — 착수보고가 곧 제품 스펙</h2>
+
+<p>착수보고 v1.7 수정안은 업무조사·SME 검증의 <strong>방식·부담·산출 수준을 문장으로 확정</strong>했고, 그 문장들이 회의록 → 산출물 명세표 → 과업범위 합의서로 이어집니다. 따라서 웹 플랫폼이 착수보고 문언과 다르게 동작하면 합의서 체계 전체가 흔들립니다. 아래 10개 요구사항(R1~R10)이 개편의 전체 범위이며, 상호배제적으로 §6(화면)·§7(데이터)·§9(Export)에 배분됩니다.</p>
+
+<table>
+  <thead><tr><th style="width:40px" class="c">ID</th><th style="width:210px">요구사항</th><th>착수보고·계약 원문 근거</th><th style="width:150px">플랫폼 반영처</th></tr></thead>
+  <tbody>
+    <tr><td class="c">R1</td><td>초안 선작성 → SME 확인·보완 구조 유지</td><td>"직무·과업 초안을 HCG가 먼저 작성하고 업무전문가(SME)가 확인·보완하는 방식" <span class="ref">11면 헤드메시지</span></td><td>§6-2 마법사 전체</td></tr>
+    <tr class="hl"><td class="c">R2</td><td><strong>과업별 투입 비중(FTE) 배분</strong></td><td>"확인 단계에서 과업별 투입 비중(FTE, 직무 단위 합계 100%)의 배분을 함께 받음" · "개인별 소요 시간 실측 방식 대비 작성 부담과 응답 편차가 작음" <span class="ref">11면 Step 2</span><span class="ref c">계약 1-(4)</span></td><td>§6-2 STEP 3 · §7-1</td></tr>
+    <tr><td class="c">R3</td><td>검토 가이드 제공(작성가이드 흡수)</td><td>"SME 검토용 직무·Task 초안과 검토 가이드를 제공" — 계약 1-(3) 「업무 조사서(작성가이드 포함)」를 우리 방식으로 흡수하는 문장 <span class="ref">11면</span><span class="ref c">계약 1-(3)</span></td><td>§6-1 가이드·온보딩</td></tr>
+    <tr><td class="c">R4</td><td>소요 시간 관리·실측</td><td>"현업 SME 1인당 예상 소요: 직무당 약 ○○분 수준 (착수 후 확정)" <span class="ref">11면</span> — 앱이 응답 소요를 실측해 ○○분 확정 근거 확보</td><td>§6-1 · §7-1 review_sessions</td></tr>
+    <tr><td class="c">R5</td><td>화면 확정 절차 이행</td><td>"업무조사 응답 화면 (예시 — 실제 적용 화면은 착수 후 확정)" <span class="ref">11면 캡션</span> — 본 개편이 그 "실제 적용 화면"의 확정 작업</td><td>본 기획안 전체</td></tr>
+    <tr><td class="c">R6</td><td>SME 배정 규칙(직무별 1~2명)</td><td>"업무 조사는 직무별 최소 인원의 업무전문가(SME, 1~2명)를 대상으로 운영" <span class="ref">7면</span><span class="ref">12면</span></td><td>§6-3 배정·현황</td></tr>
+    <tr><td class="c">R7</td><td>워크숍 대상 최소화·판별</td><td>"Web 기반 검증을 기본으로 하되, 조정 필요 직무에 한해 워크숍 방식을 병행 (대상 최소화)" <span class="ref">13면</span></td><td>§6-3 워크숍 플래깅</td></tr>
+    <tr><td class="c">R8</td><td>조직 단위 분석 가능성 확보</td><td>산출물 "업무조사 결과(직무·조직별 투입 비중 분포 포함)" · "조직별 업무량·업무분장 분석" <span class="ref">23면</span><span class="ref c">계약 1-(2)</span><span class="ref c">계약 1-(4)</span></td><td>§7-1 org_units · §9 E2</td></tr>
+    <tr><td class="c">R9</td><td>대상 통제(사무직·명부 기반)</td><td>"설문·인터뷰·업무조사는 사무직을 대상으로 실시하며, 세부 대상 조직/직군은 TF와 협의하여 확정" <span class="ref">8면 각주</span><span class="ref">23면</span></td><td>§6-3 명부·계정 관리</td></tr>
+    <tr><td class="c">R10</td><td>적정 인력 산정의 원천 데이터</td><td>"직무·조직별 투입 비중(FTE) 분포를 활용한 적정 인력 산정 방법론" <span class="ref">16면</span><span class="ref c">계약 3-(4)</span> — 확정 수치 산정은 후속 별도 과제이므로 <em>분포 데이터·Export까지만</em>이 플랫폼의 범위</td><td>§9 E2·E3</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><b>범위 종료선 — 플랫폼에도 동일하게 적용</b>
+<p>착수보고의 산출 수준 원칙(설계 요소·적용 방향 제시 수준, 규정 문안·산식·기준표 확정은 후속 별도 과제)<span class="ref">15~16면 하단 고정행</span>은 플랫폼에도 그대로 적용됩니다. 즉 플랫폼은 <strong>FTE 분포의 수집·집계·Export까지</strong> 수행하며, 전사 적정 인력의 확정 수치 계산이나 조직별 증감 판단 기능은 만들지 않습니다. 이 경계를 지켜야 웹 도구가 과업 범위를 스스로 확장하는 역효과를 막을 수 있습니다.</p></div>
+</section>
+<!-- ═══════════════ 3. As-Is 진단 ═══════════════ -->
+<section id="s3">
+<h2><span class="sn">3</span>As-Is 진단 — 현 레포(jobreview_seoyoneh) 코드 분석 결과</h2>
+
+<h3>3-1. 현재 구현 인벤토리</h3>
+<p>레포 전수 분석 결과, 현 플랫폼은 Bolt로 초기 생성된 후 상당한 자체 고도화(보안 마이그레이션, 통합 업로드, 자동 저장 등)를 거친 상태로 확인됩니다. 방법론의 골격(초안 검토형)은 올바르며, 아래 기능이 이미 동작합니다.</p>
+<table>
+  <thead><tr><th style="width:120px">영역</th><th>구현 현황</th><th style="width:220px">근거 파일</th></tr></thead>
+  <tbody>
+    <tr><td>인증·권한</td><td>이메일·비밀번호 로그인, ADMIN/SME 역할 분리, 전 테이블 RLS, 멀티 계열사(companies) 필터</td><td><span class="ref f">src/pages/LoginPage.tsx</span> <span class="ref f">supabase/migrations/…secure_role_based_login</span></td></tr>
+    <tr><td>직무 데이터</td><td>직군→직렬→직무 계층, 직무정의·주요과업/세부활동·Skill(Hard/Soft)·수행요건. Excel 2시트 통합 업로드(필수열 검증·미리보기), 버전 보존(source_version)으로 재업로드 시 제출 이력 유지</td><td><span class="ref f">src/components/UploadPage.tsx</span> <span class="ref f">src/lib/integratedUploadUtils.ts</span></td></tr>
+    <tr><td>SME 검토</td><td>배정 직무 목록, 4개 섹션(직무정의/과업·활동/Skill/수행요건) × 적합성 3단계(적합/일부 수정 필요/부적합) + 의견 + 수정 제안 + 삭제 제안 + 신규 항목 제안, 자동 저장(입력 후 2.5초), 진행률 표시, 임시저장/최종 제출, 재검토 요청 흐름, 검토 이력</td><td><span class="ref f">src/pages/SmeReviewPage.tsx</span> <span class="ref f">src/pages/sme-review/sections.tsx</span> <span class="ref f">src/pages/sme-review/controls.tsx</span></td></tr>
+    <tr><td>관리자</td><td>대시보드, 검토 상태 요약, SME 계정 관리(단건/일괄 생성·삭제, Edge Function), 제출 결과 Excel 다운로드</td><td><span class="ref f">src/pages/DashboardPage.tsx</span> <span class="ref f">src/components/modals/*</span> <span class="ref f">supabase/functions/admin-create-user</span></td></tr>
+    <tr><td>보안 이력</td><td>SECURITY DEFINER 함수의 권한 구멍(타 계열사 SME 정보 노출, 임의 배정 삭제)을 이미 식별·차단한 마이그레이션 존재 — 보안 인식 수준 양호</td><td><span class="ref f">…20260828010500_secure_review_status_and_sync.sql</span></td></tr>
+    <tr><td>배포</td><td>GitHub Actions → GitHub Pages(base <code>/jobreview_seoyoneh/</code>), 환경변수는 Actions variables 주입</td><td><span class="ref f">.github/workflows/deploy.yml</span></td></tr>
+  </tbody>
+</table>
+
+<h3>3-2. 6축 진단 — 부족한 것과 그 결과</h3>
+<p>사용자가 지적한 "기능/화면 구성/컴포넌트/UX/UI/보안 전반 부족"을 6축으로 상호배제 분해하고, 각 공백이 초래하는 결과를 명시합니다. 심각도는 계약 이행 영향 기준입니다.</p>
+<table>
+  <thead><tr><th style="width:90px">축</th><th>진단 결과</th><th>방치 시 결과</th><th style="width:58px" class="c">심각도</th></tr></thead>
+  <tbody>
+    <tr class="hl"><td>① 기능</td><td><strong>FTE 투입 비중 배분 기능 전무</strong>(코드·스키마·화면 전수 검색 결과 0건). 검토 가이드, 문의 채널, 마감·리마인더, 워크숍 판별, 조직별 집계 부재</td><td>계약 1-(4)·3-(4) 원천 데이터 미확보 → 12월 검수·잔금 리스크 직결. 문의는 메일·전화로 이탈해 운영 부담 증가</td><td class="c"><strong>상</strong></td></tr>
+    <tr><td>② 화면 구성(IA)</td><td>SME 검토가 <strong>단일 장문 폼</strong>(676행 페이지 + 섹션 스크롤). 온보딩·시작 안내 없음. 단계 개념과 완료 조건이 화면에 없음</td><td>SME가 전체 분량을 가늠하지 못해 중도 이탈·부실 응답 증가. "직무당 약 ○○분" 관리 불가</td><td class="c"><strong>상</strong></td></tr>
+    <tr><td>③ 컴포넌트</td><td>공용 UI가 4종(Button/Field/Toast/ModalShell)뿐. 참고 레포는 shadcn 계열 26종 + 조사 전용 16종(StepChecklist·ExamplePopover·FieldHint·SaveStatusChip 등) 보유</td><td>신규 화면마다 일회성 마크업이 늘어 유지보수 난도 상승, 시각 일관성 저하</td><td class="c">중</td></tr>
+    <tr><td>④ UX</td><td>부담 최소화 장치(직군별 예시, 용어 힌트, 남은 항목 안내, 제출 전 요약) 부재. 저장 상태가 소극적 노출. 반려 사유 전달 UI 부재</td><td>착수보고가 약속한 "현업 부담 최소화"<span class="ref">11면</span>가 실사용에서 체감되지 않음 → 고객 TF 신뢰 손상</td><td class="c">중</td></tr>
+    <tr><td>⑤ 데이터</td><td>소속 조직이 <code>profiles.organization</code> 자유 텍스트 → <strong>조직별 집계 불가</strong>. 응답 소요 시간 미기록. 감사 로그 부분적(updated_by 수준)</td><td>계약 1-(2)·1-(4)의 "조직별" 분석 축이 원천에서 부재. ○○분 확정 근거 없음</td><td class="c"><strong>상</strong></td></tr>
+    <tr><td>⑥ 보안</td><td>RLS·역할 통제는 양호하나 <strong>공개 URL에 noindex 부재</strong>, 첫 로그인 비밀번호 변경 강제 없음, 로그인 시도 제한 없음, README에 테스트 계정·초기 비밀번호 문서화(운영 전 제거 필요), 고객사 데이터 보존·파기 기준 미정</td><td>고객사명이 포함된 검토 도구가 검색엔진에 색인될 수 있음. 초기 비밀번호 유출 시 계정 탈취</td><td class="c"><strong>상</strong></td></tr>
+  </tbody>
+</table>
+
+<h3>3-3. 참고 레포(job-analysis-seoyon) 대비 갭 요약</h3>
+<p>참고 레포는 동일 목적군(서연그룹 직무분석)의 성숙 플랫폼으로, 운영·품질 장치가 P0~P5로 체계화되어 있습니다. 단 <strong>방법론이 다릅니다</strong> — 참고 레포는 "임직원이 직접 작성"(bottom-up), 개편 대상은 "초안 검토·보완"(top-down·착수보고 방식). 따라서 이식은 선별적으로 수행합니다(§4-2).</p>
+<table>
+  <thead><tr><th>역량</th><th class="c" style="width:150px">jobreview_seoyoneh<br>(개편 대상)</th><th class="c" style="width:150px">job-analysis-seoyon<br>(참고)</th></tr></thead>
+  <tbody>
+    <tr><td>초안 검토·보완형 방법론(착수보고 일치)</td><td class="c"><span class="tag done">보유</span></td><td class="c">－ (직접 작성형)</td></tr>
+    <tr><td>과업별 FTE 투입 비중 배분</td><td class="c">－</td><td class="c">－ (중요도·책임수준 등만)</td></tr>
+    <tr><td>온보딩 튜토리얼(필수) · 단계형 마법사 · 검증 게이트</td><td class="c">－</td><td class="c"><span class="tag done">보유</span></td></tr>
+    <tr><td>직군별 예시 · 용어 힌트 · 저장 상태 칩 · 제출 요약</td><td class="c">－</td><td class="c"><span class="tag done">보유</span></td></tr>
+    <tr><td>문의 채널(응답자 ↔ 관리자 인박스)</td><td class="c">－</td><td class="c"><span class="tag done">보유</span></td></tr>
+    <tr><td>검토 큐 · 승인/반려 · 동일 직무 비교 뷰</td><td class="c">부분(재검토 요청만)</td><td class="c"><span class="tag done">보유</span></td></tr>
+    <tr><td>조직 트리 필터 · 참여율 히트맵</td><td class="c">－</td><td class="c"><span class="tag done">보유</span></td></tr>
+    <tr><td>마감(D-day) · 리마인더 메일 배치(미설정 시 시뮬레이션)</td><td class="c">－</td><td class="c"><span class="tag done">보유</span></td></tr>
+    <tr><td>첫 로그인 PW 변경 강제 · 로그인 잠금 · noindex · 감사 로그</td><td class="c">－</td><td class="c"><span class="tag done">보유</span></td></tr>
+    <tr><td>산출물 내보내기(다중 시트 CSV + schema_version JSON)</td><td class="c">단일 Excel</td><td class="c"><span class="tag done">보유</span></td></tr>
+  </tbody>
+</table>
+<p class="sub" style="font-size:12.5px;color:var(--muted)">※ FTE 배분은 두 레포 모두 부재 — 본 개편에서 신규 설계하는 유일한 무전례 기능이며, 그만큼 §6-2 STEP 3에 가장 상세한 명세를 부여했습니다.</p>
+</section>
+
+<!-- ═══════════════ 4. To-Be 방향 ═══════════════ -->
+<section id="s4">
+<h2><span class="sn">4</span>To-Be 개편 방향</h2>
+
+<h3>4-1. 설계 원칙 5</h3>
+<table>
+  <thead><tr><th style="width:34px" class="c">#</th><th style="width:200px">원칙</th><th>내용</th></tr></thead>
+  <tbody>
+    <tr><td class="c">P1</td><td><strong>착수보고 문언 = 제품 문구</strong></td><td>화면의 안내문·라벨은 착수보고 수정안 문언을 그대로 사용합니다. 세션에서 "자료와 실제 도구가 같다"는 사실 자체가 신뢰와 검수 방어의 근거가 됩니다. 문언 원본은 §6 각 화면 명세의 인용 블록에 고정합니다.</td></tr>
+    <tr><td class="c">P2</td><td><strong>스택 유지 · 점진 증축</strong></td><td>Vite SPA + Supabase + GitHub Pages 유지. 서버가 필요한 기능(메일 발송, 제출 검증)은 기존 패턴대로 Supabase Edge Function·RPC로 구현합니다. 참고 레포의 SSR 스택 전환은 이득 대비 리스크(배포 체계 교체, 비개발자 운영 난도)가 커서 배제합니다.</td></tr>
+    <tr><td class="c">P3</td><td><strong>SME 부담 최소화의 계량화</strong></td><td>목표: 직무당 총 소요 20~30분 이내(파일럿으로 확정, R4). 이를 위해 단계 분할·기본값(균등 배분 시작점)·예시·자동 저장을 조합하고, 앱이 소요 시간을 실측합니다.</td></tr>
+    <tr><td class="c">P4</td><td><strong>데이터 = 산출물</strong></td><td>모든 테이블·Export는 계약 산출물 번호에 역추적됩니다(§9 매핑표). 산출물로 이어지지 않는 수집 항목은 만들지 않습니다(개인정보 최소화와 일치).</td></tr>
+    <tr><td class="c">P5</td><td><strong>보안 기본기 우선</strong></td><td>기능 증축 전에 Phase 0으로 노출면 축소(noindex)·계정 위생(첫 로그인 PW 변경, 테스트 계정 제거)·감사 추적을 먼저 확보합니다. 참조 기준: OWASP ASVS V2(인증)·V4(접근통제), Supabase RLS 공식 가이드.</td></tr>
+  </tbody>
+</table>
+
+<h3>4-2. 참고 레포 이식 판단표</h3>
+<table>
+  <thead><tr><th>참고 레포 자산</th><th style="width:70px" class="c">판단</th><th>적용 방식</th></tr></thead>
+  <tbody>
+    <tr><td>온보딩 튜토리얼(필수 통과) · StepChecklist · 단계 검증 게이트</td><td class="c"><span class="tag new">이식</span></td><td>검증형 5단계로 재구성(§6-2). 온보딩은 3~4장 카드로 간소화</td></tr>
+    <tr><td>ExamplePopover(직군별 예시) · FieldHint/용어집 · SaveStatusChip · SubmissionSummary · RecheckBanner</td><td class="c"><span class="tag new">이식</span></td><td>컴포넌트 개념·UX 카피 차용, 현 레포 Tailwind 3 토큰으로 재구현</td></tr>
+    <tr><td>InquiryComposer/Panel(응답자) · InquiryInbox(관리자)</td><td class="c"><span class="tag new">이식</span></td><td>직무·단계 컨텍스트가 자동 첨부되는 문의 채널(§6-1·§6-3)</td></tr>
+    <tr><td>ReviewWorkbench(검토 큐·승인/반려·동일 직무 비교)</td><td class="c"><span class="tag new">이식</span></td><td>SME 1·2인 나란히 비교 + FTE 편차 표시로 확장(§6-3)</td></tr>
+    <tr><td>OrgTreeFilter · 참여 현황 · D-day · MailSendPanel(Resend, 미설정 시 시뮬레이션 모드)</td><td class="c"><span class="tag new">이식</span></td><td>Edge Function + Resend. 발송 이력 기록, 시뮬레이션 모드 기본</td></tr>
+    <tr><td>첫 로그인 PW 변경 강제 · 로그인 잠금 · noindex · 감사 로그 · 수동 스냅샷</td><td class="c"><span class="tag new">이식</span></td><td>Phase 0~1 보안 패키지(§8)</td></tr>
+    <tr><td>stdjob 4시트 CSV + schema_version JSON 내보내기</td><td class="c"><span class="tag new">이식</span></td><td>계약 매핑 Export 5종으로 확장(§9)</td></tr>
+    <tr><td>TanStack Start SSR · Cloudflare Workers 배포</td><td class="c"><span class="tag keep">배제</span></td><td>P2 원칙(스택 유지). 현 GitHub Pages 파이프라인 유지</td></tr>
+    <tr><td>6단계 "직접 작성" 마법사 원형</td><td class="c"><span class="tag keep">배제</span></td><td>방법론 상이(작성 ≠ 검토). 구조만 차용, 내용은 검증형으로 재설계</td></tr>
+    <tr><td>AI 어시스트(오타 검수·부실 감지·자동 채움)</td><td class="c"><span class="tag imp">보류</span></td><td>관리자 전용 검토 보조로 유효하나 범위 확장 요인 — Phase 3 완료 후 별도 판단(§12)</td></tr>
+    <tr><td>명부 컬럼 매핑 업로더(P5급)</td><td class="c"><span class="tag imp">간소화</span></td><td>고정 양식 2종(SME 명부 + 조직 마스터)으로 단순화</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ═══════════════ 5. IA·흐름 ═══════════════ -->
+<section id="s5">
+<h2><span class="sn">5</span>정보구조(IA)·사용자 흐름</h2>
+
+<h3>5-1. SME 흐름 — 로그인부터 제출까지</h3>
+<div class="flow">
+  <div class="st">초대 메일<small>계정·기한 안내</small></div><div class="ar">→</div>
+  <div class="st">첫 로그인<small>PW 변경 강제</small></div><div class="ar">→</div>
+  <div class="st">시작 가이드<small>최초 1회 필수</small></div><div class="ar">→</div>
+  <div class="st">내 배정 직무<small>1~2개 · D-day</small></div><div class="ar">→</div>
+  <div class="st">검증 마법사<small>5단계 · 자동 저장</small></div><div class="ar">→</div>
+  <div class="st">최종 제출<small>서버 검증 게이트</small></div><div class="ar">→</div>
+  <div class="st g">승인 / 반려<small>반려 시 재검토 배너</small></div>
+</div>
+<p class="flow-cap">배정된 직무가 2개인 SME는 직무 단위로 마법사를 반복합니다. 어느 단계에서든 이탈해도 자동 저장으로 이어서 진행됩니다(R1·R4).</p>
+
+<h3>5-2. 관리자 흐름 — 준비 → 운영 → 검토 → 산출</h3>
+<div class="flow">
+  <div class="st">준비<small>조직 마스터·직무 초안 업로드, SME 명부·배정</small></div><div class="ar">→</div>
+  <div class="st">개시<small>초대 발송 · 마감 설정</small></div><div class="ar">→</div>
+  <div class="st">운영<small>진행 매트릭스 · 리마인더 · 문의 응대</small></div><div class="ar">→</div>
+  <div class="st">검토<small>워크벤치 승인/반려 · 워크숍 플래깅</small></div><div class="ar">→</div>
+  <div class="st">산출<small>Export 5종 → 보고서·명세표</small></div>
+</div>
+
+<h3>5-3. 사이트맵(To-Be) — 라우트 기준</h3>
+<table>
+  <thead><tr><th style="width:230px">라우트</th><th>화면</th><th style="width:70px" class="c">역할</th><th style="width:64px" class="c">구분</th></tr></thead>
+  <tbody>
+    <tr><td><code>/login</code> · <code>/change-password</code></td><td>로그인 · 첫 로그인 비밀번호 변경(강제)</td><td class="c">공통</td><td class="c"><span class="tag imp">개선</span></td></tr>
+    <tr><td><code>/guide</code></td><td>시작 가이드(온보딩) — 최초 1회 필수 통과, 이후 상시 재열람</td><td class="c">SME</td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td><code>/assignments</code></td><td>내 배정 직무 — 직무별 진행 상태·D-day·이어하기</td><td class="c">SME</td><td class="c"><span class="tag imp">개선</span></td></tr>
+    <tr><td><code>/review/:jobId</code> (+ <code>?step=1..5</code>)</td><td>검증 마법사 5단계(§6-2)</td><td class="c">SME</td><td class="c"><span class="tag imp">개선</span></td></tr>
+    <tr><td><code>/inquiries</code></td><td>내 문의 — 작성·답변 확인</td><td class="c">SME</td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td><code>/history</code></td><td>내 검토 이력(제출본 열람)</td><td class="c">SME</td><td class="c"><span class="tag keep">유지</span></td></tr>
+    <tr><td><code>/dashboard</code></td><td>운영 대시보드 — 응답률·D-day·미시작·문의 미답</td><td class="c">ADMIN</td><td class="c"><span class="tag imp">개선</span></td></tr>
+    <tr><td><code>/progress</code></td><td>진행 현황 — 조직×직무 매트릭스 · 리마인더 발송</td><td class="c">ADMIN</td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td><code>/workbench</code> · <code>/workbench/:jobId</code></td><td>검토 워크벤치 — 제출 큐, SME 비교, 승인/반려, 워크숍 플래그</td><td class="c">ADMIN</td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td><code>/analytics/fte</code></td><td>FTE 분포 — 직무·조직별 투입 비중 집계</td><td class="c">ADMIN</td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td><code>/upload</code> · <code>/jobs</code> · <code>/users</code> · <code>/admin-users</code></td><td>직무 초안 업로드(조직 마스터 시트 추가) · 직무 조회 · SME/관리자 계정</td><td class="c">ADMIN</td><td class="c"><span class="tag imp">개선</span></td></tr>
+    <tr><td><code>/exports</code></td><td>산출물 내보내기 센터(§9 E1~E5)</td><td class="c">ADMIN</td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td><code>/settings</code></td><td>운영 설정 — 마감일, 안내문, 예상 소요, 문의 담당</td><td class="c">ADMIN</td><td class="c"><span class="tag new">신규</span></td></tr>
+    <tr><td><code>/inbox</code></td><td>문의 인박스 — 답변·상태 관리</td><td class="c">ADMIN</td><td class="c"><span class="tag new">신규</span></td></tr>
+  </tbody>
+</table>
+</section>
+<!-- ═══════════════ 6. 화면별 상세 기획 ═══════════════ -->
+<section id="s6">
+<h2><span class="sn">6</span>화면별 상세 기획</h2>
+<p>각 화면은 <strong>목적 → 구성 요소 → 핵심 동작 → 화면 문구(착수보고 문언 고정)</strong> 순으로 명세합니다. Claude CLI는 이 절의 문구를 UI 카피로 그대로 사용해야 합니다(원칙 P1).</p>
+
+<h3>6-1. SME | 시작 가이드·온보딩 <span class="tag new">신규</span> — R3·R4</h3>
+<ul>
+  <li><strong>목적</strong> — 계약 1-(3)의 "작성가이드 포함"을 화면으로 이행하고, 조사 방식·FTE 개념·예상 소요를 시작 전에 각인합니다.</li>
+  <li><strong>구성</strong> — 4장 카드(가로 진행): ① 조사 취지와 방식 ② 무엇을 하게 되는지(5단계 미리보기) ③ 투입 비중(FTE)이란 ④ 소요·저장·문의 안내. 최초 로그인 시 필수 통과(마지막 카드의 "시작하기"), 이후 상단 "가이드 다시 보기"로 상시 재열람.</li>
+  <li><strong>핵심 동작</strong> — 가이드 통과 시각을 기록(<code>profiles.guide_completed_at</code>). 마법사 각 단계 상단에도 해당 단계 축약 가이드를 접이식으로 상시 노출.</li>
+  <li><strong>소요 실측(R4)</strong> — 마법사 진입~이탈을 <code>review_sessions</code>에 기록해 직무당 실소요 중앙값을 산출합니다. 화면에는 "예상 소요 약 N분"(관리자 설정값)만 표시하고, 실측치는 관리자 화면에서만 노출합니다(SME 압박 방지).</li>
+</ul>
+<div class="note"><b>화면 문구(고정) — 카드 ①·③은 착수보고 문언 그대로</b>
+<p>카드 ①: "직무·과업 초안을 HCG가 먼저 작성했습니다. 여러분은 초안이 실제 업무와 맞는지 <strong>확인·보완</strong>해 주시면 됩니다. 처음부터 작성하는 조사가 아닙니다." <span class="ref">11면</span></p>
+<p>카드 ③: "투입 비중(FTE)은 지난 1년 기준, 이 직무 수행에 실제로 들어간 시간의 <strong>상대적 비중</strong>을 과업별로 배분하는 것입니다. 직무 단위 합계가 100%가 되면 됩니다. <strong>개인별 소요 시간을 실측하는 방식이 아니므로</strong>, 시계를 재실 필요가 없습니다." <span class="ref">11면 Step 2</span></p>
+<p>카드 ④: "예상 소요는 직무당 약 N분이며, 입력은 자동 저장됩니다. 중간에 나가셔도 이어서 진행됩니다. 막히는 부분은 화면 우측 하단 '문의하기'로 남겨 주세요."</p></div>
+
+<h3>6-2. SME | 검증 마법사 5단계 <span class="tag imp">개선</span> — R1·R2·R6</h3>
+<p>현행 단일 장문 폼을 5단계 마법사로 재구성합니다. 좌측(모바일에서는 상단 가로) StepChecklist가 단계·완료 상태를 상시 표시하고, 각 단계는 <strong>검증 게이트</strong>를 통과해야 다음으로 이동합니다. 기존 자동 저장(2.5초)·적합성 컨트롤·제안 편집기는 재사용합니다<span class="ref f">src/pages/sme-review/controls.tsx</span>.</p>
+<table>
+  <thead><tr><th style="width:170px">단계</th><th>내용(기존 자산 재사용 표기)</th><th style="width:230px">다음 단계 이동 게이트</th></tr></thead>
+  <tbody>
+    <tr><td><strong>STEP 1</strong> 직무 개요 확인</td><td>직무명·직무정의 표시 + 적합성 3단계 + 의견·수정안 <span class="tag keep">FeedbackSection 재사용</span></td><td>적합성 1건 선택 필수. '부적합/일부 수정' 선택 시 의견 또는 수정안 필수</td></tr>
+    <tr><td><strong>STEP 2</strong> 과업·활동 확인·보완</td><td>Task별 적합성/수정/삭제 제안 + 신규 Task 추가(명칭·설명) <span class="tag keep">TaskActivityFeedback·SuggestionEditor 재사용</span>. 직군별 작성 예시 팝오버 <span class="tag new">신규</span></td><td>모든 Task 평가 완료. 신규 Task는 명칭 필수</td></tr>
+    <tr class="hl"><td><strong>STEP 3</strong> 투입 비중(FTE) 배분</td><td><strong>본 개편의 핵심 신규 화면</strong> — 아래 상세 명세·와이어프레임 참조 <span class="tag new">신규</span></td><td><strong>합계 = 100% (서버에서 재검증)</strong></td></tr>
+    <tr><td><strong>STEP 4</strong> Skill·수행요건 확인</td><td>Skill(Hard/Soft)·수행요건 적합성 평가 + 신규 Skill 제안 <span class="tag keep">SkillFeedback·RequirementFeedback 재사용</span></td><td>모든 항목 평가 완료</td></tr>
+    <tr><td><strong>STEP 5</strong> 최종 확인·제출</td><td>제출 요약(단계별 완료 현황, 수정·신규 제안 건수, FTE 상위 3개 과업), 미완료 항목은 해당 단계로 바로가기 링크. 제출 확인 모달 → 제출 후 읽기 전용 잠금(반려 시에만 해제)</td><td>서버 RPC <code>submit_review</code>가 전 단계 완료 + FTE 합계 100을 최종 검증(§7-2)</td></tr>
+  </tbody>
+</table>
+
+<h4>STEP 3 상세 — 투입 비중(FTE) 배분 화면</h4>
+<ul>
+  <li><strong>대상 목록</strong> — STEP 2 결과가 실시간 반영됩니다: 유지 Task + SME가 추가한 신규 제안 Task(라벨 표시). <em>삭제 제안한 Task는 목록에서 제외</em>하되 "삭제 제안 n건 제외됨" 안내를 표시합니다.</li>
+  <li><strong>입력 방식</strong> — 행별 ±5% 스텝퍼 + 직접 숫자 입력(0~100, 정수) + 행별 미니 막대. 시작점 옵션 "균등 배분으로 시작"(잔여 없이 n등분 후 미세 조정) 제공 — 백지 공포를 줄이는 P3 장치.</li>
+  <li><strong>합계 게이지</strong> — 우측(모바일 하단 고정)에 합계 링과 잔여 % 상시 표시. 100% 도달 시 "다음" 활성화, 초과 시 초과분 적색 표시.</li>
+  <li><strong>품질 가드</strong> — ⓐ 단일 Task 100% 배분 시 확인 모달("이 직무의 시간이 사실상 한 과업에 쓰인다는 의미입니다. 맞습니까?") ⓑ 0% Task 존재 시 제출 요약에 목록 표시(허용은 하되 인지시킴) ⓒ 5% 미만 다수 분산 시 안내 문구.</li>
+  <li><strong>겸직·비중 인식 지원</strong> — 헤더에 기간 기준("지난 1년")과 "이 직무에 쓴 시간만을 100%로 봅니다(타 직무 겸직 시간 제외)"를 고정 표기 — SME 1~2인 응답 편차를 줄이는 정의 통일 장치(R6).</li>
+</ul>
+
+<div class="wire" role="img" aria-label="STEP 3 투입 비중 배분 화면 와이어프레임">
+  <div class="wf-bar"><span>영업기획 · STEP 3/5 — 투입 비중(FTE) 배분</span><span class="chip">자동 저장됨 · 방금</span></div>
+  <div class="wf-grid">
+    <div class="wf-steps">
+      <div class="ok">1 직무 개요 ✓</div>
+      <div class="ok">2 과업 확인 ✓</div>
+      <div class="on">3 투입 비중</div>
+      <div>4 Skill·요건</div>
+      <div>5 최종 확인</div>
+    </div>
+    <div class="wf-main">
+      <div class="msg">지난 1년 기준, 이 직무 수행에 실제로 들어간 시간의 비중을 과업별로 배분해 주세요. 합계 100%가 되면 다음으로 진행됩니다. (개인별 시간 실측이 아닙니다)</div>
+      <div class="wf-row"><span class="t">연간 사업계획 수립<small>목표 설정·배분, 실행계획 문서화</small></span><span class="stp">− 30 +</span><span class="pct">30%</span><span class="bar"><i style="width:30%"></i></span></div>
+      <div class="wf-row"><span class="t">실적 분석·경영 보고<small>월/분기 실적 집계, 경영진 보고자료</small></span><span class="stp">− 25 +</span><span class="pct">25%</span><span class="bar"><i style="width:25%"></i></span></div>
+      <div class="wf-row"><span class="t">거래선 대응·견적 관리<small>단가 협의, 견적 산출 지원</small></span><span class="stp">− 25 +</span><span class="pct">25%</span><span class="bar"><i style="width:25%"></i></span></div>
+      <div class="wf-row sug"><span class="t">신규 수주 대응(RFQ)<small>SME 추가 제안 과업</small></span><span class="stp">− 15 +</span><span class="pct">15%</span><span class="bar"><i style="width:15%"></i></span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">삭제 제안 1건은 배분 대상에서 제외되었습니다 · <u>균등 배분으로 시작</u></div>
+    </div>
+    <div class="wf-side">
+      <div style="font-weight:700">배분 합계</div>
+      <div class="wf-ring"><i><b>95%</b><small>/ 100%</small></i></div>
+      <div class="rem">잔여 5% 를 배분해 주세요</div>
+      <div class="btn">이전 단계</div>
+      <div class="btn pri" style="opacity:.45">다음 단계 (100% 필요)</div>
+    </div>
+  </div>
+  <div class="cap">그림 6-A. STEP 3 와이어프레임 — 합계 미충족 상태(95%). 100% 도달 시 우측 하단 버튼이 활성화됩니다. 모바일에서는 좌측 단계 목록이 상단 가로 배열, 합계 게이지가 하단 고정 바로 전환됩니다.</div>
+</div>
+
+<h3>6-3. ADMIN | 운영·검토 화면군</h3>
+
+<h4>ⓐ 운영 대시보드 <span class="tag imp">개선</span> · 진행 현황 <span class="tag new">신규</span> — R6·R8·R9</h4>
+<ul>
+  <li><strong>대시보드</strong> — 상단 4지표: 응답률(제출/배정), 마감 D-day, 미시작 SME 수, 미답 문의 수. 계열사 필터 유지<span class="ref f">CompanyFilterDropdown.tsx</span>.</li>
+  <li><strong>진행 매트릭스</strong> — 행=조직(org_units 트리), 열=직무, 셀=상태 색(미시작/작성 중/제출/승인/반려). 셀 클릭 → 해당 SME·검토로 이동. "직무별 SME 배정 수" 열로 1~2명 규칙(R6) 준수 여부를 즉시 점검.</li>
+  <li><strong>리마인더</strong> — 미시작·미제출 필터 → 선택 발송(Edge Function + Resend). API 키 미설정 시 발송 시뮬레이션(로그만) — 참고 레포 패턴. 발송 이력은 <code>mail_logs</code>에 기록.</li>
+</ul>
+
+<h4>ⓑ 검토 워크벤치 <span class="tag new">신규</span> — R6·R7</h4>
+<ul>
+  <li><strong>제출 큐</strong> — 제출 완료 직무 목록(제출일·SME 수·이견 신호 배지). 정렬: 이견 신호 → 제출일.</li>
+  <li><strong>비교 뷰</strong> — 동일 직무의 SME 1·2인 응답을 나란히 표시. 적합성 판정 불일치 행, FTE 상위 과업 불일치(예: 1위 과업이 서로 다름 또는 동일 과업 비중 차 ≥ 20%p), 신규 제안 유무를 하이라이트.</li>
+  <li><strong>승인/반려</strong> — 승인 시 상태 확정, 반려 시 사유 입력 필수 → SME 화면 RecheckBanner로 노출되고 해당 단계만 재편집 열림(기존 재검토 요청 RPC 확장<span class="ref f">…add_request_rereview_rpc.sql</span>).</li>
+  <li><strong>워크숍 플래깅(R7)</strong> — 자동 후보 규칙 + 수동 지정. 자동 규칙(초기값, §12에서 임계 확정): ① '부적합' 판정 비율 ≥ 30% ② SME 간 FTE 1위 과업 불일치 ③ 신규 제안 Task ≥ 3건 ④ SME 응답 1명뿐(교차 확인 불가). 플래그 직무 목록은 사유와 함께 Export(§9 E4) — 13면 "조정 필요 직무에 한해 워크숍 병행(대상 최소화)"의 판별 근거가 됩니다.</li>
+</ul>
+
+<div class="wire" role="img" aria-label="검토 워크벤치 비교 뷰 와이어프레임">
+  <div class="wf-bar"><span>워크벤치 · 영업기획 — SME 응답 비교</span><span class="chip" style="color:var(--red);background:var(--red-soft);border-color:#E7C9C9">이견 신호 2건 · 워크숍 후보</span></div>
+  <div class="wb">
+    <div class="col"><h5>SME A (영업1팀 · 책임) — 제출 09/24</h5>
+      <div class="li"><span>연간 사업계획 수립</span><span class="v">30%</span></div>
+      <div class="li diff"><span>실적 분석·경영 보고</span><span class="v">25%</span></div>
+      <div class="li"><span>거래선 대응·견적 관리</span><span class="v">25%</span></div>
+      <div class="li diff"><span>신규 수주 대응(RFQ) <em style="font-size:10px">신규 제안</em></span><span class="v">15%</span></div>
+    </div>
+    <div class="col"><h5>SME B (영업2팀 · 선임) — 제출 09/25</h5>
+      <div class="li"><span>연간 사업계획 수립</span><span class="v">25%</span></div>
+      <div class="li diff"><span>실적 분석·경영 보고</span><span class="v">50%</span></div>
+      <div class="li"><span>거래선 대응·견적 관리</span><span class="v">20%</span></div>
+      <div class="li diff"><span>신규 수주 대응(RFQ)</span><span class="v">－ 미제안</span></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <span class="btn" style="border:1px solid var(--line);border-radius:6px;padding:5px 14px;font-weight:700;background:var(--green-soft);color:var(--green)">승인</span>
+    <span class="btn" style="border:1px solid var(--line);border-radius:6px;padding:5px 14px;font-weight:700;background:var(--red-soft);color:var(--red)">반려 (사유 필수)</span>
+    <span class="btn" style="border:1px solid var(--navy-line);border-radius:6px;padding:5px 14px;font-weight:700;background:var(--navy-soft);color:var(--navy)">워크숍 대상 지정</span>
+  </div>
+  <div class="cap">그림 6-B. 비교 뷰 — FTE 비중 차 ≥ 20%p 행과 신규 제안 불일치가 하이라이트됩니다. 이 신호가 13면의 "조정 필요 직무" 판별 근거입니다.</div>
+</div>
+
+<h4>ⓒ FTE 분포 · 업로드 · 설정 · 문의 인박스</h4>
+<ul>
+  <li><strong>FTE 분포(<code>/analytics/fte</code>)</strong> <span class="tag new">신규</span> — 직무별 과업 비중 평균(SME 평균), 조직별 피벗 표, 상위 과업 순위. 화면 하단에 종료선 문구 고정: "본 화면은 투입 비중 분포의 집계까지 제공하며, 적정 인력의 확정 수치 산정은 후속 별도 과제로 구분됩니다"<span class="ref">16면</span>.</li>
+  <li><strong>업로드</strong> <span class="tag imp">개선</span> — 기존 2시트(직무 기본 6열 + Skill·수행요건)에 <strong>③ 조직 마스터 시트</strong>(조직코드·조직명·상위조직코드)와 <strong>④ SME 명부 시트</strong>(성명·이메일·조직코드·직급·배정직무)를 추가한 통합 4시트 양식. 기존 필수열 검증·미리보기 패턴 재사용<span class="ref f">integratedUploadUtils.ts</span>.</li>
+  <li><strong>설정</strong> <span class="tag new">신규</span> — 마감일(D-day 계산 원점), 예상 소요 N분, 가이드 문구(마크다운), 문의 담당 표기, 리마인더 템플릿.</li>
+  <li><strong>문의 인박스</strong> <span class="tag new">신규</span> — 문의는 직무·단계 컨텍스트가 자동 첨부되어 도착. 답변 시 SME 화면 배너로 노출. 상태(미답/답변/종결)와 미답 경과일 표시.</li>
+</ul>
+</section>
+<!-- ═══════════════ 7. 데이터 모델 ═══════════════ -->
+<section id="s7">
+<h2><span class="sn">7</span>데이터 모델 변경</h2>
+<p>원칙: <strong>가산적(additive) 마이그레이션</strong> — 기존 테이블·데이터를 파괴하지 않고 신규 테이블·컬럼만 추가합니다. 기존 버전 보존 설계(source_version, 피드백의 원본 참조)를 그대로 계승합니다<span class="ref f">supabase/migrations/20260812084909_create_job_review_system.sql</span>.</p>
+
+<h3>7-1. 신규 테이블·컬럼 (DDL 스케치)</h3>
+<div class="pre-label">Claude CLI 참조용 — 실제 마이그레이션 작성 시 기존 파일의 RLS·인덱스·코멘트 관례를 따를 것</div>
+<pre><code><span class="cm">-- ① 조직 트리 (R8 — 조직별 분석의 원천)</span>
+create table org_units (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id),
+  parent_id uuid references org_units(id),
+  code text not null,            <span class="cm">-- 고객 조직코드(업로드 키)</span>
+  name text not null,
+  active boolean not null default true,
+  unique (company_id, code)
+);
+alter table profiles add column org_unit_id uuid references org_units(id);
+<span class="cm">-- organization 텍스트 컬럼은 과도기 표시용으로 유지</span>
+
+<span class="cm">-- ② 과업별 투입 비중 (R2 — 핵심 신규)</span>
+create table task_fte_allocations (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid not null references reviews(id) on delete cascade,
+  target_type text not null check (target_type in ('EXISTING','SUGGESTED')),
+  task_id uuid references task_activities(id),        <span class="cm">-- EXISTING일 때</span>
+  suggestion_id uuid references new_task_suggestions(id), <span class="cm">-- SUGGESTED일 때</span>
+  pct numeric(5,2) not null check (pct >= 0 and pct <= 100),
+  updated_at timestamptz not null default now(),
+  check ( (target_type='EXISTING' and task_id is not null and suggestion_id is null)
+       or (target_type='SUGGESTED' and suggestion_id is not null and task_id is null) )
+);
+create unique index on task_fte_allocations (review_id, target_type, coalesce(task_id, suggestion_id));
+
+<span class="cm">-- ③ 응답 소요 실측 (R4 — 개인정보 아님: 화면 체류 구간만)</span>
+create table review_sessions (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid not null references reviews(id) on delete cascade,
+  step smallint not null check (step between 0 and 5),  <span class="cm">-- 0=가이드</span>
+  started_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+
+<span class="cm">-- ④ 문의 채널</span>
+create table inquiries (
+  id uuid primary key default gen_random_uuid(),
+  sme_id uuid not null references profiles(id),
+  review_id uuid references reviews(id),
+  step smallint,                                <span class="cm">-- 컨텍스트 자동 첨부</span>
+  body text not null,
+  status text not null default 'OPEN' check (status in ('OPEN','ANSWERED','CLOSED')),
+  answer text, answered_by uuid references profiles(id), answered_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+<span class="cm">-- ⑤ 워크숍 플래그 (R7)</span>
+create table job_workshop_flags (
+  job_id uuid primary key references jobs(id),
+  flagged boolean not null default true,
+  source text not null check (source in ('AUTO','MANUAL')),
+  reasons text[] not null default '{}',        <span class="cm">-- 예: {'부적합 30%+','FTE 1위 불일치'}</span>
+  decided_by uuid references profiles(id),
+  updated_at timestamptz not null default now()
+);
+
+<span class="cm">-- ⑥ 감사 로그 · 메일 이력 · 운영 설정 (모듈 E·D)</span>
+create table audit_logs (
+  id bigint generated always as identity primary key,
+  actor_id uuid, action text not null, entity text not null, entity_id text,
+  meta jsonb not null default '{}', created_at timestamptz not null default now()
+);
+create table mail_logs (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('INVITE','REMINDER')),
+  recipient uuid not null references profiles(id),
+  simulated boolean not null default true,     <span class="cm">-- Resend 미설정 시 true</span>
+  sent_at timestamptz not null default now(), meta jsonb not null default '{}'
+);
+create table survey_settings (
+  company_id uuid primary key references companies(id),
+  due_date date, expected_minutes int, guide_md text,
+  inquiry_contact text, updated_at timestamptz not null default now()
+);
+
+alter table profiles add column must_change_password boolean not null default true;
+alter table profiles add column guide_completed_at timestamptz;
+alter table reviews  add column approved_at timestamptz, add column rejected_reason text;
+</code></pre>
+
+<h3>7-2. RLS·서버 검증 규칙</h3>
+<table>
+  <thead><tr><th style="width:210px">객체</th><th>규칙</th></tr></thead>
+  <tbody>
+    <tr><td><code>task_fte_allocations</code> · <code>review_sessions</code> · <code>inquiries</code></td><td>SME는 본인 review 소속 행만 select/insert/update. 관리자는 자사(company) 범위 select. 기존 보안 마이그레이션의 호출자 검증 패턴을 동일 적용<span class="ref f">…secure_review_status_and_sync.sql</span></td></tr>
+    <tr><td><code>audit_logs</code> · <code>mail_logs</code></td><td>select는 ADMIN 한정, insert는 SECURITY DEFINER RPC/Edge Function 경유만 허용(클라이언트 직접 insert 차단)</td></tr>
+    <tr class="hl"><td>제출 게이트 <code>rpc submit_review(review_id)</code></td><td><strong>클라이언트 검증만으로 제출을 허용하지 않습니다.</strong> 서버에서 ① 전 섹션 평가 완료 ② 조건부 필수 의견 충족 ③ FTE 합계 = 100.00 ④ 호출자 = 배정 SME 본인 — 4가지를 재검증한 뒤에만 상태를 SUBMITTED로 전이합니다. 실패 시 부족 항목 목록을 반환해 STEP 5 요약에 그대로 표시</td></tr>
+    <tr><td>승인/반려 <code>rpc decide_review(review_id, verdict, reason)</code></td><td>ADMIN 한정, 반려 시 reason 필수, audit_logs 기록, 반려는 해당 review만 재편집 해제</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ═══════════════ 8. 보안 ═══════════════ -->
+<section id="s8">
+<h2><span class="sn">8</span>보안·개인정보 요구사항 <span class="tag sec">Phase 0 우선</span></h2>
+<p>고객사 실명 조직·직무 데이터와 임직원 개인정보(성명·이메일·소속·직급)를 다루는 도구이므로, 기능보다 먼저 아래를 확보합니다. 참조 기준: OWASP ASVS 4.0의 인증(V2)·접근통제(V4) 요구, Supabase RLS 공식 가이드, 개인정보보호법상 최소 수집 원칙.</p>
+<table>
+  <thead><tr><th style="width:36px" class="c">#</th><th style="width:170px">항목</th><th>요구사항</th><th style="width:78px" class="c">시점</th></tr></thead>
+  <tbody>
+    <tr><td class="c">S1</td><td>검색 노출 차단</td><td><code>index.html</code>에 <code>&lt;meta name="robots" content="noindex, nofollow"&gt;</code> + <code>public/robots.txt</code>(전체 Disallow). GitHub Pages 특성상 URL 자체는 공개이므로 "비밀은 오직 인증·RLS"임을 README에 명문화</td><td class="c">Phase 0</td></tr>
+    <tr><td class="c">S2</td><td>계정 위생</td><td>첫 로그인 비밀번호 변경 강제(<code>must_change_password</code>), 비밀번호 최소 정책(길이 10+ 권장), 시드·테스트 계정(<code>admin@jobreview.local</code> 등) 운영 배포 전 삭제 절차를 체크리스트화</td><td class="c">Phase 0</td></tr>
+    <tr><td class="c">S3</td><td>로그인 보호</td><td>연속 실패 시 지연·잠금 UI + Supabase Auth rate limit 설정 점검. 세션 만료 정책 확인</td><td class="c">Phase 0</td></tr>
+    <tr><td class="c">S4</td><td>인가 일관성</td><td>신규 테이블 전부 RLS 활성 + SECURITY DEFINER 함수는 호출자 검증 필수(기존 수정 패턴 준수). service_role 키는 Edge Function 환경변수에만 존재 — 클라이언트·저장소 커밋 금지</td><td class="c">Phase 1</td></tr>
+    <tr><td class="c">S5</td><td>감사 추적</td><td>제출·승인/반려·계정 생성/삭제·업로드·Export·메일 발송을 audit_logs에 기록</td><td class="c">Phase 1~4</td></tr>
+    <tr><td class="c">S6</td><td>개인정보 최소화·파기</td><td>수집 항목을 성명·이메일·조직·직급으로 한정(주민번호·연락처 수집 금지). 로그인 화면에 수집·이용 안내 1문장. 프로젝트 종료 시 파기·이관 기준을 고객 TF와 합의(§12) — 데이터 위치(Supabase 리전) 명시</td><td class="c">Phase 0·5</td></tr>
+    <tr><td class="c">S7</td><td>백업</td><td>주요 테이블 수동 스냅샷 Export(관리자 버튼) — 참고 레포의 스냅샷 개념 간소화 이식</td><td class="c">Phase 4</td></tr>
+    <tr><td class="c">S8</td><td>접근성 기준선</td><td>WCAG 2.2 AA 지향 — 키보드 조작(스텝퍼 포함), 라벨·aria(기존 progressbar 패턴 유지), 대비 4.5:1, 오류 문구의 구체성</td><td class="c">전 Phase</td></tr>
+  </tbody>
+</table>
+<div class="warn"><b>anon key에 대한 정확한 이해</b>
+<p>Supabase anon key가 클라이언트 번들에 포함되는 것은 설계상 정상이며 비밀이 아닙니다. 실제 방어선은 RLS와 함수 권한입니다. 따라서 "키 숨기기"가 아니라 <strong>RLS 누락 0건·DEFINER 함수 호출자 검증 100%</strong>가 보안 목표로 관리되어야 합니다(현 레포의 2026-08-28 보안 마이그레이션이 이미 이 방향을 정확히 잡고 있습니다).</p></div>
+</section>
+
+<!-- ═══════════════ 9. 산출물 연계 ═══════════════ -->
+<section id="s9">
+<h2><span class="sn">9</span>산출물 연계 — Export 5종 = 계약 산출물 원천</h2>
+<p>Export 센터(<code>/exports</code>)는 아래 5종을 XLSX(실무용) + CSV/JSON(<code>schema_version</code> 포함, 분석·AI 처리용)으로 제공합니다. 각 Export가 어떤 계약 산출물·착수보고 문언의 원천인지 화면에 함께 표기해, 12월 검수 시 이 화면이 그대로 증빙 목록이 되게 합니다.</p>
+<table>
+  <thead><tr><th style="width:44px" class="c">ID</th><th style="width:190px">Export</th><th>구성(시트/필드 요지)</th><th style="width:170px">산출물 매핑</th></tr></thead>
+  <tbody>
+    <tr><td class="c">E1</td><td>업무조사 응답 원본</td><td>직무 × SME × 항목: 적합성 판정, 의견, 수정·삭제·신규 제안, FTE 비중, 제출·승인 시각</td><td><span class="ref c">계약 1-(2)</span><span class="ref c">계약 1-(3)</span><span class="ref">23면 현황진단 행</span></td></tr>
+    <tr class="hl"><td class="c">E2</td><td><strong>직무·조직별 투입 비중 분포</strong></td><td>피벗: 직무 × 과업 × 조직(org_units) — SME 평균 비중, 표준편차, 응답 수. 승인 응답 기준/전체 기준 토글</td><td><span class="ref c">계약 1-(4)</span><span class="ref c">계약 3-(4) 원천</span><span class="ref">16면</span></td></tr>
+    <tr><td class="c">E3</td><td>직무기술서 원천 4시트</td><td>job_description / task_activity(<strong>FTE 비중 열 포함</strong>) / skill / requirements — 검토 반영(승인) 기준</td><td><span class="ref c">계약 2-(2) JD</span><span class="ref">23면 직무기술서 구성항목</span></td></tr>
+    <tr><td class="c">E4</td><td>워크숍 대상 직무 목록</td><td>직무, 플래그 사유(자동/수동), SME 이견 지표 — "대상 최소화" 판별 근거</td><td><span class="ref">13면</span></td></tr>
+    <tr><td class="c">E5</td><td>검토 이력·감사 로그</td><td>상태 전이 이력, 반려 사유, 관리자 행위 로그, 소요 실측 요약(직무당 중앙값 N분)</td><td>검수 대응 · <span class="ref">11면 ○○분 확정 근거</span></td></tr>
+  </tbody>
+</table>
+<div class="note"><b>산출물 명세표와의 연결</b>
+<p>과업범위 합의서의 산출물 명세표(착수보고 수정안 C장 체크리스트) 작성 시, E1~E3의 필드 정의를 "검수 기준" 열에 그대로 인용할 수 있습니다. 예: 1-(4) 검수 기준 = "E2 Export의 직무×조직 피벗이 승인 응답 기준으로 산출 가능할 것". 플랫폼 명세가 곧 검수 기준이 되므로 문언 분쟁 여지가 줄어듭니다.</p></div>
+</section>
+<!-- ═══════════════ 10. 로드맵 ═══════════════ -->
+<section id="s10">
+<h2><span class="sn">10</span>구현 로드맵 — Phase 0~5</h2>
+<p>순서 논리: <strong>보안(0) → 데이터(1) → SME 경험(2) → 관리자(3) → 운영·산출(4) → 파일럿·확정(5)</strong>. 각 Phase는 독립 배포 가능 단위이며, 완료 기준(DoD)을 충족해야 다음 Phase로 이동합니다. 공수는 Claude CLI 작업 세션 기준 추정치입니다.</p>
+
+<div class="phase"><div class="ph"><span class="no">P0</span><b>보안 기반</b><span class="dur">추정 0.5일 · <span class="tag sec">선행 필수</span></span></div><div class="pb">
+<p>S1~S3 + audit_logs 골격. <strong>DoD</strong>: ① noindex·robots.txt 배포 확인 ② 신규 SME 계정이 첫 로그인에서 비밀번호 변경 없이는 어떤 화면에도 진입 불가 ③ 시드 계정 제거 절차가 README에 반영 ④ <code>npm run typecheck && npm run build</code> 통과.</p></div></div>
+
+<div class="phase"><div class="ph"><span class="no">P1</span><b>데이터 모델 확장</b><span class="dur">추정 0.5~1일</span></div><div class="pb">
+<p>§7-1 신규 테이블 8종 + RLS + <code>submit_review</code>·<code>decide_review</code> RPC. 조직 마스터·SME 명부 업로드(4시트 양식). <strong>DoD</strong>: ① 마이그레이션이 빈 DB와 기존 DB 양쪽에서 순서 실행 성공(가산성 검증) ② SME 계정으로 타인 review의 FTE 행 insert 시도가 RLS로 거부 ③ FTE 합계 99.99에서 submit_review가 부족 항목을 반환.</p></div></div>
+
+<div class="phase"><div class="ph"><span class="no">P2</span><b>SME 검증 마법사 + FTE + 가이드</b><span class="dur">추정 2~3일 · 최대 공수</span></div><div class="pb">
+<p>§6-1·§6-2 전체 — 마법사 골격·StepChecklist·게이트, STEP 3 FTE 화면(그림 6-A), 시작 가이드, 예시 팝오버·용어 힌트, 문의 작성, 소요 세션 기록. 기존 섹션 컴포넌트는 단계 안으로 이식(로직 재사용). <strong>DoD</strong>: ① STEP 2에서 Task 추가·삭제 제안 시 STEP 3 목록이 즉시 동기화 ② 합계 100% 미만이면 다음·제출 모두 차단(클라+서버) ③ 마법사 중도 이탈 후 재진입 시 동일 단계·값 복원 ④ 모바일(390px)에서 STEP 3 조작 가능 ⑤ 화면 문구가 §6 고정 문언과 일치.</p></div></div>
+
+<div class="phase"><div class="ph"><span class="no">P3</span><b>관리자 워크벤치·현황</b><span class="dur">추정 2일</span></div><div class="pb">
+<p>§6-3 ⓐⓑ — 진행 매트릭스, 비교 뷰(그림 6-B), 승인/반려, 워크숍 자동 규칙·수동 플래그, 문의 인박스. <strong>DoD</strong>: ① 반려 시 SME 화면에 사유 배너 노출·해당 review만 편집 해제 ② FTE 비중 차 ≥ 20%p 행 하이라이트 ③ 자동 플래그 사유가 reasons 배열에 축적 ④ 계열사 필터가 전 화면에서 일관 동작.</p></div></div>
+
+<div class="phase"><div class="ph"><span class="no">P4</span><b>운영·산출</b><span class="dur">추정 1~2일</span></div><div class="pb">
+<p>Export 5종(§9), 마감 D-day, 리마인더 메일(Edge Function + Resend, 미설정 시 시뮬레이션), 수동 스냅샷. <strong>DoD</strong>: ① E1~E5가 XLSX·CSV·JSON으로 다운로드 ② E2 피벗 수치가 원본 응답 수기 검산과 일치(표본 3개 직무) ③ Resend 키 없이도 발송 흐름이 mail_logs(simulated=true)로 완결.</p></div></div>
+
+<div class="phase"><div class="ph"><span class="no">P5</span><b>파일럿·확정</b><span class="dur">추정 1일 + 파일럿 기간</span></div><div class="pb">
+<p>내부 2~3인 파일럿 → 소요 실측으로 "직무당 약 ○○분" 확정(R4) → 문구·기본값 조정 → 접근성·부하(동시 30~50명 응답) 점검 → 시드 계정 제거·운영 계정 전환. <strong>DoD</strong>: 파일럿 체크리스트 전 항목 통과 + PM 확인 4건(§12) 반영.</p></div></div>
+</section>
+
+<!-- ═══════════════ 11. CLI 작업 지시 ═══════════════ -->
+<section id="s11">
+<h2><span class="sn">11</span>Claude CLI 작업 지시</h2>
+
+<h3>11-1. 공통 작업 규칙 (모든 Phase 프롬프트에 자동 적용)</h3>
+<ul class="chk">
+  <li>이 기획안 파일을 레포 루트에 <code>docs/PLAN.html</code>로 커밋하고, 매 Phase 프롬프트에서 해당 §를 참조 지시합니다(아래 프롬프트에 반영됨).</li>
+  <li>브랜치: <code>revamp/phase-N</code> 단위 작업 → PR → main 머지 → Pages 자동 배포. Phase 간 브랜치 혼합 금지.</li>
+  <li>마이그레이션: 기존 명명 관례(타임스탬프_설명.sql)와 파일 상단 주석 서식(문제/조치/결과)을 따르고, 반드시 가산적으로 작성. 적용 스크립트는 기존 <code>supabase/APPLY_*.sql</code> 관례 준수.</li>
+  <li>기존 컴포넌트(<code>sme-review/controls.tsx</code>의 SuitabilityControl·AutoTextarea·ReviewItemCard 등) 최우선 재사용 — 신규 스타일 체계 도입 금지, Tailwind 기존 토큰 사용.</li>
+  <li>UI 문구는 기획안 §6의 고정 문언을 글자 단위로 사용. 임의 요약·의역 금지.</li>
+  <li>모든 Phase 종료 조건: <code>npm run typecheck && npm run lint && npm run build</code> 통과 + 해당 Phase DoD 자가 검증 결과를 PR 본문에 표로 기록.</li>
+  <li>비밀값(service_role, Resend 키)은 코드·저장소에 절대 기록 금지 — Supabase 대시보드/Actions secrets에만 존재.</li>
+</ul>
+
+<h3>11-2. Phase별 복붙 프롬프트</h3>
+
+<div class="pre-label">Phase 0 — 보안 기반</div>
+<pre><code>docs/PLAN.html의 §8(보안)과 §10 P0을 읽고 다음을 수행해줘.
+브랜치 revamp/phase-0에서 작업한다.
+1) index.html에 robots noindex,nofollow 메타 추가 + public/robots.txt(전체 Disallow) 생성.
+2) profiles.must_change_password(boolean, default true) 마이그레이션 추가.
+   로그인 후 이 값이 true면 /change-password 외 모든 라우트를 차단하는 강제 변경
+   화면을 만들고, 변경 성공 시 false로 갱신한다(본인 행만 update 가능하도록 RLS 확인).
+3) 로그인 연속 실패 5회 시 60초 잠금 UI를 LoginPage에 추가한다(클라이언트 지연 +
+   실패 카운트, Supabase Auth rate limit 설정은 README에 점검 항목으로 기록).
+4) audit_logs 테이블(§7-1 ⑥)과 기록용 SECURITY DEFINER RPC(log_audit)를 추가하되
+   호출자 검증 패턴은 supabase/migrations/20260828010500_secure_review_status_and_sync.sql
+   의 방식을 그대로 따른다. select는 ADMIN만.
+5) README의 테스트 계정 절에 "운영 배포 전 제거 필수" 절차를 명시한다.
+제약: 기존 테이블·데이터 파괴 금지, UI 문구는 PLAN §6 어조 유지.
+완료 기준: PLAN §10 P0의 DoD 4건. typecheck/lint/build 통과 후 결과를 보고해줘.</code></pre>
+
+<div class="pre-label">Phase 1 — 데이터 모델 확장</div>
+<pre><code>docs/PLAN.html의 §7(데이터 모델)과 §10 P1을 읽고 다음을 수행해줘.
+브랜치 revamp/phase-1에서 작업한다.
+1) §7-1의 신규 테이블을 마이그레이션으로 추가한다: org_units,
+   task_fte_allocations, review_sessions, inquiries, job_workshop_flags,
+   mail_logs, survey_settings + profiles/reviews 컬럼 추가.
+   전 테이블 RLS 활성, 정책은 §7-2 표를 따른다.
+2) rpc submit_review(review_id)를 만든다 — 서버에서 ①전 섹션 평가 완료
+   ②조건부 필수 의견 ③FTE 합계=100.00 ④호출자=배정 SME 본인을 재검증하고,
+   실패 시 부족 항목 배열을 반환한다. 기존 제출 로직은 이 RPC 경유로 교체한다.
+3) rpc decide_review(review_id, verdict, reason)를 만든다 — ADMIN 한정,
+   반려 시 reason 필수, audit_logs 기록.
+4) UploadPage의 통합 업로드에 시트 ③조직 마스터(조직코드/조직명/상위조직코드),
+   ④SME 명부(성명/이메일/조직코드/직급/배정직무)를 추가하고 기존 검증·미리보기
+   패턴(src/lib/integratedUploadUtils.ts)을 확장한다. 양식 다운로드도 갱신.
+제약: 가산적 마이그레이션만. 기존 review 상태 머신(5상태)은 변경하지 않는다.
+완료 기준: PLAN §10 P1의 DoD 3건 + RLS 거부 테스트 시나리오를 PR에 기록해줘.</code></pre>
+
+<div class="pre-label">Phase 2 — SME 검증 마법사 + FTE + 가이드</div>
+<pre><code>docs/PLAN.html의 §6-1, §6-2(그림 6-A 포함)와 §10 P2를 읽고 다음을 수행해줘.
+브랜치 revamp/phase-2에서 작업한다.
+1) /review/:jobId를 5단계 마법사로 재구성한다(?step=1..5). 좌측 StepChecklist
+   (모바일은 상단 가로), 단계별 검증 게이트, 저장 상태 칩. 기존
+   FeedbackSection/TaskActivityFeedback/SkillFeedback/RequirementFeedback/
+   SuggestionEditor는 각 단계 안으로 이식해 로직을 재사용한다.
+2) STEP 3 FTE 배분 화면을 §6-2 상세 명세대로 구현한다: STEP 2 결과(유지+신규
+   제안, 삭제 제안 제외) 실시간 반영, ±5% 스텝퍼+직접 입력+미니 막대,
+   균등 배분 시작 버튼, 합계 링(100% 게이트), 단일 100% 확인 모달,
+   0% 항목 요약 표시. 저장은 task_fte_allocations에 자동 저장 패턴(2.5초)으로.
+3) /guide 시작 가이드 4장 카드를 만들고 최초 1회 필수 통과 처리
+   (profiles.guide_completed_at). 카드 문구는 PLAN §6-1의 고정 문언 그대로.
+4) 마법사 진입/이탈을 review_sessions에 기록한다(step 포함).
+5) 문의 작성 버튼(화면 우측 하단)을 전 단계에 두고, 직무·현재 step이 자동
+   첨부되게 한다(inquiries insert).
+6) STEP 5 제출 요약과 submit_review RPC 연동 — 서버가 반환한 부족 항목을
+   해당 단계 바로가기 링크로 표시한다.
+제약: UI 문구는 PLAN §6 문언 그대로. 390px 모바일에서 STEP 3 조작 가능해야 한다.
+완료 기준: PLAN §10 P2의 DoD 5건. 각 게이트의 통과/차단 시나리오를 PR에 기록해줘.</code></pre>
+
+<div class="pre-label">Phase 3 — 관리자 워크벤치·현황</div>
+<pre><code>docs/PLAN.html의 §6-3 ⓐⓑ(그림 6-B 포함)와 §10 P3을 읽고 다음을 수행해줘.
+브랜치 revamp/phase-3에서 작업한다.
+1) /progress 진행 매트릭스: 행=org_units 트리, 열=직무, 셀=상태 색.
+   직무별 SME 배정 수 표시(1~2명 규칙 점검), 미시작/미제출 필터.
+2) /workbench 제출 큐 + /workbench/:jobId 비교 뷰: SME 1·2인 응답을 나란히,
+   적합성 불일치 행과 FTE 비중 차 ≥ 20%p 행 하이라이트, 신규 제안 유무 표시.
+   승인/반려는 decide_review RPC 사용, 반려 사유는 SME 화면 RecheckBanner로.
+3) 워크숍 플래깅: 자동 규칙 4종(부적합≥30%, FTE 1위 과업 불일치, 신규 제안≥3,
+   SME 응답 1명) 계산 + 수동 지정/해제, job_workshop_flags에 사유 축적.
+4) /inbox 문의 인박스: 상태(미답/답변/종결), 미답 경과일, 답변 시 SME 배너 노출.
+제약: 임계값(30%/20%p/3건)은 상수 파일로 분리해 §12 확정 후 조정 가능하게.
+완료 기준: PLAN §10 P3의 DoD 4건을 PR에 기록해줘.</code></pre>
+
+<div class="pre-label">Phase 4 — 운영·산출(Export)</div>
+<pre><code>docs/PLAN.html의 §9(Export 5종)와 §10 P4를 읽고 다음을 수행해줘.
+브랜치 revamp/phase-4에서 작업한다.
+1) /exports 센터: E1~E5를 XLSX + CSV + JSON(schema_version 포함)으로 생성.
+   각 카드에 계약 산출물 매핑 라벨(§9 표의 매핑 열)을 그대로 표기한다.
+   E2는 승인 응답 기준/전체 기준 토글, E5에 직무당 소요 중앙값 요약 포함.
+2) /settings: 마감일(D-day 원점), 예상 소요 N분, 가이드 문구, 문의 담당,
+   리마인더 템플릿 — survey_settings CRUD(ADMIN 한정).
+3) 리마인더 메일: Edge Function(send-reminder) + Resend. RESEND_API_KEY
+   미설정 시 시뮬레이션 모드로 mail_logs(simulated=true)만 기록.
+   /progress의 미시작·미제출 필터에서 선택 발송. Export 실행도 audit_logs 기록.
+4) 수동 스냅샷: 주요 테이블 JSON 일괄 다운로드 버튼(ADMIN).
+제약: 비밀키는 코드에 절대 포함 금지. E2 수치는 원본 검산 방법을 PR에 기록.
+완료 기준: PLAN §10 P4의 DoD 3건을 PR에 기록해줘.</code></pre>
+
+<div class="pre-label">Phase 5 — 파일럿·확정</div>
+<pre><code>docs/PLAN.html의 §10 P5와 §8 S6·S8을 읽고 다음을 수행해줘.
+브랜치 revamp/phase-5에서 작업한다.
+1) 파일럿 체크리스트 문서(docs/PILOT.md)를 만든다: 계정 발급→가이드→
+   5단계 완주→제출→반려→재제출→승인→Export 검산까지 전 경로 + 모바일 390px
+   + 키보드 전용 조작 + 대비 점검 항목.
+2) review_sessions 기반 직무당 소요 중앙값을 /dashboard에 표시하고,
+   settings의 "예상 소요 N분" 갱신 안내를 덧붙인다(착수보고 ○○분 확정 근거).
+3) 접근성 보완: 스텝퍼·게이지 aria, 오류 문구 구체화, 포커스 이동 점검.
+4) 운영 전환 절차를 README에 확정: 시드 계정 제거, 관리자 운영 계정 생성,
+   Supabase 리전·백업·프로젝트 종료 시 파기 절차 기재.
+완료 기준: PILOT.md 전 항목 통과 기록 + PLAN §12의 PM 확인 4건 반영 여부 표.</code></pre>
+</section>
+
+<!-- ═══════════════ 12. 오픈 이슈 ═══════════════ -->
+<section id="s12">
+<h2><span class="sn">12</span>오픈 이슈·확인 사항</h2>
+<table>
+  <thead><tr><th style="width:36px" class="c">#</th><th style="width:210px">이슈</th><th>내용·권고</th><th style="width:96px" class="c">확인 주체</th></tr></thead>
+  <tbody>
+    <tr><td class="c">1</td><td>직무당 예상 소요 ○○분</td><td>파일럿(P5) 실측 중앙값으로 확정 후 착수보고·가이드 문구에 반영 <span class="ref">11면 "착수 후 확정"</span></td><td class="c">파일럿 결과</td></tr>
+    <tr><td class="c">2</td><td>조직 마스터 입수</td><td>고객 조직도(조직코드 체계 포함)의 입수 시점·형식 — 업로드 시트 ③의 선행 조건. 미입수 시 임시 코드로 개시 후 매핑 교체 가능하나 이중 작업 발생</td><td class="c">고객 TF</td></tr>
+    <tr><td class="c">3</td><td>SME 배정 예외 처리</td><td>겸직 직무(1인이 2개 직무 배정)와 SME 1인뿐인 직무의 취급 — 후자는 자동 워크숍 후보 규칙에 이미 포함(§6-3ⓑ). 배정 상한·기준 문서화 권장</td><td class="c">PM(상무)</td></tr>
+    <tr><td class="c">4</td><td>메일 발신 도메인</td><td>초대·리마인더 실발송 시 SPF·DKIM 인증 도메인 필요(HCG 또는 고객 도메인). 미확정 기간은 시뮬레이션 모드 + 관리자 수동 안내로 운영 가능</td><td class="c">HCG IT</td></tr>
+    <tr><td class="c">5</td><td>워크숍 플래그 임계값</td><td>초기값(부적합 30% · FTE 차 20%p · 신규 3건)은 가설이므로 파일럿 후 조정 — 상수 파일로 분리해 둠(P3 제약)</td><td class="c">PM(상무)</td></tr>
+    <tr><td class="c">6</td><td>데이터 보존·파기</td><td>프로젝트 종료 시 응답 데이터의 이관(고객 제공) 범위·파기 시점·Supabase 프로젝트 처리 — 과업범위 합의서 또는 회의록에 1문장 반영 권장</td><td class="c">PM(상무)·TF</td></tr>
+    <tr><td class="c">7</td><td>참고 레포 AI 검토 보조 이식</td><td>오타 검수·부실 응답 감지는 관리자 검토 품질에 유효하나 범위 확장 요인 — P3 완료 후 잔여 일정 기준으로 판단</td><td class="c">사용자</td></tr>
+    <tr><td class="c">8</td><td>기존 응답 데이터 존재 여부</td><td>현 배포본에 실제 응답이 이미 있다면 P1 마이그레이션 전 스냅샷 필수. 없다면 자유롭게 진행</td><td class="c">사용자</td></tr>
+  </tbody>
+</table>
+</section>
+
+<footer>
+서연이화 업무조사·SME 검증 플랫폼 개편 기획안 v1.0 · 2026-08-31 · 기준: 착수보고 v1.7 수정안(2026-08-31)·계약 산출물 매핑표 · 대상: 0101-commits/jobreview_seoyoneh · 참고: 0101-commits/job-analysis-seoyon<br>
+본 문서의 공수·임계값은 추정이며, §12의 확인 절차를 통해 확정합니다.
+</footer>
+
+</main>
+</div>
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('nav.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'))}).filter(Boolean);
+  function mark(){
+    var y=window.scrollY+120, cur=secs[0];
+    secs.forEach(function(s){ if(s.offsetTop<=y) cur=s; });
+    links.forEach(function(a){ a.classList.toggle('on', a.getAttribute('href')==='#'+cur.id); });
+  }
+  window.addEventListener('scroll', mark, {passive:true}); mark();
+})();
+</script>
+</body>
+</html>
