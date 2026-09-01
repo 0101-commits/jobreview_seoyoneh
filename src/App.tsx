@@ -20,7 +20,9 @@ import {
   ClipboardList,
   Clock3,
   FileSpreadsheet,
+  Inbox,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
   Menu,
   MessageSquareText,
@@ -42,6 +44,10 @@ import { HistoryPage } from '@/pages/ReviewHistoryPage';
 import { MyAssignmentsPage } from '@/pages/MyAssignmentsPage';
 import { GuidePage } from '@/pages/GuidePage';
 import { MyInquiriesPage } from '@/pages/MyInquiriesPage';
+import { ProgressMatrixPage } from '@/pages/ProgressMatrixPage';
+import { WorkbenchPage } from '@/pages/WorkbenchPage';
+import { JobComparePage } from '@/pages/workbench/compare';
+import { InquiryInboxPage } from '@/pages/InquiryInboxPage';
 import { GUIDE_REOPEN_LINK } from '@/pages/sme-review/copy';
 import type { StepNo } from '@/pages/sme-review/wizardTypes';
 import type { Role, User } from '@/types';
@@ -53,6 +59,10 @@ type NavItem = { to: string; label: string; sub: string; Icon: typeof LayoutDash
 const adminNav: NavItem[] = [
   { to: '/dashboard', label: '대시보드', sub: '전체 검토 현황을 확인하세요', Icon: LayoutDashboard },
   { to: '/reviews', label: '검토 현황', sub: 'SME별 검토 진행 상태', Icon: BarChart3 },
+  // §5-2 라우트 표의 문언을 그대로 쓴다(진행 현황 · 검토 워크벤치 · 문의 인박스).
+  { to: '/progress', label: '진행 현황', sub: '조직×직무 매트릭스 · 리마인더', Icon: LayoutGrid },
+  { to: '/workbench', label: '검토 워크벤치', sub: '제출 큐 · SME 비교 · 승인/반려', Icon: ClipboardCheck },
+  { to: '/inbox', label: '문의 인박스', sub: '문의 답변·상태 관리', Icon: Inbox },
   { to: '/jobs', label: '직무정보 관리', sub: '등록된 직무정보를 관리하세요', Icon: FileSpreadsheet },
   { to: '/upload', label: '직무정보 업로드', sub: 'Excel 파일로 일괄 등록', Icon: Upload },
   { to: '/users', label: 'SME 계정 관리', sub: 'SME 계정을 등록·관리하세요', Icon: Users },
@@ -74,6 +84,10 @@ const smeHome = '/assignments';
 const titles: [string, string][] = [
   ['/dashboard', '관리자 대시보드'],
   ['/reviews', 'SME 검토 현황'],
+  ['/progress', '진행 현황'],
+  // '/workbench'가 '/workbench/:jobId'(비교 뷰)까지 함께 잡는다 — titleOf가 startsWith로도 본다.
+  ['/workbench', '검토 워크벤치'],
+  ['/inbox', '문의 인박스'],
   ['/jobs', '직무정보 관리'],
   ['/upload', '직무정보 업로드'],
   ['/users', 'SME 계정 관리'],
@@ -357,6 +371,19 @@ function Shell({
                     path="/reviews"
                     element={<ReviewTable companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
                   />
+                  <Route
+                    path="/progress"
+                    element={<ProgressMatrixPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                  />
+                  <Route
+                    path="/workbench"
+                    element={<WorkbenchRoute companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                  />
+                  <Route path="/workbench/:jobId" element={<CompareRoute />} />
+                  <Route
+                    path="/inbox"
+                    element={<InquiryInboxPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                  />
                   <Route path="/jobs" element={<JobsRoute userId={user.id} />} />
                   <Route path="/jobs/:jobId" element={<JobsRoute userId={user.id} />} />
                   <Route path="/upload" element={<UploadPage />} />
@@ -505,6 +532,32 @@ function DashboardRoute({
   );
 }
 
+/** 제출 큐(/workbench) → 비교 뷰(/workbench/:jobId). 다른 관리자 화면과 같이 URL을 App이 정한다. */
+function WorkbenchRoute({
+  companyFilter,
+  setCompanyFilter,
+}: {
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
+}) {
+  const navigate = useNavigate();
+  return (
+    <WorkbenchPage
+      companyFilter={companyFilter}
+      setCompanyFilter={setCompanyFilter}
+      onOpenJob={(jobId) => navigate(`/workbench/${jobId}`)}
+    />
+  );
+}
+
+/** 비교 뷰(§6-3 ⓑ 그림 6-B). 직무 id가 없는 주소는 제출 큐로 돌려보낸다. */
+function CompareRoute() {
+  const { jobId } = useParams();
+  const navigate = useNavigate();
+  if (!jobId) return <Navigate to="/workbench" replace />;
+  return <JobComparePage jobId={jobId} onBack={() => navigate('/workbench')} />;
+}
+
 function JobsRoute({ userId }: { userId: string }) {
   const { jobId } = useParams();
   const navigate = useNavigate();
@@ -571,6 +624,11 @@ function ReviewRoute({ user }: { user: User }) {
       onDirtyChange={setDirty}
       onBack={() => {
         if (confirmLeave()) navigate(smeHome);
+      }}
+      // 문의 답변 배너(§6-3 ⓒ) → '내 문의'. onBack과 같은 이탈 가드를 태운다 —
+      // 검토 화면을 떠나는 이동이라 작성 중인 입력이 있으면 먼저 확인을 거쳐야 한다.
+      onOpenInquiries={() => {
+        if (confirmLeave()) navigate('/inquiries');
       }}
     />
   );

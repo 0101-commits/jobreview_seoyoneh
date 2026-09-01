@@ -1,12 +1,85 @@
 // 관리자 대시보드 — 관리자(ADMIN) 홈 화면. 전체 검토 현황 요약을 보여준다.
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, RotateCw, Upload } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarClock,
+  ClipboardCheck,
+  MessageSquareText,
+  RotateCw,
+  Upload,
+  UserX,
+} from 'lucide-react';
 import { fetchCompanies, fetchReviewStatusResult, type Company, type ReviewStatusRow } from '@/lib/jobApi';
+import { fetchDashboardStats, type DashboardStats } from '@/lib/adminApi';
 import { Button } from '@/components/ui/Button';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { setReviewTablePrefilter, type StatusChip } from '@/pages/ReviewStatusPage';
 
 const timeFormat: Intl.DateTimeFormatOptions = { dateStyle: 'long', timeStyle: 'short' };
+const dateFormat: Intl.DateTimeFormatOptions = { dateStyle: 'long' };
+
+// ── §6-3 ⓐ 상단 4지표 ───────────────────────────────────────────────
+
+/**
+ * 마감 D-day 문구. dDay는 adminApi가 survey_settings.due_date로 계산한다.
+ * 미설정이면 숫자를 지어내지 않고 "마감일 미설정"으로 둔다 —
+ * 없는 마감일을 그럴듯한 D-30으로 그리는 순간 그 화면이 잘못된 근거가 된다.
+ */
+function dDayText(dDay: number | null): string {
+  if (dDay === null) return '';
+  if (dDay > 0) return `D-${dDay}`;
+  if (dDay === 0) return 'D-day';
+  return `D+${-dDay}`;
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  tone,
+  Icon,
+  to,
+  linkLabel,
+  state,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tone: string;
+  Icon: typeof CalendarClock;
+  to: string;
+  linkLabel: string;
+  /** 'loading' · 'error'일 때는 값을 그리지 않는다. 0과 구분되지 않기 때문이다. */
+  state: 'ready' | 'loading' | 'error';
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex min-h-11 flex-col border border-border bg-card p-4 shadow-sm transition hover:border-primary"
+    >
+      <p className="flex items-center gap-1.5 text-xs text-foreground-muted">
+        <Icon size={13} className="shrink-0" aria-hidden="true" />
+        {label}
+      </p>
+      <p
+        className={`mt-3 font-semibold ${value.length > 5 ? 'text-lg' : 'text-2xl'} ${
+          state === 'ready' ? tone : 'text-foreground-subtle'
+        }`}
+      >
+        {state === 'ready' ? value : '–'}
+      </p>
+      <p className="mt-1 text-[11px] text-foreground-subtle">
+        {state === 'loading' ? '불러오는 중…' : state === 'error' ? '조회 실패' : sub}
+      </p>
+      <p className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+        {linkLabel}
+        <ArrowRight size={11} aria-hidden="true" />
+      </p>
+    </Link>
+  );
+}
 
 export function Dashboard({
   go,
@@ -29,9 +102,35 @@ export function Dashboard({
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // §6-3 ⓐ 상단 4지표. 검토 현황 조회와 별개로 실패할 수 있으므로 상태를 따로 둔다
+  // (한쪽이 실패했다고 다른 쪽까지 '–'로 지우면 볼 수 있는 수치를 잃는다).
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState('');
+
   useEffect(() => {
     fetchCompanies().then(setCompanies);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatsLoading(true);
+    (async () => {
+      const result = await fetchDashboardStats(filter === 'all' ? null : filter);
+      if (cancelled) return;
+      if (result.ok) {
+        setStats(result.data);
+        setStatsError('');
+      } else {
+        setStats(null);
+        setStatsError(result.error);
+      }
+      setStatsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filter, reloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +246,59 @@ export function Dashboard({
     .join(', ');
   const donutLabel = `검토 상태 분포. 전체 ${total}건. ${dist.map((d) => `${d.label} ${d.n}건 ${pct(d.n)}%`).join(', ')}.`;
 
+  // ── §6-3 ⓐ 상단 4지표: 응답률(제출/배정) · 마감 D-day · 미시작 SME 수 · 미답 문의 수 ──
+  const statsState: 'ready' | 'loading' | 'error' = statsLoading ? 'loading' : statsError ? 'error' : 'ready';
+  const responseRatePct = stats ? Math.round(stats.responseRate * 1000) / 10 : 0;
+  // 마감일은 계열사별로 다르므로 '전체 회사'에서는 adminApi가 하나로 합치지 않고 null을 준다.
+  // 이때 '미설정'이라고 단정하면 거짓이 되므로 왜 안 보이는지를 그대로 적는다.
+  const dueSub = stats?.dueDate
+    ? `${new Date(stats.dueDate).toLocaleDateString('ko-KR', dateFormat)} 마감`
+    : filter === 'all'
+      ? '계열사를 선택하면 마감일이 표시됩니다'
+      : '— 운영 설정에서 지정';
+  const kpis: Parameters<typeof KpiCard>[0][] = [
+    {
+      label: '응답률(제출/배정)',
+      value: `${responseRatePct}%`,
+      sub: `제출 ${stats?.submittedCount ?? 0} / 배정 ${stats?.assignedCount ?? 0}건`,
+      tone: 'text-primary',
+      Icon: ClipboardCheck,
+      to: '/workbench',
+      linkLabel: '검토 워크벤치 열기',
+      state: statsState,
+    },
+    {
+      label: '마감 D-day',
+      value: stats && stats.dDay !== null ? dDayText(stats.dDay) : '마감일 미설정',
+      sub: dueSub,
+      tone: stats && stats.dDay !== null && stats.dDay < 0 ? 'text-destructive' : 'text-foreground',
+      Icon: CalendarClock,
+      to: '/progress',
+      linkLabel: '진행 현황 보기',
+      state: statsState,
+    },
+    {
+      label: '미시작 SME 수',
+      value: `${stats?.notStartedSme ?? 0}명`,
+      sub: '아직 한 번도 검토를 열지 않은 SME',
+      tone: 'text-warning',
+      Icon: UserX,
+      to: '/progress',
+      linkLabel: '진행 현황 보기',
+      state: statsState,
+    },
+    {
+      label: '미답 문의 수',
+      value: `${stats?.openInquiries ?? 0}건`,
+      sub: '답변을 기다리는 문의',
+      tone: 'text-destructive',
+      Icon: MessageSquareText,
+      to: '/inbox',
+      linkLabel: '문의 인박스 열기',
+      state: statsState,
+    },
+  ];
+
   return (
     <>
       <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
@@ -166,6 +318,24 @@ export function Dashboard({
             <Upload size={16} /> 직무정보 업로드
           </Button>
         </div>
+      </div>
+
+      {statsError && (
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-2">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>상단 지표를 불러오지 못했어요. {statsError} 잠시 후 다시 시도해 주세요.</span>
+          </p>
+          <Button variant="secondary" size="sm" onClick={() => setReloadKey((k) => k + 1)} className="shrink-0">
+            <RotateCw size={14} /> 다시 시도
+          </Button>
+        </div>
+      )}
+
+      <div className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((kpi) => (
+          <KpiCard key={kpi.label} {...kpi} />
+        ))}
       </div>
 
       {error && (

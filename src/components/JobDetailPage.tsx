@@ -31,11 +31,11 @@ import {
 } from '@/lib/jobApi';
 import {
   fetchJobReviewFeedback,
-  requestRereview,
   toFeedbackState,
   type SmeReviewFeedback,
   type SuitabilityLabel,
 } from '@/lib/reviewApi';
+import { decideReview } from '@/lib/adminApi';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Field } from '@/components/ui/Field';
@@ -457,7 +457,11 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
 
   async function submitRereview(note: string) {
     if (!rereviewTarget) return;
-    await requestRereview(rereviewTarget.review_id, note);
+    // 반려 경로는 decide_review 하나로 모은다. request_rereview는 사유를 review_history에만 남기고
+    // reviews.rejected_reason을 쓰지 않아, 이 버튼으로 반려하면 SME 화면의 재검토 배너가 관리자가
+    // 필수로 입력한 사유 대신 "사유가 함께 저장되지 않았어요"만 보여 준다(§10 P3 DoD ①).
+    const result = await decideReview(rereviewTarget.review_id, 'REJECTED', note);
+    if (!result.ok) throw new Error(result.error);
     setRereviewTarget(null);
     showToast({ type: 'success', msg: '재검토를 요청했어요. SME 화면에 「재검토 요청」으로 표시됩니다.' });
     loadFeedback();

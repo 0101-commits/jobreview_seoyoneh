@@ -127,6 +127,13 @@ export interface ReviewState {
   started_at: string | null;
   last_saved_at: string | null;
   submitted_at: string | null;
+  /**
+   * 관리자 반려 사유(§6-3 ⓑ). 값이 채워지는 경로는 DB 행을 직접 읽는 getOrCreateReview 하나뿐이다.
+   * save_review_draft·submit_review RPC의 반환 jsonb에는 이 컬럼이 없어서 그 경로에서는 늘 ''다
+   * (두 RPC 모두 이 컬럼을 쓰지 않는다 — 임시저장은 손대지 않고, 제출은 지운다).
+   * 그래서 화면은 진입 때 읽은 값을 따로 들고 있어야 한다(SmeReviewPage의 rejectedReason).
+   */
+  rejected_reason: string;
 }
 
 /**
@@ -244,7 +251,7 @@ export async function getOrCreateReview(assignmentId: string): Promise<ReviewSta
 
   const { data: existing, error: selectError } = await db
     .from('reviews')
-    .select('id, status, started_at, last_saved_at, submitted_at')
+    .select('id, status, started_at, last_saved_at, submitted_at, rejected_reason')
     .eq('assignment_id', assignmentId)
     .maybeSingle();
   if (selectError) fail('검토 상태를 불러오지', selectError.message);
@@ -253,14 +260,14 @@ export async function getOrCreateReview(assignmentId: string): Promise<ReviewSta
   const { data: created, error: insertError } = await db
     .from('reviews')
     .insert({ assignment_id: assignmentId, status: 'NOT_STARTED' })
-    .select('id, status, started_at, last_saved_at, submitted_at')
+    .select('id, status, started_at, last_saved_at, submitted_at, rejected_reason')
     .maybeSingle();
 
   // 다른 탭이 먼저 만들었으면 unique(assignment_id)에 걸린다. 그때는 다시 읽어 온다.
   if (insertError?.code === '23505') {
     const { data: retry, error: retryError } = await db
       .from('reviews')
-      .select('id, status, started_at, last_saved_at, submitted_at')
+      .select('id, status, started_at, last_saved_at, submitted_at, rejected_reason')
       .eq('assignment_id', assignmentId)
       .maybeSingle();
     if (retryError) fail('검토 상태를 불러오지', retryError.message);
@@ -298,6 +305,7 @@ function toReviewState(row: Row): ReviewState {
     started_at: str(row.started_at) || null,
     last_saved_at: str(row.last_saved_at) || null,
     submitted_at: str(row.submitted_at) || null,
+    rejected_reason: str(row.rejected_reason),
   };
 }
 
@@ -385,6 +393,8 @@ function toState(data: unknown, what: string): ReviewState {
     started_at: str(r.started_at) || null,
     last_saved_at: str(r.last_saved_at) || null,
     submitted_at: str(r.submitted_at) || null,
+    // RPC 반환에 없는 값이다. 여기서 ''를 주는 것이 "사유가 없다"는 뜻은 아니다 — 위 타입 주석 참고.
+    rejected_reason: '',
   };
 }
 
@@ -526,9 +536,19 @@ export interface SmeReviewFeedback {
   sme_id: string;
   sme_name: string;
   organization: string;
+  /** 직급. §6-3 ⓑ 그림 6-B의 열 머리가 "SME A (영업1팀 · 책임)"이라 조직과 함께 필요하다. */
+  title: string;
   status: ReviewStatus;
   submitted_at: string | null;
   last_saved_at: string | null;
+  /**
+   * 승인 시각. decide_review는 승인해도 status를 바꾸지 않고 이 컬럼만 찍으므로
+   * (RPC 주석: "승인 사실은 approved_at으로만 표현"), 이 값이 없으면 관리자 화면은
+   * 이미 승인한 검토를 아직 판정 전인 것처럼 그린다.
+   */
+  approved_at: string | null;
+  /** 반려 사유. 반려는 status=REVIEW_REQUESTED와 이 컬럼 둘로 표현된다. */
+  rejected_reason: string;
   feedback: ReviewFeedbackData;
 }
 
@@ -547,8 +567,8 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
     .select(
       `
       sme_id,
-      profiles!inner(name, organization),
-      reviews!inner(id, status, submitted_at, last_saved_at)
+      profiles!inner(name, organization, title),
+      reviews!inner(id, status, submitted_at, last_saved_at, approved_at, rejected_reason)
     `,
     )
     .eq('job_id', jobId)
@@ -565,9 +585,12 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
         sme_id: str(r.sme_id),
         sme_name: str(profile.name),
         organization: str(profile.organization),
+        title: str(profile.title),
         status: (review.status as ReviewStatus) || 'NOT_STARTED',
         submitted_at: str(review.submitted_at) || null,
         last_saved_at: str(review.last_saved_at) || null,
+        approved_at: str(review.approved_at) || null,
+        rejected_reason: str(review.rejected_reason),
         feedback: emptyFeedback(),
       };
     })
@@ -659,6 +682,10 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
  * 재검토 요청(반려). reviews.status를 REVIEW_REQUESTED로 바꾸고 review_history에 사유를 남긴다.
  * 두 쓰기가 한 트랜잭션이어야 감사 기록이 어긋나지 않으므로 RPC 한 번으로 처리한다.
  * (supabase/migrations/20260828020000_add_request_rereview_rpc.sql)
+ *
+ * ⚠ 새 화면에서는 쓰지 말 것 — 반려는 adminApi.decideReview(reviewId, 'REJECTED', 사유)를 쓴다.
+ * 이 RPC는 사유를 review_history에만 남기고 reviews.rejected_reason을 쓰지 않아, SME 화면의
+ * 재검토 배너가 사유 없이 뜬다(§10 P3 DoD ①). 지금은 호출부가 없다.
  */
 export async function requestRereview(reviewId: string, note: string): Promise<ReviewState> {
   const { data, error } = await client().rpc('request_rereview', { p_review_id: reviewId, p_note: note });

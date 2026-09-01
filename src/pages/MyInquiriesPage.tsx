@@ -1,7 +1,8 @@
 // 내 문의(/inquiries) — SME 화면. 내가 남긴 문의와 관리자 답변을 최신순으로 본다(§5-3 · §6-3ⓒ).
 //
 // 작성은 검토 화면의 문의 버튼(src/pages/sme-review/inquiry.tsx)이 담당하고, 이 화면은 읽기 전용이다.
-// SME 화면 상단에 붙일 배너 두 개도 이 파일에서 함께 내보낸다 — 배치는 통합 담당이 한다.
+// 검토 화면 상단의 '답변 도착' 배너는 src/pages/sme-review/recheck.tsx에 있다 — 같은 배너를 두 벌
+// 두면 문구가 갈라져서, 검토 화면(SmeReviewPage) 배너들과 같은 파일에 모아 두고 여기서는 지웠다.
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Clock, Inbox, MessageSquareText } from 'lucide-react';
@@ -182,59 +183,6 @@ export function MyInquiriesPage({ user }: { user: User }) {
         </div>
       )}
     </>
-  );
-}
-
-// ── SME 화면 배너 (§6-3ⓒ "답변 시 SME 화면 배너로 노출") ────────────
-//
-// 배치는 통합 담당 몫이라 여기서는 모양만 내보낸다. count는 fetchMyInquiries(user.id) 한 번으로
-// 셀 수 있다 — 예: rows.filter(q => q.status === 'ANSWERED').length.
-// 읽음 표시 컬럼이 없으므로 '답변' 상태가 유지되는 동안 계속 뜬다(관리자가 종결하면 사라진다).
-
-function InquiryBanner({
-  tone,
-  Icon,
-  text,
-}: {
-  tone: string;
-  Icon: typeof Clock;
-  text: string;
-}) {
-  return (
-    <div className={`mb-4 flex flex-wrap items-center gap-2 rounded-element border px-4 py-3 text-sm ${tone}`}>
-      <Icon size={16} className="shrink-0" aria-hidden="true" />
-      <p className="min-w-0 flex-1">{text}</p>
-      <Link
-        to="/inquiries"
-        className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-element px-3 text-xs font-medium underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:min-h-control-sm"
-      >
-        내 문의 보기
-      </Link>
-    </div>
-  );
-}
-
-/** 답변이 도착한 문의가 있을 때. count가 0이면 아무것도 그리지 않는다. */
-export function AnsweredInquiryBanner({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <InquiryBanner
-      tone="border-primary-border bg-primary-subtle text-primary"
-      Icon={MessageSquareText}
-      text={`문의 ${count}건에 답변이 등록되었습니다.`}
-    />
-  );
-}
-
-/** 아직 답변을 기다리는 문의가 있을 때. 같은 문의를 다시 남기지 않게 알려 주는 용도다. */
-export function UnansweredInquiryBanner({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <InquiryBanner
-      tone="border-warning-border bg-warning-muted text-warning"
-      Icon={Clock}
-      text={`답변을 기다리는 문의가 ${count}건 있습니다.`}
-    />
   );
 }
 
