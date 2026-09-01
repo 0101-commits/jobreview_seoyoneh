@@ -129,6 +129,23 @@ export interface ReviewState {
   submitted_at: string | null;
 }
 
+/**
+ * 서버 제출 게이트가 돌려준 부족 항목 한 건.
+ * step은 마법사 단계 번호(0=가이드, 1~5), kind는 사유 종류, label은 화면에 그대로 띄울 문구다.
+ */
+export interface MissingItem {
+  step: number;
+  kind: string;
+  label: string;
+}
+
+/**
+ * 제출 결과. 게이트에 걸린 것은 "오류"가 아니라 "아직 덜 채운 상태"라서 예외로 던지지 않는다.
+ * 던지면 화면이 저장 실패와 구분하지 못해 "다시 시도" 버튼만 내밀게 되는데,
+ * 사용자가 해야 할 일은 재시도가 아니라 빠진 항목을 채우는 것이다.
+ */
+export type SubmitResult = { ok: true; state: ReviewState } | { ok: false; missing: MissingItem[] };
+
 /** 내가 검토할 직무 한 건. */
 export interface MyAssignment {
   assignment_id: string;
@@ -153,12 +170,14 @@ export interface ReviewFeedbackData {
 
 // ── 내부 헬퍼 ───────────────────────────────────────────────────────
 
-function client() {
+// client·fail은 surveyApi.ts도 그대로 쓴다. 연결 끊김·실패 문구를 두 파일이 따로 쓰면
+// 같은 상황에서 화면 문구가 갈라지므로 여기 한 곳에만 두고 내보낸다.
+export function client() {
   if (!supabase) throw new Error('데이터베이스에 연결되어 있지 않습니다. 환경설정(.env)을 확인해 주세요.');
   return supabase;
 }
 
-function fail(what: string, message: string): never {
+export function fail(what: string, message: string): never {
   throw new Error(`${what} 실패했습니다. ${message}`);
 }
 
@@ -376,15 +395,37 @@ export async function saveReviewDraft(reviewId: string, payload: ReviewDraftPayl
   return toState(data, '검토 내용을 저장하지');
 }
 
-/** 최종 제출. 저장과 제출이 한 트랜잭션이라 payload를 함께 보내면 따로 임시저장할 필요가 없다. */
+/** 서버가 준 부족 항목 배열을 화면이 그대로 쓸 수 있는 모양으로 정리한다. 개수는 서버가 준 그대로 보존한다. */
+function toMissing(value: unknown): MissingItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((raw) => {
+    const r = (raw || {}) as Row;
+    return { step: typeof r.step === 'number' ? r.step : 0, kind: str(r.kind), label: str(r.label) };
+  });
+}
+
+/**
+ * 최종 제출. 저장과 제출이 한 트랜잭션이라 payload를 함께 보내면 따로 임시저장할 필요가 없다.
+ *
+ * 서버 제출 게이트(§7-2)는 ①전 섹션 평가 ②조건부 필수 의견 ③FTE 합계 100.00 ④호출자=배정 SME 본인을
+ * 다시 검증하고, 하나라도 모자라면 예외 대신 { ok:false, missing:[...] }를 돌려준다.
+ * 이 파일의 원칙("실패를 감추지 않는다")은 그대로다 — 네트워크·권한 오류는 여전히 throw 한다.
+ * 부족 항목은 실패가 아니라 사용자가 화면에서 채우면 되는 상태라서 호출부가 구분하도록 값으로 돌려줄 뿐이다.
+ *
+ * 게이트가 없던 구버전 서버는 ok 키 없이 검토 상태만 돌려준다. 그래서 ok가 undefined면 성공으로 읽는다.
+ */
 export async function submitReview(
   reviewId: string,
   payload: ReviewDraftPayload = EMPTY_DRAFT_PAYLOAD,
   note = '',
-): Promise<ReviewState> {
+): Promise<SubmitResult> {
   const { data, error } = await client().rpc('submit_review', { ...rpcArgs(reviewId, payload), p_note: note });
   if (error) fail('검토를 제출하지', error.message);
-  return toState(data, '검토를 제출하지');
+
+  const r = (data || {}) as Row;
+  if (r.ok === false) return { ok: false, missing: toMissing(r.missing) };
+  // 성공 응답은 검토 상태를 평평하게 담아 준다. state로 한 번 감싸 보내는 경우도 같이 받아 둔다.
+  return { ok: true, state: toState((r.state as Row) ?? r, '검토를 제출하지') };
 }
 
 // ── 화면 상태 ↔ payload 변환 ────────────────────────────────────────

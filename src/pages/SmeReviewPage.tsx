@@ -13,6 +13,7 @@ import {
   saveReviewDraft,
   submitReview,
   toFeedbackState,
+  type MissingItem,
   type ReviewState,
   type ReviewStatus,
   type SuggestionInput,
@@ -49,6 +50,23 @@ const EMPTY_FEEDBACK: Feedback = { suitability: '', comment: '', suggestion: '' 
 
 const errMsg = (e: unknown) =>
   e instanceof Error && e.message ? e.message : '알 수 없는 오류로 처리하지 못했어요. 잠시 후 다시 시도해 주세요.';
+
+/**
+ * 서버 제출 게이트가 돌려준 부족 항목 안내 문구.
+ * 개수를 먼저 밝히고 앞 3건만 이름으로 보여 준다 — 토스트에 전부 넣으면 읽히지 않는다.
+ * (어느 단계로 가야 하는지 짚어 주는 바로가기는 Phase 2의 STEP 5 제출 요약이 맡는다.)
+ */
+const missingMsg = (missing: MissingItem[]) => {
+  if (missing.length === 0) return '아직 제출할 수 없어요. 채우지 않은 항목이 남아 있어요.';
+  const head = `아직 제출할 수 없어요. 채워야 할 항목이 ${missing.length}개 있어요.`;
+  const list = missing
+    .slice(0, 3)
+    .map((m) => m.label)
+    .filter(Boolean)
+    .join(', ');
+  if (!list) return head;
+  return `${head} ${list}${missing.length > 3 ? ' 등' : ''}`;
+};
 
 const hhmm = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -321,8 +339,17 @@ export function ReviewWorkspace({
     setSubmitting(true);
     try {
       const { feedback: f, newTasks: nt, newSkills: ns } = snapshot.current;
-      const next = await submitReview(review.review_id, buildDraftPayload(f, { newTasks: nt, newSkills: ns }));
-      setReview(next);
+      const res = await submitReview(review.review_id, buildDraftPayload(f, { newTasks: nt, newSkills: ns }));
+
+      // 서버 제출 게이트에 걸렸다. 오류가 아니라 "아직 덜 채운 상태"라 제출로 넘기지 않는다.
+      // 저장 상태도 건드리지 않는다 — 서버가 이번 저장분을 되돌렸는지 알 수 없으므로,
+      // 지금 상태(대개 dirty)를 그대로 두어 자동 저장이 다시 한 번 쓰게 두는 편이 안전하다.
+      if (!res.ok) {
+        showToast({ type: 'warning', msg: missingMsg(res.missing), duration: 0 });
+        return;
+      }
+
+      setReview(res.state);
       revRef.current += 1;
       setSaveState('saved');
       setSaveError('');
