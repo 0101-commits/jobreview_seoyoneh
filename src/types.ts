@@ -27,6 +27,8 @@ export type User = {
   role: Role;
   company_id?: string | null;
   company_name?: string;
+  /** true면 첫 로그인 상태다 — 비밀번호를 바꾸기 전에는 어떤 화면에도 들어갈 수 없다(§8 S2). */
+  must_change_password: boolean;
 };
 
 // ── SME List Item Type ───────────────────────────────────────────────

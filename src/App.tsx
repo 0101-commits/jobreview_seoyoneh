@@ -19,7 +19,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { UploadPage } from '@/components/UploadPage';
 import { AdminUsersPage } from '@/components/AdminUsersPage';
-import { Login } from '@/pages/LoginPage';
+import { Login, type LoginResult } from '@/pages/LoginPage';
+import { ChangePasswordPage } from '@/pages/ChangePasswordPage';
 import { Dashboard } from '@/pages/DashboardPage';
 import { ReviewTable } from '@/pages/ReviewStatusPage';
 import { JobsPage } from '@/pages/JobsPage';
@@ -97,6 +98,13 @@ async function loadUser(authUserId: string): Promise<User> {
   if (!profile) throw new Error('사용자 권한 정보를 확인할 수 없습니다. 관리자에게 문의해 주세요.');
   if (!profile.active) throw new Error('비활성화된 계정입니다. 관리자에게 문의해 주세요.');
 
+  // 마이그레이션이 아직 적용되지 않은 DB에는 must_change_password 컬럼이 없다. 그때는 게이트가 조용히 꺼진 상태가 되는데,
+  // 화면에도 로그에도 흔적이 없으면 운영자가 이 창을 알아챌 방법이 없다. 그래서 사실만 콘솔에 남긴다.
+  if (!('must_change_password' in profile))
+    console.warn(
+      '[App] Phase 0 마이그레이션 미적용 — 비밀번호 강제 변경 게이트가 꺼져 있다. supabase/APPLY_2026-09-01_phase0.sql을 먼저 적용해 주세요.',
+    );
+
   let companyName = '';
   if (profile.company_id) {
     const { data: comp } = await supabase.from('companies').select('name').eq('id', profile.company_id).maybeSingle();
@@ -111,6 +119,10 @@ async function loadUser(authUserId: string): Promise<User> {
     role: (profile.role === 'admin' ? 'admin' : 'sme') as Role,
     company_id: profile.company_id || null,
     company_name: companyName,
+    // 마이그레이션이 아직 적용되지 않은 DB에는 이 컬럼이 없다. select('*')로 읽으므로 그때는 값이 undefined로 온다.
+    // 없는 컬럼 때문에 앱 전체가 로그인 불가가 되는 편보다 "변경 불필요"로 보고 통과시키는 편이 안전하다
+    // — 컬럼이 생기면 default true가 그대로 들어와 강제 변경이 곧바로 작동한다.
+    must_change_password: profile.must_change_password === true,
   };
 }
 
@@ -172,15 +184,20 @@ function App() {
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  // 반환값은 로그인 화면의 잠금 카운터가 쓴다 — 자격 증명이 거부된 경우('invalid')만 연속 실패로 센다.
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     setLoginError('');
     if (!supabase) {
       setLoginError('데이터베이스에 연결되어 있지 않습니다. 관리자에게 문의해 주세요.');
-      return;
+      return 'error';
     }
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     // 성공하면 onAuthStateChange가 프로필을 읽어 user를 세팅한다(권한 오류 문구도 그쪽에서 나온다).
-    if (error) setLoginError('이메일 또는 비밀번호를 확인해 주세요.');
+    if (error) {
+      setLoginError('이메일 또는 비밀번호를 확인해 주세요.');
+      return 'invalid';
+    }
+    return 'ok';
   }, []);
 
   const logout = useCallback(async () => {
@@ -196,6 +213,17 @@ function App() {
       </div>
     );
   if (!user) return <Login onLogin={login} error={loginError} />;
+
+  // 강제 게이트 — 라우터를 아예 띄우지 않는다. 라우트 가드를 두면 직접 URL 입력으로 한 번은 화면이 그려지므로,
+  // 진입 자체를 막는 이 방식이 §10 P0 DoD ②("변경 없이는 어떤 화면에도 진입 불가")를 그대로 만족한다.
+  if (user.must_change_password)
+    return (
+      <ChangePasswordPage
+        user={user}
+        onChanged={() => setUser((prev) => (prev ? { ...prev, must_change_password: false } : prev))}
+        onLogout={logout}
+      />
+    );
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
