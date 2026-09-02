@@ -35,6 +35,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { isResetPasswordPath, supabase } from '@/lib/supabase';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { UploadPage } from '@/components/UploadPage';
 import { AdminUsersPage } from '@/components/AdminUsersPage';
 import { Login, type LoginResult } from '@/pages/LoginPage';
@@ -135,9 +136,14 @@ const legacyKeyToPath: Record<string, string> = {
 
 // ── 이탈 가드 ───────────────────────────────────────────────────────
 // SME 검토 화면이 onDirtyChange(true)를 부르면 사이드바 이동·새로고침 전에 확인을 거친다.
-const DirtyContext = React.createContext<{ setDirty: (d: boolean) => void; confirmLeave: () => boolean }>({
+//
+// v2 §6-4: 예전에는 window.confirm으로 물었다. 브라우저 기본 창은 문구·버튼 위계를 정할 수 없고
+// 모바일에서는 맥락이 끊긴다. 대신 앱 안의 ConfirmDialog로 묻는데, 그 확인은 비동기라
+// "true/false를 즉시 돌려주는" 옛 계약(confirmLeave)을 쓸 수 없다.
+// 그래서 계약을 뒤집었다 — 떠나는 동작을 콜백으로 넘기고, 확인이 끝나면 셸이 그 콜백을 실행한다.
+const DirtyContext = React.createContext<{ setDirty: (d: boolean) => void; requestLeave: (run: () => void) => void }>({
   setDirty: () => {},
-  confirmLeave: () => true,
+  requestLeave: (run) => run(),
 });
 
 // ── 세션 ────────────────────────────────────────────────────────────
@@ -351,10 +357,17 @@ function Shell({
   const home = isAdmin ? adminHome : smeHome;
   const closeDrawer = useCallback(() => setMobileOpen(false), []);
 
-  const confirmLeave = useCallback(
-    () =>
-      !dirty ||
-      window.confirm('저장하지 않은 검토 내용이 있어요. 이 화면을 떠나면 작성 중인 내용이 사라집니다. 이동할까요?'),
+  /** 확인을 기다리는 이탈 동작. null이면 확인창이 닫힌 상태다. */
+  const [pendingLeave, setPendingLeave] = useState<{ run: () => void } | null>(null);
+
+  const requestLeave = useCallback(
+    (run: () => void) => {
+      if (!dirty) {
+        run();
+        return;
+      }
+      setPendingLeave({ run });
+    },
     [dirty],
   );
 
@@ -365,18 +378,35 @@ function Shell({
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty]);
 
-  const guard = React.useMemo(() => ({ setDirty, confirmLeave }), [confirmLeave]);
+  const guard = React.useMemo(() => ({ setDirty, requestLeave }), [requestLeave]);
 
   return (
     <DirtyContext.Provider value={guard}>
       <div className="min-h-screen bg-background text-foreground">
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-[#182635] text-white lg:block">
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
           <SidebarBody items={nav} onNavigate={closeDrawer} onLogout={onLogout} />
         </aside>
 
         <MobileDrawer open={mobileOpen} onClose={closeDrawer}>
           <SidebarBody items={nav} onNavigate={closeDrawer} onLogout={onLogout} />
         </MobileDrawer>
+
+        {/* 이탈 확인 — 사이드바 이동·뒤로가기 버튼이 모두 이 한 창을 쓴다. */}
+        {pendingLeave && (
+          <ConfirmDialog
+            title="작성 중인 내용이 사라져요"
+            body="저장하지 않은 검토 내용이 있어요. 이 화면을 떠나면 작성 중인 내용이 사라집니다."
+            confirmLabel="이동하기"
+            cancelLabel="여기 머무르기"
+            tone="negative"
+            onConfirm={() => {
+              const run = pendingLeave.run;
+              setPendingLeave(null);
+              run();
+            }}
+            onCancel={() => setPendingLeave(null)}
+          />
+        )}
 
         <div className="lg:pl-64">
           <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
@@ -506,16 +536,17 @@ function SidebarBody({
   onNavigate: () => void;
   onLogout: () => void;
 }) {
-  const { confirmLeave } = React.useContext(DirtyContext);
+  const { requestLeave } = React.useContext(DirtyContext);
+  const navigate = useNavigate();
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/10 px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2e9b9a]">
+      <div className="flex h-20 shrink-0 items-center gap-3 border-b border-inverse-label/10 px-6">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand">
           <ClipboardCheck size={19} aria-hidden="true" />
         </div>
         <div>
           <p className="text-[15px] font-semibold tracking-tight">Job Review Architecture</p>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Workforce platform</p>
+          <p className="t-caption uppercase tracking-[0.18em] text-inverse-label-muted">Workforce platform</p>
         </div>
       </div>
       {/* 짧은 뷰포트·확대에서도 메뉴가 잘리지 않도록 nav만 스크롤한다. */}
@@ -525,15 +556,18 @@ function SidebarBody({
             key={to}
             to={to}
             onClick={(e) => {
-              if (!confirmLeave()) {
-                e.preventDefault();
-                return;
-              }
-              onNavigate();
+              // 확인이 비동기라 기본 이동을 먼저 막고, 확인이 끝난 뒤 직접 이동한다.
+              e.preventDefault();
+              requestLeave(() => {
+                navigate(to);
+                onNavigate();
+              });
             }}
             className={({ isActive }) =>
               `flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-3 text-left text-sm transition ${
-                isActive ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                isActive
+                  ? 'bg-inverse-label/10 text-inverse-label'
+                  : 'text-inverse-label-muted hover:bg-inverse-label/5 hover:text-inverse-label'
               }`
             }
           >
@@ -543,28 +577,32 @@ function SidebarBody({
                 <div className="min-w-0 flex-1">
                   <span className="block text-sm">{label}</span>
                   {/*
-                    짙은 사이드바(#182635)는 이 앱에서 유일하게 토큰 밖 색을 쓰는 영역이다.
-                    비활성 보조설명이 slate-500(#64748b)일 때 3.23:1로 §8 S8의 4.5:1에 못 미쳤고
-                    hover로도 이 span은 밝아지지 않아 계속 미달이었다. slate-400(#94a3b8)이면 5.99:1.
-                    활성(slate-300 #cbd5e1, 10.34:1)이 여전히 더 밝으므로 활성/비활성 관계는 그대로다.
+                    반전 표면(--inverse-bg #182635)의 보조설명. 대비는 이 토큰 쌍으로 고정된다:
+                    --inverse-label-muted(#94a3b8)가 #182635 위 5.99:1로 §8 S8의 4.5:1을 넘는다.
+                    활성은 --inverse-label(흰색)을 90%로 써 더 밝다 — 활성/비활성 관계는 그대로다.
+                    (v2 §6-2: hex 14곳을 이 토큰들로 걷어냈다.)
                   */}
                   <span
-                    className={`mt-0.5 block text-[11px] leading-tight ${isActive ? 'text-slate-300' : 'text-slate-400'}`}
+                    className={`mt-0.5 block t-caption leading-tight ${
+                      isActive ? 'text-inverse-label/90' : 'text-inverse-label-muted'
+                    }`}
                   >
                     {sub}
                   </span>
                 </div>
-                {isActive && <ChevronRight size={15} className="ml-auto shrink-0 text-[#73d0c5]" aria-hidden="true" />}
+                {isActive && (
+                  <ChevronRight size={15} className="ml-auto shrink-0 text-inverse-accent" aria-hidden="true" />
+                )}
               </>
             )}
           </NavLink>
         ))}
       </nav>
-      <div className="shrink-0 border-t border-white/10 p-3">
+      <div className="shrink-0 border-t border-inverse-label/10 p-3">
         <button
           type="button"
           onClick={onLogout}
-          className="flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+          className="flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-2 t-label text-inverse-label-muted hover:bg-inverse-label/5 hover:text-inverse-label"
         >
           <LogOut size={16} aria-hidden="true" /> 로그아웃
         </button>
@@ -595,7 +633,7 @@ function MobileDrawer({ open, onClose, children }: { open: boolean; onClose: () 
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose(); // ::backdrop 클릭은 dialog로 전달된다.
       }}
-      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-[#182635] p-0 text-white backdrop:bg-slate-900/50 lg:hidden"
+      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label backdrop:bg-dimmer/50 lg:hidden"
     >
       {children}
     </dialog>
@@ -690,7 +728,7 @@ function ReviewRoute({ user }: { user: User }) {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { setDirty, confirmLeave } = React.useContext(DirtyContext);
+  const { setDirty, requestLeave } = React.useContext(DirtyContext);
 
   // 검토 화면을 벗어나면 가드를 반드시 푼다(제출 후 남아 있으면 다른 화면에서도 확인창이 뜬다).
   useEffect(() => () => setDirty(false), [setDirty]);
@@ -721,14 +759,10 @@ function ReviewRoute({ user }: { user: User }) {
         setParams({ step: String(next) });
       }}
       onDirtyChange={setDirty}
-      onBack={() => {
-        if (confirmLeave()) navigate(smeHome);
-      }}
+      onBack={() => requestLeave(() => navigate(smeHome))}
       // 문의 답변 배너(§6-3 ⓒ) → '내 문의'. onBack과 같은 이탈 가드를 태운다 —
       // 검토 화면을 떠나는 이동이라 작성 중인 입력이 있으면 먼저 확인을 거쳐야 한다.
-      onOpenInquiries={() => {
-        if (confirmLeave()) navigate('/inquiries');
-      }}
+      onOpenInquiries={() => requestLeave(() => navigate('/inquiries'))}
     />
   );
 }

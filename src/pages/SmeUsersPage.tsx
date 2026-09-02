@@ -191,7 +191,7 @@ export function UsersPage({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-1 w-56 rounded-element border border-border bg-card py-1 shadow-lg"
+                className="absolute right-0 z-20 mt-1 w-56 rounded-element border border-border bg-card py-1 shadow-2"
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
                     setMenuOpen(false);
@@ -234,7 +234,7 @@ export function UsersPage({
         등록할 때 사용합니다.
       </div>
 
-      <div className="rounded-container border border-border bg-card shadow-sm">
+      <div className="rounded-container border border-border bg-card shadow-1">
         <div className="border-b border-border p-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-3 text-foreground-subtle" size={16} aria-hidden="true" />

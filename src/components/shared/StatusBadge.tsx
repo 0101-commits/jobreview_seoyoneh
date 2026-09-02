@@ -1,18 +1,13 @@
-// 검토 상태 배지 — 관리자(ADMIN) 검토 현황과 SME 검토 이력이 함께 사용한다.
+// 검토 상태 배지 — 관리자(ADMIN) 검토 현황·SME 검토 이력·직무 목록이 함께 쓴다.
+//
+// v2 §6-4: 배지 구현이 세 벌이었다(이 파일 · 진행 현황 셀 칩 · 문의 배지 2곳).
+// 색·라벨 사전을 ui/StatusBadge 한 곳으로 모으고, 이 파일은 검토 상태 타입만 좁혀 주는
+// 얇은 래퍼로 남긴다 — 기존 호출부 9곳을 고치지 않고 한 벌로 합치기 위해서다.
+import { StatusBadge as Base } from '@/components/ui/StatusBadge';
 import type { Status } from '@/types';
 
-const statusStyle: Record<Status, string> = {
-  미시작: 'bg-slate-100 text-slate-600',
-  '작성 중': 'bg-amber-50 text-amber-700',
-  '제출 완료': 'bg-emerald-50 text-emerald-700',
-  '재검토 요청': 'bg-rose-50 text-rose-700',
-  '재제출 완료': 'bg-blue-50 text-blue-700',
-};
-
 export function StatusBadge({ status }: { status: Status }) {
-  return (
-    <span className={`whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium ${statusStyle[status]}`}>
-      {status}
-    </span>
-  );
+  return <Base status={status} domain="review" size="sm" />;
 }
+
+export default StatusBadge;

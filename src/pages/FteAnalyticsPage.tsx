@@ -26,6 +26,7 @@ import {
 import { EXPORT_COLLECTORS } from '@/lib/exportApi';
 import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { Button } from '@/components/ui/Button';
 
 // ── 열 이름 ─────────────────────────────────────────────────────────
@@ -274,29 +275,15 @@ export function FteAnalyticsPage({
       )}
 
       {/* 조건 — 집계 기준과 직무 선택. 직무 선택은 네이티브 select를 쓴다(모바일에서 그대로 동작). */}
-      <div className="mb-5 flex flex-col gap-4 border border-border bg-card p-4 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+      <div className="mb-5 flex flex-col gap-4 rounded-container border border-border bg-card p-4 shadow-1 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="mb-2 text-xs font-medium text-foreground-muted">집계 기준</p>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="집계 기준 선택">
-            {BASIS_OPTIONS.map((option) => {
-              const on = basis === option;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setBasis(option)}
-                  className={`min-h-11 rounded-element border px-3 text-xs font-medium transition sm:min-h-control-sm ${
-                    on
-                      ? 'border-primary bg-primary-subtle text-primary'
-                      : 'border-border bg-card text-foreground-muted hover:border-primary hover:text-primary'
-                  }`}
-                >
-                  {FTE_BASIS_LABELS[option]}
-                </button>
-              );
-            })}
-          </div>
+          <FilterChips
+            label="집계 기준 선택"
+            value={basis}
+            onChange={setBasis}
+            options={BASIS_OPTIONS.map((option) => ({ value: option, label: FTE_BASIS_LABELS[option] }))}
+          />
         </div>
         <div className="lg:w-96">
           <label htmlFor="fte-job" className="mb-2 block text-xs font-medium text-foreground-muted">
@@ -323,7 +310,7 @@ export function FteAnalyticsPage({
       </div>
 
       {/* ① 직무별 과업 비중 평균 + 상위 과업 순위 — 한 표에서 순위·막대·편차를 함께 읽는다. */}
-      <section className="mb-5 border border-border bg-card shadow-sm" aria-labelledby="fte-rank-title">
+      <section className="mb-5 rounded-container border border-border bg-card shadow-1" aria-labelledby="fte-rank-title">
         <div className="border-b border-border p-4">
           <h3 id="fte-rank-title" className="text-base font-semibold text-foreground">
             과업별 SME 평균 비중 · 상위 과업 순위
@@ -428,7 +415,7 @@ export function FteAnalyticsPage({
       </section>
 
       {/* ② 조직별 피벗 표 — R8(조직 단위 분석)의 축. 행=과업, 열=조직. */}
-      <section className="mb-5 border border-border bg-card shadow-sm" aria-labelledby="fte-pivot-title">
+      <section className="mb-5 rounded-container border border-border bg-card shadow-1" aria-labelledby="fte-pivot-title">
         <div className="border-b border-border p-4">
           <h3 id="fte-pivot-title" className="text-base font-semibold text-foreground">
             조직별 피벗

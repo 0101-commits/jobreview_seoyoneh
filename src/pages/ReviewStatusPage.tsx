@@ -15,6 +15,7 @@ import {
   type ReviewFeedbackData,
 } from '@/lib/reviewApi';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
@@ -235,7 +236,7 @@ export function ReviewTable({
         </div>
       )}
 
-      <div className="border border-border bg-card shadow-sm">
+      <div className="rounded-container border border-border bg-card shadow-1">
         <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 text-foreground-subtle" size={16} aria-hidden="true" />
@@ -247,28 +248,22 @@ export function ReviewTable({
               aria-label="SME 이름, 조직, 직무 검색"
             />
           </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="검토 상태 필터">
-            {CHIPS.map(({ key, label }) => {
-              const on = chip === key;
-              const count =
-                key === 'ALL' ? reviewRows.length : reviewRows.filter((r) => matchesChip(r.review_status, key)).length;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setChip(key)}
-                  className={`min-h-11 rounded-element border px-3 text-xs font-medium transition sm:min-h-control-sm ${
-                    on
-                      ? 'border-primary bg-primary-subtle text-primary'
-                      : 'border-border bg-card text-foreground-muted hover:border-primary hover:text-primary'
-                  }`}
-                >
-                  {label} {loading || error ? '' : count}
-                </button>
-              );
-            })}
-          </div>
+          <FilterChips
+            label="검토 상태 필터"
+            value={chip}
+            onChange={setChip}
+            options={CHIPS.map(({ key, label }) => ({
+              value: key,
+              label,
+              // 조회 실패·로딩 중에는 건수를 숨긴다 — 0으로 보이면 "없다"는 다른 사실이 된다.
+              count:
+                loading || error
+                  ? undefined
+                  : key === 'ALL'
+                    ? reviewRows.length
+                    : reviewRows.filter((r) => matchesChip(r.review_status, key)).length,
+            }))}
+          />
         </div>
 
         <div className="overflow-x-auto">

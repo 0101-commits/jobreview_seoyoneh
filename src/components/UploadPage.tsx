@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { ProgressTracker } from '@/components/ui/ProgressTracker';
 import { Button } from './ui/Button';
 import { ModalShell } from './ui/ModalShell';
 import { Toast, useToast } from './ui/Toast';
@@ -265,7 +266,7 @@ export function UploadPage({
         </p>
       </div>
 
-      <div className="mb-6 rounded-container border border-border bg-card p-5 shadow-sm">
+      <div className="mb-6 rounded-container border border-border bg-card p-5 shadow-1">
         <StepIndicator current={currentStep} complete={state === 'done'} />
       </div>
 
@@ -311,7 +312,7 @@ export function UploadPage({
 
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <section className="space-y-5">
-          <div className="rounded-container border border-border bg-card p-6 shadow-sm">
+          <div className="rounded-container border border-border bg-card p-6 shadow-1">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold text-foreground">통합 Excel 파일 업로드</h3>
@@ -383,7 +384,7 @@ export function UploadPage({
           )}
         </section>
 
-        <aside className="h-fit rounded-container border border-border bg-card p-5 shadow-sm">
+        <aside className="h-fit rounded-container border border-border bg-card p-5 shadow-1">
           {/* 대상 회사 — 저장 대상이 무엇인지가 업로드 방식보다 먼저 정해져야 한다(v2 F4). */}
           <h3 className="font-semibold text-foreground">대상 회사</h3>
           <div className="mt-3">
@@ -509,51 +510,18 @@ function RosterSummary({ result }: { result: SmeRosterLinkResult }) {
 // ── 진행 단계 ───────────────────────────────────────────────────────
 
 function StepIndicator({ current, complete }: { current: number; complete: boolean }) {
+  // v2 §6-4: 단계 표시는 공용 ProgressTracker 하나를 쓴다(마법사와 같은 부품).
+  // 여기서는 표시 전용이라 onSelect를 주지 않는다 — 업로드 단계는 눌러서 건너뛸 수 없다.
   return (
-    <ol className="flex flex-col gap-3 sm:flex-row sm:items-center" aria-label="업로드 진행 단계">
-      {STEPS.map((step, index) => {
-        const number = index + 1;
-        const isDone = complete || number < current;
-        const isActive = !complete && number === current;
-        const Icon = step.icon;
-        return (
-          <li key={step.label} className="flex flex-1 items-center gap-3" aria-current={isActive ? 'step' : undefined}>
-            <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
-                isDone
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : isActive
-                    ? 'border-primary bg-primary-subtle text-primary'
-                    : 'border-border bg-muted text-foreground-subtle'
-              }`}
-            >
-              {isDone ? <Check size={16} aria-hidden="true" /> : number}
-            </span>
-            <span className="min-w-0">
-              <span
-                className={`flex items-center gap-1.5 text-sm ${
-                  isActive
-                    ? 'font-semibold text-primary'
-                    : isDone
-                      ? 'font-medium text-foreground'
-                      : 'text-foreground-subtle'
-                }`}
-              >
-                <Icon size={14} aria-hidden="true" />
-                {step.label}
-                <span className="sr-only">{isDone ? ' (완료)' : isActive ? ' (진행 중)' : ' (대기)'}</span>
-              </span>
-            </span>
-            {index < STEPS.length - 1 && (
-              <span
-                aria-hidden="true"
-                className={`hidden h-px flex-1 sm:block ${isDone ? 'bg-primary' : 'bg-border'}`}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <ProgressTracker
+      label="업로드 진행 단계"
+      current={complete ? STEPS.length + 1 : current}
+      items={STEPS.map((step, index) => ({
+        step: index + 1,
+        label: step.label,
+        complete: complete || index + 1 < current,
+      }))}
+    />
   );
 }
 
@@ -795,7 +763,7 @@ function ValidationPanel({
   onCopied: (toast: { type: 'success' | 'error'; msg: string }) => void;
 }) {
   return (
-    <div className="rounded-container border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-container border border-border bg-card p-6 shadow-1">
       <h3 className="font-semibold text-foreground">데이터 검증 결과</h3>
 
       <div className="mt-4 space-y-3">
@@ -1118,7 +1086,7 @@ function PreviewPanel({ validation }: { validation: IntegratedValidationResult }
   if (validation.jobRows.length === 0 && validation.skillRows.length === 0) return null;
 
   return (
-    <div className="rounded-container border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-container border border-border bg-card p-6 shadow-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 font-semibold text-foreground">
           <Table2 size={16} className="text-primary" aria-hidden="true" /> 파일 내용 미리보기

@@ -31,6 +31,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 const KINDS: MailKind[] = ['REMINDER', 'INVITE'];
 
@@ -63,6 +64,8 @@ export function MailSendPanel({
   onSent,
 }: MailSendPanelProps) {
   const { toast, showToast, dismiss } = useToast();
+  // 되돌릴 수 없는 조작 확인(v2 §6-4) — dialog를 아래에서 반드시 그린다.
+  const { confirm, dialog } = useConfirm();
 
   const [kind, setKind] = useState<MailKind>('REMINDER');
   const [subject, setSubject] = useState(templates?.REMINDER?.subject ?? DEFAULT_TEMPLATES.REMINDER.subject);
@@ -146,10 +149,12 @@ export function MailSendPanel({
     if (targets.length === 0) return;
     if (
       isRepeatOfSent(targets) &&
-      !window.confirm(
-        `방금 이 ${targets.length}명에게 ${MAIL_KIND_LABELS[kind]} 메일을 보냈습니다. ` +
-          '같은 대상에게 한 번 더 보낼까요? 보낸 메일은 되돌릴 수 없습니다.',
-      )
+      !(await confirm({
+        title: '같은 대상에게 한 번 더 보낼까요?',
+        body: `방금 이 ${targets.length}명에게 ${MAIL_KIND_LABELS[kind]} 메일을 보냈습니다. 보낸 메일은 되돌릴 수 없습니다.`,
+        confirmLabel: '한 번 더 보내기',
+        tone: 'negative',
+      }))
     ) {
       return;
     }
@@ -455,6 +460,7 @@ export function MailSendPanel({
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} className="fixed bottom-4 right-4 z-50" />
+      {dialog}
     </section>
   );
 }

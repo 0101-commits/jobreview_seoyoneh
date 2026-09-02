@@ -91,7 +91,7 @@ export function InquiryButton({ reviewId, step, jobName }: InquiryButtonOwnProps
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           aria-label="문의하기 — 지금 보고 있는 직무와 단계가 함께 전달됩니다"
-          className="pointer-events-auto shadow-lg"
+          className="pointer-events-auto shadow-2"
           // Button은 sm 이상에서 컨트롤 높이 40px로 내려간다. 떠 있는 버튼은 주변에 기댈 것이
           // 없어 그 크기면 놓치기 쉬우므로 44px을 유지한다(인라인이라 유틸 순서와 무관하게 이긴다).
           style={{ minHeight: 44 }}

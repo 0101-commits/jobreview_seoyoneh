@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Clock, Inbox, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { StatusBadge as Base } from '@/components/ui/StatusBadge';
 import { fetchReviewStatusResult } from '@/lib/jobApi';
 import { fetchMyInquiries, type Inquiry, type InquiryStatus } from '@/lib/surveyApi';
 import { STEP_TITLES } from '@/pages/sme-review/copy';
@@ -17,22 +18,15 @@ import type { User } from '@/types';
 // shared/StatusBadge.tsx는 재사용하지 않는다. 그쪽은 검토 상태(미시작·작성 중·제출 완료…)에
 // 타입까지 묶여 있어 문의 상태(§6-3ⓒ의 미답·답변·종결) 세 값이 아예 들어가지 않는다.
 // 대신 같은 모양(rounded·11px·굵기)과 같은 원칙(색만으로 알리지 않기 — 아이콘 병기)을 따른다.
-const STATUS_VIEW: Record<InquiryStatus, { label: string; className: string; Icon: typeof Clock }> = {
-  OPEN: { label: '미답', className: 'bg-amber-50 text-amber-700', Icon: Clock },
-  ANSWERED: { label: '답변', className: 'bg-emerald-50 text-emerald-700', Icon: MessageSquareText },
-  CLOSED: { label: '종결', className: 'bg-slate-100 text-slate-600', Icon: CheckCircle2 },
+const STATUS_VIEW: Record<InquiryStatus, { label: string; Icon: typeof Clock }> = {
+  OPEN: { label: '대기', Icon: Clock },
+  ANSWERED: { label: '답변', Icon: MessageSquareText },
+  CLOSED: { label: '종결', Icon: CheckCircle2 },
 };
 
 function InquiryStatusBadge({ status }: { status: InquiryStatus }) {
-  const { label, className, Icon } = STATUS_VIEW[status];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium ${className}`}
-    >
-      <Icon size={12} aria-hidden="true" />
-      {label}
-    </span>
-  );
+  const { label, Icon } = STATUS_VIEW[status];
+  return <Base status={label} domain="inquiry" size="sm" icon={<Icon size={12} aria-hidden="true" />} />;
 }
 
 function formatAt(value: string | null) {
@@ -149,7 +143,7 @@ export function MyInquiriesPage({ user }: { user: User }) {
             const jobName = q.review_id ? jobNames[q.review_id] : '';
             const step = stepTitle(q.step);
             return (
-              <article key={q.id} className="rounded-container border border-border bg-card p-5 shadow-sm">
+              <article key={q.id} className="rounded-container border border-border bg-card p-5 shadow-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <InquiryStatusBadge status={q.status} />
                   <span className="text-xs text-foreground-subtle">{formatAt(q.created_at)}</span>

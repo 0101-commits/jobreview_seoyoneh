@@ -219,7 +219,7 @@ export function JobsPage({
           </Button>
         </div>
       ) : (
-        <div className="rounded-container border border-border bg-card shadow-sm">
+        <div className="rounded-container border border-border bg-card shadow-1">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="bg-muted text-xs text-foreground-muted">

@@ -19,6 +19,7 @@ import { type KeyboardEvent, useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, Minus, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import type { JobDetail } from '@/lib/jobApi';
 import { newSuggestion, type SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback } from '@/types';
@@ -328,6 +329,8 @@ export function FteStep({
 
   /** 가드 ⓐ에서 "다시 배분할게요"를 누르면 돌아갈 직전 값. null이면 모달이 닫힌 상태다. */
   const [revertTo, setRevertTo] = useState<FteRow[] | null>(null);
+  // 균등 배분 덮어쓰기 확인(v2 §6-4 — window.confirm 대체).
+  const { confirm, dialog } = useConfirm();
 
   /*
     삭제 제안으로 대상에서 빠진 행의 이전 비중. 셸이 rows에 그대로 남겨 두므로(주차) 되살리면
@@ -403,10 +406,19 @@ export function FteStep({
 
   const bump = (key: string, delta: number) => setPct(key, (pcts.get(key) ?? 0) + delta);
 
-  const onEqualSplit = () => {
+  const onEqualSplit = async () => {
     if (readOnly || targets.length === 0) return;
     // 덮어쓰기 확인 — 문구는 기획안에 없어 새로 씀. 이미 배분한 값이 말없이 사라지지 않게 한 번 묻는다.
-    if (total > 0 && !window.confirm('이미 입력한 비중을 지우고 균등하게 다시 배분할까요?')) return;
+    if (
+      total > 0 &&
+      !(await confirm({
+        title: '균등하게 다시 배분할까요?',
+        body: '이미 입력한 비중이 지워지고 과업 수에 맞춰 고르게 나눠집니다.',
+        confirmLabel: '다시 배분',
+        tone: 'negative',
+      }))
+    )
+      return;
     const parts = equalSplit(targets.length);
     setRows(targets.map((t, i) => ({ key: t.key, pct: parts[i] })));
     onDirty();
@@ -650,6 +662,8 @@ export function FteStep({
       </div>
 
       <TotalGauge layout="bar" total={total} showNav={showNav} goToStep={goToStep} />
+
+      {dialog}
 
       {revertTo && (
         <ModalShell

@@ -174,7 +174,7 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
     <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">
       <div className="w-full max-w-[560px]">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2e9b9a] text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-white">
             <ClipboardCheck size={21} aria-hidden="true" />
           </div>
           <span className="font-semibold text-foreground">Job Review Architecture</span>
@@ -200,7 +200,7 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
 
         <section
           aria-labelledby={titleId}
-          className="rounded-container border border-border bg-card p-6 shadow-sm sm:p-8"
+          className="rounded-container border border-border bg-card p-6 shadow-1 sm:p-8"
         >
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-element bg-primary-subtle text-primary">

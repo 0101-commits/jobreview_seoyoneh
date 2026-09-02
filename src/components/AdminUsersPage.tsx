@@ -129,7 +129,7 @@ export function AdminUsersPage({ currentUser }: Props) {
 
       <Toast toast={toast} onDismiss={dismiss} />
 
-      <div className="overflow-x-auto rounded-container border border-border bg-card shadow-sm">
+      <div className="overflow-x-auto rounded-container border border-border bg-card shadow-1">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-border bg-muted">

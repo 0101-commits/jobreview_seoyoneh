@@ -664,7 +664,7 @@ export function ReviewWorkspace({
             <StepChecklist items={checklist} current={step} onSelect={goToStep} />
           </div>
 
-          <section className="rounded-element border border-border bg-card p-5 shadow-sm lg:p-7">
+          <section className="rounded-element border border-border bg-card p-5 shadow-1 lg:p-7">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
               <h3
                 ref={stepTitleRef}

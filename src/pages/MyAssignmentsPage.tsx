@@ -70,7 +70,7 @@ export function MyAssignmentsPage({ user }: { user: User }) {
             <li key={r.assignment_id}>
               <Link
                 to={`/review/${r.job_id}`}
-                className="flex min-h-11 items-center justify-between gap-4 rounded-container border border-border bg-card p-5 shadow-sm transition hover:border-primary-border hover:bg-primary-subtle"
+                className="flex min-h-11 items-center justify-between gap-4 rounded-container border border-border bg-card p-5 shadow-1 transition hover:border-primary-border hover:bg-primary-subtle"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

@@ -98,7 +98,7 @@ export function WorkbenchPage({
         </div>
       )}
 
-      <div className="border border-border bg-card shadow-sm">
+      <div className="rounded-container border border-border bg-card shadow-1">
         {/* 표만 가로로 스크롤한다 — 390px에서 화면 전체가 옆으로 밀리지 않게. */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">

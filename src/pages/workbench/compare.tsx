@@ -281,14 +281,14 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
         </div>
       )}
 
-      {loading && <p className="border border-border bg-card p-8 text-center text-sm text-foreground-subtle">불러오는 중…</p>}
+      {loading && <p className="rounded-container border border-border bg-card p-8 text-center text-sm text-foreground-subtle">불러오는 중…</p>}
 
       {!loading && !error && comparison && (
         <div className="space-y-5">
           {/* 자동 규칙에 걸린 사유·기준·측정값은 아래 워크숍 패널이 규칙 ①~④로 풀어서 보여 준다.
               여기서 같은 말을 다시 적지 않는다(사유 문구의 출처는 workshopThresholds 한 곳이다). */}
           {comparison.smeCount === 0 ? (
-            <p className="border border-border bg-card p-8 text-center text-sm text-foreground-subtle">
+            <p className="rounded-container border border-border bg-card p-8 text-center text-sm text-foreground-subtle">
               아직 제출된 검토가 없습니다. SME가 제출하면 응답을 나란히 비교할 수 있어요.
             </p>
           ) : crossCheckImpossible ? (
@@ -366,7 +366,7 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
 
 function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFeedback[] }) {
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead
         title="적합성 판정 불일치"
         note={
@@ -458,7 +458,7 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
   }
 
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead
         title="과업별 투입 비중(FTE)"
         note={
@@ -603,7 +603,7 @@ function SuggestionSection({ smes }: { smes: SmeReviewFeedback[] }) {
   const any = smes.some((s) => s.feedback.newTasks.length > 0);
   if (!any) return null;
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead title="신규 제안 과업" note="제안한 SME가 적은 과업일수록 워크숍에서 확인할 값이 큽니다." />
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         {smes.map((sme) => (
@@ -651,7 +651,7 @@ function DecisionSection({
   onReject: (sme: SmeReviewFeedback) => void;
 }) {
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead
         title="승인 · 반려"
         note="SME 한 명의 검토 1건씩 판정합니다. 반려하면 그 SME 화면에 사유가 배너로 뜨고 해당 검토만 다시 열립니다."

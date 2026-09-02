@@ -536,7 +536,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
       </nav>
 
       {/* Top header */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4 rounded-container border border-border bg-card p-6 shadow-sm">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4 rounded-container border border-border bg-card p-6 shadow-1">
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-semibold tracking-tight text-foreground">직무 상세정보</h2>
           <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3">
@@ -1030,10 +1030,10 @@ interface PanelProps {
 
 function SmeFeedbackPanel({ data, loading, error, onRetry, onFocusField, labelFor, onRequestRereview }: PanelProps) {
   return (
-    <aside className="rounded-container border border-border bg-card p-5 shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
+    <aside className="rounded-container border border-border bg-card p-5 shadow-1 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
       <div className="mb-4 flex items-center gap-2">
         <Users size={16} className="text-primary" aria-hidden="true" />
-        <h3 className="text-base font-bold text-[#182635]">SME 검토 의견</h3>
+        <h3 className="t-headline text-foreground">SME 검토 의견</h3>
         {!loading && !error && data.length > 0 && (
           <span className="rounded-full bg-primary-subtle px-2 py-0.5 text-xs font-medium text-primary">
             {data.length}명
@@ -1299,8 +1299,8 @@ function RowActions({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-6 rounded-container border border-border bg-card p-6 shadow-sm">
-      <h3 className="mb-5 text-base font-bold text-[#182635]">{title}</h3>
+    <section className="mb-6 rounded-container border border-border bg-card p-6 shadow-1">
+      <h3 className="mb-5 t-headline text-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -1324,7 +1324,7 @@ function SkillGroup({
   const chipClass =
     accent === 'teal'
       ? 'bg-primary-subtle text-primary border-primary-border'
-      : 'bg-muted text-[#182635] border-border';
+      : 'bg-fill-alt text-foreground border-border';
   return (
     <div>
       <h4 className="mb-3 text-sm font-semibold text-foreground-muted">{label}</h4>

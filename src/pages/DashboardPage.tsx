@@ -59,7 +59,7 @@ function KpiCard({
   return (
     <Link
       to={to}
-      className="flex min-h-11 flex-col border border-border bg-card p-4 shadow-sm transition hover:border-primary"
+      className="flex min-h-11 flex-col rounded-container border border-border bg-card p-4 shadow-1 transition hover:border-primary"
     >
       <p className="flex items-center gap-1.5 text-xs text-foreground-muted">
         <Icon size={13} className="shrink-0" aria-hidden="true" />
@@ -107,7 +107,7 @@ function DurationCard({
   if (!stats) {
     if (!error) return null;
     return (
-      <section className="mt-7 border border-border bg-card p-5 text-sm text-foreground-subtle shadow-sm">
+      <section className="mt-7 rounded-container border border-border bg-card p-5 text-sm text-foreground-subtle shadow-1">
         소요 실측을 불러오지 못했어요. {error}
       </section>
     );
@@ -120,7 +120,7 @@ function DurationCard({
   const diff = hasMedian && expectedMinutes !== null ? Math.round((medianMinutes - expectedMinutes) * 10) / 10 : null;
 
   return (
-    <section className="mt-7 border border-border bg-card p-5 shadow-sm">
+    <section className="mt-7 rounded-container border border-border bg-card p-5 shadow-1">
       <div className="flex items-start gap-2">
         <Timer size={15} className="mt-0.5 shrink-0 text-foreground-muted" aria-hidden="true" />
         <div>
@@ -513,7 +513,7 @@ export function Dashboard({
             type="button"
             onClick={() => openReviews(status)}
             disabled={!ready}
-            className="border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary disabled:cursor-default disabled:hover:border-border"
+            className="rounded-container border border-border bg-card p-4 text-left shadow-1 transition hover:border-primary disabled:cursor-default disabled:hover:border-border"
           >
             <p className="text-xs text-foreground-muted">{label}</p>
             <p className={`mt-3 text-2xl font-semibold ${ready ? tone : 'text-foreground-subtle'}`}>
@@ -529,7 +529,7 @@ export function Dashboard({
       <DurationCard stats={duration} error={durationError} />
 
       <div className="mt-7 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-        <section className="border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-container border border-border bg-card p-5 shadow-1">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold text-foreground">SME별 검토 현황</h3>
@@ -627,7 +627,7 @@ export function Dashboard({
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-container border border-border bg-card p-5 shadow-1">
           <h3 className="font-semibold text-foreground">검토 상태 분포</h3>
           <p className="mt-1 text-xs text-foreground-subtle">
             {loading

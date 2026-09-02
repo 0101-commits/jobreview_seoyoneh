@@ -33,6 +33,7 @@ import { fetchOperationSettings, type OperationSettings } from '@/lib/settingsAp
 import { DEFAULT_TEMPLATES, type MailRecipient } from '@/lib/mailApi';
 import { MailSendPanel } from '@/pages/admin/MailSendPanel';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { Button } from '@/components/ui/Button';
 
 // ── 표시용 상수 ─────────────────────────────────────────────────────
@@ -427,28 +428,14 @@ export function ProgressMatrixPage({
         </div>
       )}
 
-      <div className="border border-border bg-card shadow-sm">
+      <div className="rounded-container border border-border bg-card shadow-1">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="진행 상태 필터">
-            {FILTERS.map(({ key, label }) => {
-              const on = filter === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setFilter(key)}
-                  className={`min-h-11 rounded-element border px-3 text-xs font-medium transition sm:min-h-control-sm ${
-                    on
-                      ? 'border-primary bg-primary-subtle text-primary'
-                      : 'border-border bg-card text-foreground-muted hover:border-primary hover:text-primary'
-                  }`}
-                >
-                  {label} {ready ? filterCount(key) : ''}
-                </button>
-              );
-            })}
-          </div>
+          <FilterChips
+            label="진행 상태 필터"
+            value={filter}
+            onChange={setFilter}
+            options={FILTERS.map(({ key, label }) => ({ value: key, label, count: filterCount(key) }))}
+          />
           <label className="inline-flex min-h-11 items-center gap-2 text-xs text-foreground-muted">
             <input
               type="checkbox"
