@@ -3,7 +3,6 @@ import { normalize, parseWorkbook } from './uploadUtils';
 
 export { normalize, parseWorkbook };
 
-export const FIXED_COMPANY_NAME = '서연이화';
 export const JOB_SHEET_NAME = '직무 및 과업 정보';
 export const SKILL_SHEET_NAME = 'Skill 및 수행요건';
 

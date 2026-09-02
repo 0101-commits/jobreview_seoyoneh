@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import { logAudit } from './auditApi';
 import {
-  FIXED_COMPANY_NAME,
   type IntegratedJobRow,
   type IntegratedOrgRow,
   type IntegratedSkillRow,
@@ -28,21 +27,6 @@ interface RpcSaveResult {
   activity_count?: number;
   skill_count?: number;
   requirement_count?: number;
-}
-
-export async function fetchFixedCompanyId(): Promise<string> {
-  if (!supabase) throw new Error('데이터베이스 연결이 없습니다.');
-  const { data: company, error: companyError } = await supabase
-    .from('companies')
-    .select('id')
-    .eq('name', FIXED_COMPANY_NAME)
-    .maybeSingle();
-
-  if (companyError) throw new Error(companyError.message);
-  if (!company?.id) {
-    throw new Error(`회사 정보 ‘${FIXED_COMPANY_NAME}’를 찾을 수 없습니다. companies 테이블을 확인해 주세요.`);
-  }
-  return company.id;
 }
 
 /**

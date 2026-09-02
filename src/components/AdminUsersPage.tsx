@@ -2,7 +2,7 @@
 // 모달 안에서 벌어진 실패는 모달 안에서 보여 준다(모달 뒤 토스트로 보내면 사실상 보이지 않는다).
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Eye, EyeOff, KeyRound, Plus, RotateCw, ShieldCheck, Trash2, UserCog } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { resetRedirectUrl, supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
@@ -54,7 +54,6 @@ export function AdminUsersPage({ currentUser }: Props) {
   const [loadError, setLoadError] = useState('');
   const [showRegister, setShowRegister] = useState(false);
   const [showManage, setShowManage] = useState<AdminProfile | null>(null);
-  const [showRecreate, setShowRecreate] = useState<AdminProfile | null>(null);
   const { toast, showToast, dismiss } = useToast();
 
   const fetchAdmins = useCallback(async () => {
@@ -197,9 +196,16 @@ export function AdminUsersPage({ currentUser }: Props) {
                       >
                         {a.active ? '● 활성' : '○ 비활성'}
                       </span>
+                      {/*
+                        로그인 계정(auth)만 없는 프로필. 화면에서 재생성하면 profile.id ≠ auth.uid인 계정이
+                        생겨 로그인 자체가 막혔다(v2 F3). 그래서 복구 경로는 문서화된 SQL 절차 하나로 둔다.
+                      */}
                       {a.hasAuth === false && (
-                        <span className="flex w-fit items-center gap-1 rounded-full bg-warning-muted px-2.5 py-1 text-xs font-medium text-warning">
-                          <AlertTriangle size={12} aria-hidden="true" /> 로그인 계정 미생성
+                        <span
+                          title="supabase/BOOTSTRAP_2026-09-02_admin.sql 절차로 복구해 주세요."
+                          className="flex w-fit items-center gap-1 rounded-full bg-warning-muted px-2.5 py-1 text-xs font-medium text-warning"
+                        >
+                          <AlertTriangle size={12} aria-hidden="true" /> 로그인 계정 미생성 · SQL 복구 필요
                         </span>
                       )}
                     </div>
@@ -207,11 +213,6 @@ export function AdminUsersPage({ currentUser }: Props) {
                   <td className="px-6 py-4 text-foreground-muted">{formatDate(a.created_at)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">
-                      {a.hasAuth === false && (
-                        <Button variant="secondary" size="sm" onClick={() => setShowRecreate(a)}>
-                          로그인 계정 재생성
-                        </Button>
-                      )}
                       <Button variant="secondary" size="sm" onClick={() => setShowManage(a)}>
                         관리
                       </Button>
@@ -235,17 +236,6 @@ export function AdminUsersPage({ currentUser }: Props) {
         />
       )}
 
-      {showRecreate && (
-        <RecreateAuthModal
-          admin={showRecreate}
-          onClose={() => setShowRecreate(null)}
-          onSuccess={() => {
-            setShowRecreate(null);
-            showToast({ type: 'success', msg: '로그인 계정을 생성했어요.' });
-            fetchAdmins();
-          }}
-        />
-      )}
 
       {showManage && (
         <ManageModal
@@ -439,7 +429,7 @@ function ManageModal({
     }
     setResetting(true);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(admin.email, {
-      redirectTo: window.location.origin,
+      redirectTo: resetRedirectUrl(),
     });
     setResetting(false);
     if (resetError) {
@@ -548,103 +538,6 @@ function ManageModal({
           )}
         </div>
       </div>
-    </ModalShell>
-  );
-}
-
-// ── 로그인 계정 재생성 ───────────────────────────────────────
-
-const RECREATE_FORM_ID = 'admin-recreate-form';
-
-function RecreateAuthModal({
-  admin,
-  onClose,
-  onSuccess,
-}: {
-  admin: AdminProfile;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [localError, setLocalError] = useState('');
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLocalError('');
-    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-      setLocalError('비밀번호는 8자 이상이며 영문과 숫자를 포함해 주세요.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await callAdminFn({
-        mode: 'recreate-auth',
-        profileId: admin.id,
-        email: admin.email,
-        password,
-        name: admin.name,
-      });
-      onSuccess();
-    } catch (err) {
-      setLocalError(errorMessage(err, '로그인 계정을 생성하지 못했어요. 잠시 후 다시 시도해 주세요.'));
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <ModalShell
-      title="로그인 계정 재생성"
-      icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
-      onClose={onClose}
-      dirty={Boolean(password) && !submitting}
-      closeDisabled={submitting}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            취소
-          </Button>
-          <Button type="submit" form={RECREATE_FORM_ID} loading={submitting}>
-            {submitting ? '생성 중...' : '로그인 계정 생성'}
-          </Button>
-        </>
-      }
-    >
-      <form id={RECREATE_FORM_ID} onSubmit={handleSubmit} className="space-y-5">
-        <Alert tone="warning">이 계정에는 로그인 계정이 없어요. 새 비밀번호로 로그인 계정을 만듭니다.</Alert>
-        <Field label="이름" value={admin.name} onChange={() => {}} disabled />
-        <Field label="이메일" value={admin.email} onChange={() => {}} disabled />
-        {/*
-          감싼 div는 눈 아이콘 버튼을 겹쳐 놓기 위해 필요하다. 그래서 div를 없애는 대신
-          함수형 children으로 라벨·설명(aria-describedby)·필수 여부의 연결 대상만 입력 칸으로 내렸다.
-          (예전에는 Field가 이 div에 id를 달아 라벨이 div를 가리키고, 비밀번호 규칙 설명이 입력 칸에 닿지 않았다.)
-        */}
-        <Field label="비밀번호" required description="8자 이상, 영문과 숫자를 포함해 주세요.">
-          {(a11y) => (
-            <div className="relative">
-              <input
-                {...a11y}
-                type={showPw ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="비밀번호를 입력해 주세요"
-                autoComplete="new-password"
-                className="input pr-11"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw(!showPw)}
-                aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
-                className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-element text-foreground-subtle transition hover:text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-              </button>
-            </div>
-          )}
-        </Field>
-        {localError && <Alert tone="error">{localError}</Alert>}
-      </form>
     </ModalShell>
   );
 }

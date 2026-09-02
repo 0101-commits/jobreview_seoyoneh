@@ -34,7 +34,7 @@ import {
   UserCog,
   UserPlus,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { isResetPasswordPath, supabase } from '@/lib/supabase';
 import { UploadPage } from '@/components/UploadPage';
 import { AdminUsersPage } from '@/components/AdminUsersPage';
 import { Login, type LoginResult } from '@/pages/LoginPage';
@@ -186,6 +186,9 @@ function App() {
   const [booting, setBooting] = useState(true);
   const [loginError, setLoginError] = useState('');
   const [companyFilter, setCompanyFilter] = useState<string>('all'); // 관리자 회사 필터
+  // 비밀번호 재설정 흐름(F1). 주소가 진실이고, PASSWORD_RECOVERY 이벤트는 보조 신호다
+  // — supabase-js가 해시(#type=recovery)를 먼저 지워도 경로는 남기 때문이다.
+  const [recovery, setRecovery] = useState(isResetPasswordPath);
 
   // 부팅과 로그인이 같은 경로를 쓰도록, 프로필 조회는 여기 한 곳에서만 한다.
   useEffect(() => {
@@ -227,6 +230,9 @@ function App() {
 
     // 토큰 만료·다른 탭 로그아웃을 반영한다. 콜백 안에서 곧바로 supabase를 부르면 잠길 수 있어 한 틱 미룬다.
     const { data: sub } = auth.onAuthStateChange((event, session) => {
+      // 재설정 메일 링크로 들어온 세션. 주소가 /reset-password가 아니어도(메일 클라이언트가 주소를
+      // 바꾸는 경우) 이 이벤트로 재설정 화면을 띄운다.
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
       if (event === 'INITIAL_SESSION') return; // getSession이 이미 처리했다.
       setTimeout(() => {
         void apply(session?.user?.id);
@@ -261,12 +267,37 @@ function App() {
     setUser(null);
   }, []);
 
+  // 재설정을 마치거나 포기했을 때 — 주소에서 /reset-password를 지워 새로고침해도 다시 열리지 않게 한다.
+  const exitRecovery = useCallback(() => {
+    window.history.replaceState(null, '', import.meta.env.BASE_URL);
+    setRecovery(false);
+  }, []);
+
   if (booting)
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-foreground-subtle">
         불러오는 중…
       </div>
     );
+
+  // 재설정 게이트(F1) — 로그인 게이트보다 앞이다. 링크가 만료돼 세션이 없으면
+  // ChangePasswordPage가 "링크가 만료되었어요"를 보여 주고 로그인 화면으로 되돌린다.
+  if (recovery)
+    return (
+      <ChangePasswordPage
+        mode="recovery"
+        user={user}
+        onChanged={() => {
+          setUser((prev) => (prev ? { ...prev, must_change_password: false } : prev));
+          exitRecovery();
+        }}
+        onLogout={async () => {
+          await logout();
+          exitRecovery();
+        }}
+      />
+    );
+
   if (!user) return <Login onLogin={login} error={loginError} />;
 
   // 강제 게이트 — 라우터를 아예 띄우지 않는다. 라우트 가드를 두면 직접 URL 입력으로 한 번은 화면이 그려지므로,
@@ -401,9 +432,22 @@ function Shell({
                     path="/inbox"
                     element={<InquiryInboxPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
                   />
-                  <Route path="/jobs" element={<JobsRoute userId={user.id} />} />
-                  <Route path="/jobs/:jobId" element={<JobsRoute userId={user.id} />} />
-                  <Route path="/upload" element={<UploadPage />} />
+                  <Route
+                    path="/jobs"
+                    element={
+                      <JobsRoute userId={user.id} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
+                  />
+                  <Route
+                    path="/jobs/:jobId"
+                    element={
+                      <JobsRoute userId={user.id} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
+                  />
+                  <Route
+                    path="/upload"
+                    element={<UploadPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                  />
                   <Route
                     path="/users"
                     element={<UsersPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
@@ -603,7 +647,15 @@ function CompareRoute() {
   return <JobComparePage jobId={jobId} onBack={() => navigate('/workbench')} />;
 }
 
-function JobsRoute({ userId }: { userId: string }) {
+function JobsRoute({
+  userId,
+  companyFilter,
+  setCompanyFilter,
+}: {
+  userId: string;
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
+}) {
   const { jobId } = useParams();
   const navigate = useNavigate();
   return (
@@ -611,6 +663,8 @@ function JobsRoute({ userId }: { userId: string }) {
       userId={userId}
       selectedJobId={jobId ?? null}
       onSelectJob={(next) => navigate(next ? `/jobs/${next}` : '/jobs')}
+      companyFilter={companyFilter}
+      setCompanyFilter={setCompanyFilter}
     />
   );
 }

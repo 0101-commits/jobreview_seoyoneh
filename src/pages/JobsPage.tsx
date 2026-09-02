@@ -19,8 +19,9 @@ import {
   mapReviewStatus,
   type JobListItem,
 } from '@/lib/jobApi';
-import { fetchFixedCompanyId } from '@/lib/integratedJobApi';
+import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { JobDetailPage } from '@/components/JobDetailPage';
+import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import type { Status } from '@/types';
@@ -56,21 +57,28 @@ export function JobsPage({
   userId,
   selectedJobId: controlledJobId,
   onSelectJob,
+  companyFilter,
+  setCompanyFilter,
 }: {
   userId: string;
   /** 라우터 연결(담당 2) 후에는 URL이 원천이 된다. 주지 않으면 내부 상태로 동작한다. */
   selectedJobId?: string | null;
   onSelectJob?: (jobId: string | null) => void;
+  /** 공통 회사 필터(App 보유). 'all'이면 전 회사 직무를 함께 본다 — v2 F4로 회사명 하드코딩을 걷어냈다. */
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [statusWarning, setStatusWarning] = useState('');
-  const [fixedCompanyId, setFixedCompanyId] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'name', asc: true });
   const [internalJobId, setInternalJobId] = useState<string | null>(null);
 
+  // 'all'은 전 회사다(회사 없이 조회하면 서버가 전체를 준다).
+  const companyId = companyFilter === 'all' ? null : companyFilter;
   const selectedJobId = controlledJobId !== undefined ? controlledJobId : internalJobId;
   const selectJob = useCallback(
     (jobId: string | null) => {
@@ -84,20 +92,6 @@ export function JobsPage({
     setLoading(true);
     setLoadError('');
     setStatusWarning('');
-
-    let companyId: string;
-    try {
-      companyId = await fetchFixedCompanyId();
-    } catch (error) {
-      setFixedCompanyId(null);
-      setRows([]);
-      setLoadError(
-        error instanceof Error ? error.message : '회사 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-      );
-      setLoading(false);
-      return;
-    }
-    setFixedCompanyId(companyId);
 
     const jobs = await fetchAllJobsResult(companyId);
     if (!jobs.ok) {
@@ -138,11 +132,15 @@ export function JobsPage({
       }),
     );
     setLoading(false);
-  }, []);
+  }, [companyId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    fetchCompanies().then(setCompanies);
+  }, []);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -163,10 +161,13 @@ export function JobsPage({
     setSort((prev) => (prev.key === key ? { key, asc: !prev.asc } : { key, asc: true }));
   }
 
-  if (selectedJobId)
+  if (selectedJobId) {
+    // 직군·직렬 후보와 중복 검사는 그 직무가 속한 회사 기준이어야 한다('전체' 필터에서도).
+    const jobCompanyId = rows.find((r) => r.id === selectedJobId)?.company_id ?? companyId;
     return (
-      <JobDetailPage jobId={selectedJobId} onBack={() => selectJob(null)} userId={userId} companyId={fixedCompanyId} />
+      <JobDetailPage jobId={selectedJobId} onBack={() => selectJob(null)} userId={userId} companyId={jobCompanyId} />
     );
+  }
 
   return (
     <>
@@ -178,11 +179,8 @@ export function JobsPage({
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">직무정보 관리</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant="secondary"
-            onClick={() => fixedCompanyId && exportAllJobsToExcel(fixedCompanyId)}
-            disabled={!fixedCompanyId || loading}
-          >
+          <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
+          <Button variant="secondary" onClick={() => exportAllJobsToExcel(companyId)} disabled={loading}>
             <Download size={16} aria-hidden="true" /> 전체 직무정보 다운로드
           </Button>
           <div className="relative">

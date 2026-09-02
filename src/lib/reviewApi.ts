@@ -678,18 +678,9 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
     );
 }
 
-/**
- * 재검토 요청(반려). reviews.status를 REVIEW_REQUESTED로 바꾸고 review_history에 사유를 남긴다.
- * 두 쓰기가 한 트랜잭션이어야 감사 기록이 어긋나지 않으므로 RPC 한 번으로 처리한다.
- * (supabase/migrations/20260828020000_add_request_rereview_rpc.sql)
- *
- * ⚠ 새 화면에서는 쓰지 말 것 — 반려는 adminApi.decideReview(reviewId, 'REJECTED', 사유)를 쓴다.
- * 이 RPC는 사유를 review_history에만 남기고 reviews.rejected_reason을 쓰지 않아, SME 화면의
- * 재검토 배너가 사유 없이 뜬다(§10 P3 DoD ①). 지금은 호출부가 없다.
+/*
+ * (삭제) requestRereview — v2 F8. 호출부 0이었고, 사유를 reviews.rejected_reason에 쓰지 않아
+ * SME 화면의 재검토 배너가 사유 없이 떴다. 반려는 adminApi.decideReview(reviewId, 'REJECTED', 사유)다.
+ * 서버의 request_rereview 실행 권한도 함께 회수한다(APPLY_2026-09-02_phaseA.sql).
  */
-export async function requestRereview(reviewId: string, note: string): Promise<ReviewState> {
-  const { data, error } = await client().rpc('request_rereview', { p_review_id: reviewId, p_note: note });
-  if (error) fail('재검토를 요청하지', error.message);
-  const row = Array.isArray(data) ? data[0] : data;
-  return toState(row, '재검토를 요청하지');
-}
+

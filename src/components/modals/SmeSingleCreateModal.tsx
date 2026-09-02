@@ -15,7 +15,8 @@ export function SmeSingleCreateModal({
 }: {
   companies: { id: string; name: string }[];
   onClose: () => void;
-  onSuccess: () => void;
+  /** keepOpen이면 목록만 새로고침하고 모달은 열어 둔다(임시 비밀번호 1회 표시 — v2 S2). */
+  onSuccess: (opts?: { keepOpen: boolean }) => void;
 }) {
   const [companyId, setCompanyId] = useState('');
   const [organization, setOrganization] = useState('');
@@ -23,11 +24,13 @@ export function SmeSingleCreateModal({
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
+  // 서버가 만든 임시 비밀번호(v2 S2 / 결정 D1 ⓑ). 이 상태에만 있고 모달을 닫으면 사라진다.
+  const [issued, setIssued] = useState<{ email: string; tempPassword: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const dirty = Boolean(companyId || organization || title || employeeNumber || name || email || password);
+  const dirty = Boolean(companyId || organization || title || employeeNumber || name || email) && !issued;
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -39,38 +42,68 @@ export function SmeSingleCreateModal({
       !title.trim() ||
       !employeeNumber.trim() ||
       !name.trim() ||
-      !email.trim() ||
-      !password
+      !email.trim()
     ) {
-      setLocalError('회사, 조직, 직급, 사번, 이름, 이메일, 비밀번호를 모두 입력해 주세요.');
-      return;
-    }
-
-    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-      setLocalError('비밀번호는 8자 이상이며 영문과 숫자를 포함해 주세요.');
+      setLocalError('회사, 조직, 직급, 사번, 이름, 이메일을 모두 입력해 주세요.');
       return;
     }
 
     setSubmitting(true);
     try {
-      await callAdminFn({
+      const res = await callAdminFn<{ tempPassword?: string }>({
         mode: 'create-sme',
         sme: {
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          password,
           company_id: companyId,
           organization: organization.trim(),
           title: title.trim(),
           employee_number: employeeNumber.trim(),
         },
       });
-      onSuccess();
+      // 목록 새로고침은 지금 하되 모달은 닫지 않는다 — 임시 비밀번호를 한 번은 보여 줘야 한다.
+      setSubmitting(false);
+      setIssued({ email: email.trim().toLowerCase(), tempPassword: res.tempPassword ?? '' });
+      onSuccess({ keepOpen: true });
     } catch (err) {
       setLocalError(errorMessage(err, 'SME 계정 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
       setSubmitting(false);
     }
   }
+
+  if (issued)
+    return (
+      <ModalShell
+        title="SME 계정을 만들었어요"
+        description="임시 비밀번호는 이 창을 닫으면 다시 볼 수 없어요."
+        icon={<UserPlus size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
+        onClose={onClose}
+        footer={<Button onClick={onClose}>닫기</Button>}
+      >
+        <div className="space-y-3">
+          <div className="rounded-element border border-warning-border bg-warning-muted px-3.5 py-3 text-sm text-warning">
+            아래 임시 비밀번호를 {issued.email} 님에게 개별적으로 전달해 주세요. 첫 로그인에서 반드시 바꾸게 됩니다.
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-element border border-border bg-card px-3.5 py-3">
+            <span className="font-mono text-base font-semibold text-foreground">{issued.tempPassword}</span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(issued.tempPassword);
+                  setCopied(true);
+                } catch {
+                  setCopied(false);
+                }
+              }}
+            >
+              {copied ? '복사했어요' : '복사'}
+            </Button>
+          </div>
+        </div>
+      </ModalShell>
+    );
 
   return (
     <ModalShell
@@ -123,16 +156,10 @@ export function SmeSingleCreateModal({
           autoComplete="off"
         />
 
-        <Field
-          label="비밀번호"
-          required
-          type="password"
-          value={password}
-          onChange={setPassword}
-          placeholder="8자 이상, 영문 및 숫자 포함"
-          description="8자 이상, 영문과 숫자를 포함해 주세요."
-          autoComplete="new-password"
-        />
+        <p className="rounded-element border border-border bg-muted px-3 py-2.5 text-xs leading-5 text-foreground-muted">
+          비밀번호는 서버가 임시로 만들어 등록 직후 이 창에 한 번 보여 드려요. SME는 첫 로그인에서 반드시 새
+          비밀번호로 바꿉니다.
+        </p>
 
         {localError && (
           <div

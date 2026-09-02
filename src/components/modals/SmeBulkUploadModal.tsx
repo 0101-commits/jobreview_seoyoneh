@@ -20,6 +20,12 @@ interface UploadResult {
   failed: number;
   aborted: boolean;
   errors: { email: string; message: string }[];
+  /*
+   * 서버가 만든 임시 비밀번호(v2 S2 / 결정 D1 ⓑ).
+   * 이 배열은 모달의 상태로만 존재한다 — 어디에도 저장하지 않고 모달을 닫으면 사라진다.
+   * 관리자는 이 목록을 복사해 각 SME에게 전달하고, SME는 첫 로그인에서 반드시 바꾼다.
+   */
+  issued: { email: string; tempPassword: string }[];
 }
 
 export function SmeBulkUploadModal({
@@ -100,24 +106,25 @@ export function SmeBulkUploadModal({
         failed: rows.length,
         aborted: false,
         errors: [{ email: '', message: errorMessage(err, '인증 정보를 확인할 수 없어요.') }],
+        issued: [],
       });
       return;
     }
 
     let created = 0;
     const errors: UploadResult['errors'] = [];
+    const issued: UploadResult['issued'] = [];
 
     for (let i = 0; i < rows.length; i++) {
       if (abortRef.current) break;
       const row = rows[i];
       try {
-        await callAdminFn(
+        const created1 = await callAdminFn<{ tempPassword?: string }>(
           {
             mode: 'create-sme',
             sme: {
               name: row.이름,
               email: row.이메일,
-              password: row.비밀번호,
               company_id: compIdMap.get(row.회사) || null,
               organization: row.조직,
               title: row.직급,
@@ -127,6 +134,7 @@ export function SmeBulkUploadModal({
           token,
         );
         created++;
+        if (created1.tempPassword) issued.push({ email: String(row.이메일), tempPassword: created1.tempPassword });
       } catch (err) {
         errors.push({ email: String(row.이메일), message: errorMessage(err, '등록하지 못했어요.') });
       }
@@ -135,7 +143,7 @@ export function SmeBulkUploadModal({
 
     const aborted = abortRef.current;
     setSubmitting(false);
-    setResult({ total: rows.length, created, failed: errors.length, aborted, errors });
+    setResult({ total: rows.length, created, failed: errors.length, aborted, errors, issued });
     onCompleted({ created, failed: errors.length, aborted });
   }
 
@@ -286,6 +294,8 @@ export function SmeBulkUploadModal({
             </p>
           </div>
 
+          {result.issued.length > 0 && <IssuedPasswords issued={result.issued} />}
+
           {result.errors.length > 0 && (
             <div className="max-h-56 overflow-y-auto rounded-element border border-destructive-border bg-destructive-muted p-3">
               <p className="mb-2 text-xs font-medium text-destructive">실패 목록 ({result.errors.length}건)</p>
@@ -302,5 +312,55 @@ export function SmeBulkUploadModal({
         </div>
       )}
     </ModalShell>
+  );
+}
+
+/**
+ * 발급된 임시 비밀번호를 한 번만 보여 주는 패널(v2 S2).
+ * 파일로 내려받는 기능은 두지 않는다 — 평문 목록이 파일로 남는 것을 없애려고 한 변경이기 때문이다.
+ * 복사 버튼만 두고, 모달을 닫으면 값은 사라진다.
+ */
+function IssuedPasswords({ issued }: { issued: { email: string; tempPassword: string }[] }) {
+  const [copied, setCopied] = useState(false);
+  // 이메일 + 탭 + 비밀번호 — 엑셀·메모장에 붙이면 두 열로 들어간다.
+  const text = issued.map((r) => `${r.email}\t${r.tempPassword}`).join('\n');
+
+  return (
+    <div className="rounded-element border border-warning-border bg-warning-muted p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium text-warning">
+          임시 비밀번호 {issued.length}건 — 이 창을 닫으면 다시 볼 수 없어요.
+        </p>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              setCopied(true);
+            } catch {
+              setCopied(false);
+            }
+          }}
+        >
+          {copied ? '복사했어요' : '목록 복사'}
+        </Button>
+      </div>
+      <p className="mb-2 text-xs leading-5 text-warning">
+        각 SME에게 개별적으로 전달해 주세요. SME는 첫 로그인에서 비밀번호를 반드시 바꿉니다.
+      </p>
+      <div className="max-h-48 overflow-y-auto rounded-inner bg-card p-2">
+        <table className="w-full text-xs">
+          <tbody>
+            {issued.map((r) => (
+              <tr key={r.email} className="border-b border-border last:border-0">
+                <td className="py-1.5 pr-3 text-foreground-muted">{r.email}</td>
+                <td className="py-1.5 font-mono font-medium text-foreground">{r.tempPassword}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

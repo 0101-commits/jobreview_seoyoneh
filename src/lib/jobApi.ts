@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { normalize, type Step1Row, type Step2Row, type JobMaster } from './uploadUtils';
+import { type JobMaster } from './uploadUtils';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -131,234 +131,12 @@ export async function hasJobMasters(): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-// ── Save STEP 1 data ────────────────────────────────────────────────
-
-export async function saveStep1Data(rows: Step1Row[], mode: 'append' | 'replace', userId: string): Promise<{ saved: number; error?: string }> {
-  if (!supabase) return { saved: 0, error: '데이터베이스 연결이 없습니다.' };
-
-  // Fetch company master for name → id mapping
-  const { data: companies } = await supabase.from('companies').select('id, name').eq('active', true);
-  const companyMap = new Map<string, string>();
-  for (const c of (companies || []) as { id: string; name: string }[]) {
-    companyMap.set(normalize(c.name).toLowerCase(), c.id);
-  }
-
-  // Validate all company names exist
-  const unknownCompanies = new Set<string>();
-  for (const r of rows) {
-    const key = normalize(r.회사).toLowerCase();
-    if (!companyMap.has(key)) unknownCompanies.add(r.회사);
-  }
-  if (unknownCompanies.size > 0) {
-    return { saved: 0, error: `등록되지 않은 회사입니다: ${[...unknownCompanies].join(', ')}` };
-  }
-
-  // Group rows by 회사 → 직군 → 직렬 → 직무 → 주요과업 → 세부활동
-  const groupMap = new Map<string, { name: string; companyId: string }>();
-  const seriesMap = new Map<string, { name: string; companyId: string; groupId: string }>();
-  const jobMap = new Map<string, { name: string; definition: string; companyId: string; groupId: string; seriesId: string }>();
-  const taskMap = new Map<string, { name: string; jobKey: string; sortOrder: number }>();
-  const activityList: { jobTaskKey: string; name: string; sortOrder: number }[] = [];
-
-  let taskCounter = 0;
-  rows.forEach((r) => {
-    const companyId = companyMap.get(normalize(r.회사).toLowerCase())!;
-    const gKey = `${companyId}|${normalize(r.직군)}`;
-    const sKey = `${gKey}|${normalize(r.직렬)}`;
-    const jKey = `${sKey}|${normalize(r.직무)}`;
-    const tKey = `${jKey}|${normalize(r.주요과업)}`;
-
-    if (!groupMap.has(gKey)) groupMap.set(gKey, { name: normalize(r.직군), companyId });
-    if (!seriesMap.has(sKey)) seriesMap.set(sKey, { name: normalize(r.직렬), companyId, groupId: gKey });
-    if (!jobMap.has(jKey)) jobMap.set(jKey, { name: normalize(r.직무), definition: normalize(r.직무정의), companyId, groupId: gKey, seriesId: sKey });
-    if (!taskMap.has(tKey)) {
-      taskMap.set(tKey, { name: normalize(r.주요과업), jobKey: jKey, sortOrder: taskCounter });
-      taskCounter++;
-    }
-    activityList.push({ jobTaskKey: tKey, name: normalize(r.세부활동), sortOrder: activityList.length });
-  });
-
-  try {
-    if (mode === 'replace') {
-      await supabase.from('task_activities').update({ active: false }).eq('active', true);
-      await supabase.from('job_tasks').update({ active: false }).eq('active', true);
-      await supabase.from('job_skills').update({ active: false }).eq('active', true);
-      await supabase.from('job_requirements').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('jobs').update({ active: false }).eq('active', true);
-      await supabase.from('job_series').update({ active: false }).eq('active', true);
-      await supabase.from('job_groups').update({ active: false }).eq('active', true);
-    }
-
-    // 1. Upsert job_groups (with company_id)
-    const groupRows = [...groupMap.entries()].map(([, val]) => ({ company_id: val.companyId, name: val.name, active: true, source_version: 1, created_by: userId }));
-    const { data: insertedGroups, error: gErr } = await supabase.from('job_groups').upsert(groupRows, { onConflict: 'company_id,name,source_version', ignoreDuplicates: false }).select('id, name, company_id');
-    if (gErr) return { saved: 0, error: gErr.message };
-    const groupIdMap = new Map((insertedGroups || []).map((g: Record<string, unknown>) => [`${(g.company_id as string) || ''}|${g.name as string}`, g.id as string]));
-
-    // 2. Upsert job_series (with company_id)
-    const seriesRows = [...seriesMap.entries()].map(([, val]) => {
-      const groupId = groupIdMap.get(val.groupId)!;
-      return { company_id: val.companyId, group_id: groupId, name: val.name, active: true, source_version: 1, created_by: userId };
-    });
-    const { data: insertedSeries, error: sErr } = await supabase.from('job_series').upsert(seriesRows, { onConflict: 'company_id,group_id,name,source_version', ignoreDuplicates: false }).select('id, name, group_id, company_id');
-    if (sErr) return { saved: 0, error: sErr.message };
-    const seriesIdMap = new Map((insertedSeries || []).map((s: Record<string, unknown>) => [`${(s.company_id as string) || ''}|${s.group_id as string}|${s.name as string}`, s.id as string]));
-
-    // 3. Upsert jobs (with company_id)
-    const jobRows = [...jobMap.entries()].map(([, val]) => {
-      const groupId = groupIdMap.get(val.groupId)!;
-      const seriesId = seriesIdMap.get(`${val.companyId}|${groupId}|${seriesMap.get(val.seriesId)!.name}`)!;
-      return { company_id: val.companyId, group_id: groupId, series_id: seriesId, name: val.name, definition: val.definition, active: true, source_version: 1, created_by: userId };
-    });
-    const { data: insertedJobs, error: jErr } = await supabase.from('jobs').upsert(jobRows, { onConflict: 'company_id,series_id,name,source_version', ignoreDuplicates: false }).select('id, name, group_id, series_id, company_id');
-    if (jErr) return { saved: 0, error: jErr.message };
-    const jobIdMap = new Map((insertedJobs || []).map((j: Record<string, unknown>) => [`${(j.company_id as string) || ''}|${j.group_id as string}|${j.series_id as string}|${j.name as string}`, j.id as string]));
-
-    // 4. Insert job_tasks
-    const taskRows = [...taskMap.entries()].map(([, val]) => {
-      const jobKey = val.jobKey;
-      const job = jobMap.get(jobKey)!;
-      const groupId = groupIdMap.get(job.groupId)!;
-      const seriesId = seriesIdMap.get(`${job.companyId}|${groupId}|${seriesMap.get(job.seriesId)!.name}`)!;
-      const jKey = `${job.companyId}|${groupId}|${seriesId}|${job.name}`;
-      const jobId = jobIdMap.get(jKey)!;
-      return { job_id: jobId, name: val.name, sort_order: val.sortOrder, active: true };
-    });
-    const { data: insertedTasks, error: tErr } = await supabase.from('job_tasks').insert(taskRows).select('id, name, job_id, sort_order');
-    if (tErr) return { saved: 0, error: tErr.message };
-
-    const taskIdMap = new Map<string, string>();
-    (insertedTasks || []).forEach((t: Record<string, unknown>) => {
-      taskIdMap.set(`${t.job_id as string}|${t.name as string}`, t.id as string);
-    });
-
-    // 5. Insert task_activities
-    const activityRows = activityList.map((a) => {
-      const taskKey = a.jobTaskKey;
-      const jKey = taskKey.split('|').slice(0, 4).join('|');
-      const taskName = taskKey.split('|')[4];
-      const job = jobMap.get(jKey)!;
-      const groupId = groupIdMap.get(job.groupId)!;
-      const seriesId = seriesIdMap.get(`${job.companyId}|${groupId}|${seriesMap.get(job.seriesId)!.name}`)!;
-      const jobId = jobIdMap.get(`${job.companyId}|${groupId}|${seriesId}|${job.name}`)!;
-      const taskId = taskIdMap.get(`${jobId}|${taskName}`)!;
-      return { job_task_id: taskId, activity_name: a.name, sort_order: a.sortOrder, active: true };
-    });
-    if (activityRows.length > 0) {
-      const { error: aErr } = await supabase.from('task_activities').insert(activityRows);
-      if (aErr) return { saved: 0, error: aErr.message };
-    }
-
-    return { saved: rows.length };
-  } catch (e) {
-    return { saved: 0, error: e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.' };
-  }
-}
-
-// ── Save STEP 2 data ────────────────────────────────────────────────
-
-export async function saveStep2Data(
-  rows: Step2Row[],
-  matchResults: { row: number; status: string; jobId?: string }[],
-  mode: 'append' | 'replace',
-): Promise<{ saved: number; error?: string }> {
-  if (!supabase) return { saved: 0, error: '데이터베이스 연결이 없습니다.' };
-
-  try {
-    const rowToJobId = new Map<number, string>();
-    matchResults.forEach((r) => {
-      if (r.status === 'matched' && r.jobId) rowToJobId.set(r.row, r.jobId);
-    });
-
-    const skillsByJob = new Map<string, { skill_type: string; name: string; sort_order: number }[]>();
-    const reqsByJob = new Map<string, { education: string; major: string; certifications: string }>();
-    const reqConflicts: string[] = [];
-    const reqRowsByJob = new Map<string, { row: number; education: string; major: string; certifications: string }[]>();
-
-    rows.forEach((row, i) => {
-      const rowNum = i + 2;
-      const jobId = rowToJobId.get(rowNum);
-      if (!jobId) return;
-
-      const skillType = normalize(row['Skill 구분']);
-      const skillName = normalize(row.Skill);
-      if (skillName) {
-        const arr = skillsByJob.get(jobId) || [];
-        arr.push({ skill_type: skillType, name: skillName, sort_order: arr.length });
-        skillsByJob.set(jobId, arr);
-      }
-
-      const education = normalize(row['요구 학력']);
-      const major = normalize(row['관련 전공']);
-      const certifications = normalize(row['관련 자격증/면허']);
-      const list = reqRowsByJob.get(jobId) || [];
-      list.push({ row: rowNum, education, major, certifications });
-      reqRowsByJob.set(jobId, list);
-    });
-
-    for (const [jobId, entries] of reqRowsByJob) {
-      const merged = { education: '', major: '', certifications: '' };
-      const seenVals: Record<string, Map<string, number>> = {
-        education: new Map(),
-        major: new Map(),
-        certifications: new Map(),
-      };
-      for (const e of entries) {
-        (['education', 'major', 'certifications'] as const).forEach((f) => {
-          if (e[f]) {
-            const rowsForVal = seenVals[f].get(e[f]);
-            if (rowsForVal === undefined) seenVals[f].set(e[f], e.row);
-          }
-        });
-      }
-      let conflict = false;
-      const fieldLabel: Record<string, string> = { education: '요구 학력', major: '관련 전공', certifications: '관련 자격증/면허' };
-      (['education', 'major', 'certifications'] as const).forEach((f) => {
-        const vals = [...seenVals[f].keys()];
-        if (vals.length > 1) {
-          conflict = true;
-          const detail = vals.map((v) => `${seenVals[f].get(v)}행: ${v}`).join(', ');
-          reqConflicts.push(`${fieldLabel[f]} - ${detail}`);
-        } else if (vals.length === 1) {
-          merged[f] = vals[0];
-        }
-      });
-      if (conflict) continue;
-      reqsByJob.set(jobId, merged);
-    }
-
-    if (reqConflicts.length > 0) {
-      return { saved: 0, error: `동일 직무에 서로 다른 수행요건이 입력되어 있습니다.\n${reqConflicts.join('\n')}` };
-    }
-
-    if (mode === 'replace') {
-      await supabase.from('job_skills').update({ active: false }).eq('active', true);
-      await supabase.from('job_requirements').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    }
-
-    let skillCount = 0;
-    for (const [jobId, skills] of skillsByJob) {
-      const skillRows = skills.map((s) => ({ job_id: jobId, skill_type: s.skill_type, name: s.name, sort_order: s.sort_order, active: true }));
-      const { error } = await supabase.from('job_skills').insert(skillRows);
-      if (error) return { saved: 0, error: error.message };
-      skillCount += skillRows.length;
-    }
-
-    let reqCount = 0;
-    for (const [jobId, req] of reqsByJob) {
-      const { error } = await supabase.from('job_requirements').upsert(
-        { job_id: jobId, education: req.education, major: req.major, certifications: req.certifications },
-        { onConflict: 'job_id' },
-      );
-      if (error) return { saved: 0, error: error.message };
-      reqCount++;
-    }
-
-    return { saved: skillCount + reqCount };
-  } catch (e) {
-    return { saved: 0, error: e instanceof Error ? e.message : '알 수 없는 오류가 발생했습니다.' };
-  }
-}
+/*
+ * (삭제) saveStep1Data · saveStep2Data — v2 F8.
+ * 호출부가 0인데 replace 분기가 회사 필터 없이 jobs·job_tasks·job_task_activities를 전량
+ * active=false로 내리고 job_requirements를 전량 삭제했다. 업로드는 saveIntegratedJobData
+ * (SECURITY DEFINER RPC, 회사 범위 한정)만 쓴다.
+ */
 
 // ── Fetch full job detail for SME review ────────────────────────────
 
@@ -714,16 +492,18 @@ export async function saveJobEdits(data: SaveJobEditData): Promise<{ error?: str
 
 // ── Export all job data to Excel ────────────────────────────────────
 
-export async function exportAllJobsToExcel(companyId: string): Promise<void> {
+/** companyId가 null이면 전 회사를 내보낸다(v2 F4 — 화면의 회사 필터가 'all'인 경우). */
+export async function exportAllJobsToExcel(companyId: string | null): Promise<void> {
   if (!supabase) return;
   const XLSX = await import('xlsx');
 
-  const { data: jobs } = await supabase
+  let jobQuery = supabase
     .from('jobs')
     .select(`id, name, definition, group_id, series_id, job_groups!inner(name), job_series!inner(name)`)
-    .eq('company_id', companyId)
     .eq('active', true)
     .order('name');
+  if (companyId) jobQuery = jobQuery.eq('company_id', companyId);
+  const { data: jobs } = await jobQuery;
   if (!jobs || jobs.length === 0) return;
 
   const jobIds = jobs.map(j => j.id);

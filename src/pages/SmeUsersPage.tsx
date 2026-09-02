@@ -379,8 +379,9 @@ export function UsersPage({
         <SmeSingleCreateModal
           companies={companies}
           onClose={() => setShowSingleCreate(false)}
-          onSuccess={() => {
-            setShowSingleCreate(false);
+          onSuccess={(opts) => {
+            // keepOpen: 모달이 임시 비밀번호를 보여 주는 동안 목록만 새로고침한다(v2 S2).
+            if (!opts?.keepOpen) setShowSingleCreate(false);
             showToast({ type: 'success', msg: 'SME 계정을 추가했어요.' });
             fetchSmes();
           }}

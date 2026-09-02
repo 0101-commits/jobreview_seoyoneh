@@ -1,5 +1,48 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+/*
+ * auth.admin.listUsers()는 인자를 주지 않으면 첫 50건만 돌려준다(supabase-js 기본 perPage).
+ * 그 응답으로 "이 이메일이 이미 있는가"를 판정하면 계정 51번째부터 답이 틀린다(v2 F2).
+ * 그래서 이메일로 찾아야 할 때만 이 헬퍼로 전체를 순회하고, id로 찾을 때는 getUserById를 쓴다.
+ */
+async function findAuthUserByEmail(
+  adminClient: ReturnType<typeof createClient>,
+  email: string,
+): Promise<{ id: string; email?: string } | null> {
+  const target = email.trim().toLowerCase();
+  const perPage = 1000;
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const users = data?.users || [];
+    const hit = users.find((u) => u.email?.toLowerCase() === target);
+    if (hit) return hit;
+    if (users.length < perPage) return null; // 마지막 페이지
+  }
+  return null;
+}
+
+/*
+ * 임시 비밀번호 생성(v2 S2 / 결정 D1 ⓑ).
+ * 관리자가 엑셀 평문 비밀번호를 유통하던 발급 방식을 서버 생성으로 바꾼다.
+ * 생성값은 응답으로 한 번만 돌려주고 어디에도 저장하지 않는다(profiles.must_change_password가
+ * true라 SME는 첫 로그인에서 곧바로 바꾼다).
+ * 혼동하기 쉬운 글자(0/O, 1/l/I)는 뺀다 — 관리자가 사람에게 읽어 줘야 하는 값이다.
+ */
+function generateTempPassword(): string {
+  const upper = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const bytes = new Uint8Array(14);
+  crypto.getRandomValues(bytes);
+  const pick = (set: string, i: number) => set[bytes[i] % set.length];
+  // 앞 3자로 정책(영문 대·소문자 + 숫자)을 보장하고 나머지는 전체 집합에서 뽑는다.
+  const head = [pick(upper, 0), pick(lower, 1), pick(digits, 2)];
+  const tail = Array.from({ length: bytes.length - 3 }, (_, k) => pick(all, k + 3));
+  return [...head, ...tail].join("");
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -62,100 +105,18 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const { name, email, password, mode } = body;
 
-    // ── Company Master CRUD ────────────────────────────────────
-    if (mode === "companies-list") {
-      const { data, error } = await adminClient
-        .from("companies")
-        .select("id, name, code, active, sort_order")
-        .order("sort_order");
-      if (error) {
-        return new Response(
-          JSON.stringify({ error: "회사 목록을 불러올 수 없습니다." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      return new Response(
-        JSON.stringify({ success: true, companies: data || [] }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    if (mode === "company-save") {
-      const { id, name: compName, code, active: compActive, sortOrder } = body;
-      if (!compName || !code) {
-        return new Response(
-          JSON.stringify({ error: "회사명과 코드를 입력해 주세요." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (id) {
-        const { error: updErr } = await adminClient
-          .from("companies")
-          .update({ name: compName.trim(), code: code.trim(), active: compActive, sort_order: sortOrder || 0, updated_at: new Date().toISOString() })
-          .eq("id", id);
-        if (updErr) {
-          return new Response(
-            JSON.stringify({ error: "회사 정보 수정 중 오류가 발생했습니다." }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-      } else {
-        const { error: insErr } = await adminClient
-          .from("companies")
-          .insert({ name: compName.trim(), code: code.trim(), active: compActive !== false, sort_order: sortOrder || 0 });
-        if (insErr) {
-          return new Response(
-            JSON.stringify({ error: "회사 등록 중 오류가 발생했습니다." }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-      }
-      return new Response(
-        JSON.stringify({ success: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    if (mode === "company-delete") {
-      const { id: compId } = body;
-      if (!compId) {
-        return new Response(
-          JSON.stringify({ error: "삭제할 회사를 지정해 주세요." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      const { error: delErr } = await adminClient
-        .from("companies")
-        .delete()
-        .eq("id", compId);
-      if (delErr) {
-        return new Response(
-          JSON.stringify({ error: "회사 삭제 중 오류가 발생했습니다." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      return new Response(
-        JSON.stringify({ success: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     // ── SME batch creation from Excel upload ───────────────────
     if (mode === "create-sme") {
       const { sme: smeData } = body;
-      // smeData: { name, email, password, company_id, organization, title, employee_number }
-      if (!smeData || !smeData.email || !smeData.password || !smeData.name) {
+      // smeData: { name, email, company_id, organization, title, employee_number }
+      // password는 받지 않는다(v2 S2) — 서버가 만들어 응답으로 한 번만 돌려준다.
+      if (!smeData || !smeData.email || !smeData.name) {
         return new Response(
-          JSON.stringify({ error: "이름, 이메일, 비밀번호를 모두 입력해 주세요." }),
+          JSON.stringify({ error: "이름과 이메일을 입력해 주세요." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      if (smeData.password.length < 8 || !/[a-zA-Z]/.test(smeData.password) || !/[0-9]/.test(smeData.password)) {
-        return new Response(
-          JSON.stringify({ error: `비밀번호는 8자 이상이며 영문과 숫자를 포함해 주세요. (${smeData.email})` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
+      const smeTempPassword = generateTempPassword();
 
       const normalizedSmeEmail = smeData.email.trim().toLowerCase();
 
@@ -189,11 +150,8 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Check auth.users for duplicate email
-      const { data: existingSmeAuthList } = await adminClient.auth.admin.listUsers();
-      const existingSmeAuth = (existingSmeAuthList?.users || []).find(
-        (u) => u.email?.toLowerCase() === normalizedSmeEmail,
-      );
+      // Check auth.users for duplicate email (전 페이지 순회 — F2)
+      const existingSmeAuth = await findAuthUserByEmail(adminClient, normalizedSmeEmail);
       if (existingSmeAuth) {
         return new Response(
           JSON.stringify({ error: `이미 등록된 이메일입니다. (${smeData.email})` }),
@@ -204,7 +162,7 @@ Deno.serve(async (req: Request) => {
       // Create auth user
       const { data: smeAuthData, error: smeAuthErr } = await adminClient.auth.admin.createUser({
         email: normalizedSmeEmail,
-        password: smeData.password,
+        password: smeTempPassword,
         email_confirm: true,
         user_metadata: { name: smeData.name.trim() },
       });
@@ -264,8 +222,9 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // tempPassword는 이 응답에만 있다. 화면은 관리자에게 1회 표시한 뒤 버린다(D1 ⓑ).
       return new Response(
-        JSON.stringify({ success: true, userId: smeUserId }),
+        JSON.stringify({ success: true, userId: smeUserId, tempPassword: smeTempPassword }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -433,91 +392,22 @@ Deno.serve(async (req: Request) => {
     }
 
     if (mode === "check-auth") {
-      // Return list of profile IDs that have a matching auth user
+      // 프로필 id로 auth 사용자를 하나씩 확인한다(v2 F2 — listUsers 50건 상한 제거).
+      // 이메일 일치는 판정에 쓰지 않는다: 앱의 로그인은 profiles.id = auth.uid()로만 프로필을 찾으므로
+      // (App.tsx loadUser) 이메일만 같고 id가 다른 계정은 "로그인 가능"이 아니다(F3).
       const { data: allProfiles } = await adminClient
         .from("profiles")
         .select("id, email")
         .eq("role", "admin");
-      const { data: authList } = await adminClient.auth.admin.listUsers();
-      const authEmails = new Set((authList?.users || []).map((u) => u.email?.toLowerCase()));
-      const authIds = new Set((authList?.users || []).map((u) => u.id));
-      const result = (allProfiles || []).map((p: { id: string; email: string }) => ({
-        id: p.id,
-        email: p.email,
-        hasAuth: authIds.has(p.id) || authEmails.has(p.email.toLowerCase()),
-      }));
+      const profiles = (allProfiles || []) as { id: string; email: string }[];
+      const result = await Promise.all(
+        profiles.map(async (p) => {
+          const { data: found } = await adminClient.auth.admin.getUserById(p.id);
+          return { id: p.id, email: p.email, hasAuth: Boolean(found?.user) };
+        }),
+      );
       return new Response(
         JSON.stringify({ success: true, profiles: result }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    if (mode === "recreate-auth") {
-      // Recreate auth user for an orphan profile (profile exists, auth user missing)
-      const { profileId, email: pEmail, password: pPassword } = body;
-
-      if (!pEmail || !pPassword) {
-        return new Response(
-          JSON.stringify({ error: "이메일과 비밀번호를 입력해 주세요." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (pPassword.length < 8 || !/[a-zA-Z]/.test(pPassword) || !/[0-9]/.test(pPassword)) {
-        return new Response(
-          JSON.stringify({ error: "비밀번호는 8자 이상이며 영문과 숫자를 포함해 주세요." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-
-      const normalizedReEmail = pEmail.trim().toLowerCase();
-
-      // Check if auth user already exists for this email
-      const { data: existingList } = await adminClient.auth.admin.listUsers();
-      const existingAuth = (existingList?.users || []).find(
-        (u) => u.email?.toLowerCase() === normalizedReEmail,
-      );
-
-      let authId: string;
-
-      if (existingAuth) {
-        // Auth user exists — link it to the existing profile
-        authId = existingAuth.id;
-      } else {
-        // Create new auth user
-        const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
-          email: normalizedReEmail,
-          password: pPassword,
-          email_confirm: true,
-          user_metadata: { name: body.name || "" },
-        });
-        if (authErr || !authData?.user) {
-          console.error("recreate-auth: createUser failed:", authErr);
-          return new Response(
-            JSON.stringify({ error: "로그인 계정 생성 중 오류가 발생했습니다." }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-        authId = authData.user.id;
-      }
-
-      // Update the existing profile to link to the auth user
-      // If the profile ID matches the auth user ID, just update email
-      // Otherwise we need to update the profile's id (which may conflict)
-      // Simplest: update the profile row to have the correct email
-      const { error: linkErr } = await adminClient
-        .from("profiles")
-        .update({ email: normalizedReEmail, updated_at: new Date().toISOString() })
-        .eq("id", profileId);
-      if (linkErr) {
-        console.error("recreate-auth: profile update failed:", linkErr);
-        return new Response(
-          JSON.stringify({ error: "로그인 계정 연결 중 오류가 발생했습니다." }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ success: true, authId }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -553,11 +443,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Also check auth.users for duplicate email (covers orphan auth users)
-    const { data: existingAuthList } = await adminClient.auth.admin.listUsers();
-    const existingAuthUser = (existingAuthList?.users || []).find(
-      (u) => u.email?.toLowerCase() === normalizedEmail,
-    );
+    // Also check auth.users for duplicate email (covers orphan auth users, 전 페이지 순회 — F2)
+    const existingAuthUser = await findAuthUserByEmail(adminClient, normalizedEmail);
     if (existingAuthUser) {
       return new Response(
         JSON.stringify({ error: "이미 등록된 이메일입니다." }),
