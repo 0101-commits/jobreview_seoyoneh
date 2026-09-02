@@ -32,6 +32,7 @@ import {
   Upload,
   Users,
   UserCog,
+  UserPlus,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { UploadPage } from '@/components/UploadPage';
@@ -42,6 +43,7 @@ import { Dashboard } from '@/pages/DashboardPage';
 import { ReviewTable } from '@/pages/ReviewStatusPage';
 import { JobsPage } from '@/pages/JobsPage';
 import { UsersPage } from '@/pages/SmeUsersPage';
+import { AssignmentAdminPage } from '@/pages/AssignmentAdminPage';
 import { ReviewWorkspace } from '@/pages/SmeReviewPage';
 import { HistoryPage } from '@/pages/ReviewHistoryPage';
 import { MyAssignmentsPage } from '@/pages/MyAssignmentsPage';
@@ -73,6 +75,8 @@ const adminNav: NavItem[] = [
   { to: '/jobs', label: '직무정보 관리', sub: '등록된 직무정보를 관리하세요', Icon: FileSpreadsheet },
   { to: '/upload', label: '직무정보 업로드', sub: 'Excel 파일로 일괄 등록', Icon: Upload },
   { to: '/users', label: 'SME 계정 관리', sub: 'SME 계정을 등록·관리하세요', Icon: Users },
+  // SME 화면의 '/assignments'(내 검토 목록)와 다른 화면이다. 라벨에 'SME'를 붙여 구분한다.
+  { to: '/assignments-admin', label: 'SME 배정 관리', sub: '직무별 SME 1~2명(R6) 점검·조정', Icon: UserPlus },
   { to: '/admin-users', label: '관리자 계정 관리', sub: '관리자 계정을 등록·관리하세요', Icon: UserCog },
   { to: '/exports', label: '산출물 내보내기', sub: '계약 산출물 E1~E5 · 스냅샷', Icon: Download },
   { to: '/settings', label: '운영 설정', sub: '마감일 · 안내문 · 예상 소요 · 문의 담당', Icon: Settings },
@@ -101,6 +105,7 @@ const titles: [string, string][] = [
   ['/jobs', '직무정보 관리'],
   ['/upload', '직무정보 업로드'],
   ['/users', 'SME 계정 관리'],
+  ['/assignments-admin', 'SME 배정 관리'],
   ['/admin-users', '관리자 계정 관리'],
   ['/exports', '산출물 내보내기'],
   ['/settings', '운영 설정'],
@@ -402,6 +407,12 @@ function Shell({
                   <Route
                     path="/users"
                     element={<UsersPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                  />
+                  <Route
+                    path="/assignments-admin"
+                    element={
+                      <AssignmentAdminPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
                   />
                   <Route path="/admin-users" element={<AdminUsersPage currentUser={user} />} />
                   <Route

@@ -42,6 +42,8 @@
 | — | (Phase 3에 해당하는 SQL 없음) | 진행 매트릭스·워크벤치·워크숍 플래깅·문의 인박스는 전부 화면이고 DDL이 없다 | — |
 | 5 | `supabase/APPLY_2026-09-01_phase4.sql` | `survey_settings.reminder_subject`·`reminder_body_md` 두 컬럼 추가(ALTER 두 줄) | 앞뒤 어느 쪽이어도 안전. 1-6 참조 |
 | 6 | `supabase/APPLY_2026-09-02_p5.sql` | `link_sme_roster` 함수 신설(SME 명부로 `profiles.org_unit_id` 연결 + 「배정직무」를 `review_assignments`에 추가), `sync_sme_assignments`에 COMMENT, `survey_settings.fte_required`의 컬럼 DEFAULT를 true로 | 앞뒤 어느 쪽이어도 안전. **적용 전에는 통합 업로드의 SME 명부 단계만 `PGRST202`로 실패하고**(직무·과업·Skill·조직 마스터 저장은 정상) 조직축이 계속 비어 있다. 1-7 참조 |
+| 7 | `supabase/APPLY_2026-09-02_followup.sql` | `submit_review`·`request_rereview`·`save_integrated_job_data` 세 함수를 **감사 기록 한 줄씩만 얹어** 재정의(`REVIEW_SUBMITTED`/`REVIEW_RESUBMITTED` · `REVIEW_REREVIEW_REQUESTED` · `JOB_DATA_UPLOADED`). 표·컬럼·정책·상태머신·함수 시그니처는 건드리지 않는다 | **반드시 1·3 이후.** 그 두 파일이 만든 최신 정의 위에 얹는 것이라 순서를 뒤집으면 나중에 실행된 파일이 감사 블록을 지운다. 화면 배포와는 무관하다 — 적용 전에도 화면은 그대로 돌고 기록만 계속 빠진다. 1-8 참조 |
+| 8 | `supabase/APPLY_2026-09-02_assignment_guard.sql` | 배정 해제 안전장치를 서버로 내린다 — `review_assignments` 해제 잠금 트리거(제출된 응답이 있으면 `active = false` UPDATE를 42501로 거절) + `submit_review` 재정의(상태 전이 앞에서 배정이 살아 있는지 확인). 표·컬럼·행·정책·상태머신·함수 시그니처는 건드리지 않는다 | **반드시 7 이후.** 7이 만든 `submit_review` 정의 위에 배정 확인만 얹는 것이라 순서를 뒤집으면 나중에 실행된 파일이 그 확인을 지운다(오류 없이 조용히). 화면 배포와는 무관하다 — 화면은 지금도 같은 판정을 하고 있고 이 SQL은 화면을 거치지 않는 해제·제출까지 막는다. 1-8 참조 |
 
 전부 `IF NOT EXISTS` / `CREATE OR REPLACE` / `DROP POLICY IF EXISTS` / `ON CONFLICT DO UPDATE`로만 되어 있어
 여러 번 실행해도 안전하다. 각 파일 끝의 `NOTIFY pgrst, 'reload schema';`는 PostgREST가 새 함수·컬럼을
@@ -208,7 +210,49 @@ SELECT column_name, data_type, is_nullable FROM information_schema.columns
 
 미확인 — 파일럿에서 확인.
 
-### 1-8. Edge Function 배포
+### 1-8. 후속(감사 로그 보강) — 순서 제약은 "마지막"뿐
+
+`CREATE OR REPLACE FUNCTION` / `REVOKE` / `GRANT` / `COMMENT`뿐이다. 행·표·정책을 건드리지 않는다.
+
+- **반드시 ①(`APPLY_2026-08-28.sql`)과 ③(`APPLY_2026-09-01_phase1.sql`) 뒤에 적용한다.** 이 파일은
+  그 두 파일이 만든 최신 함수 정의를 그대로 옮기고 끝에 `log_audit` 호출만 끼워 넣은 것이라,
+  순서를 뒤집어 ③을 나중에 실행하면 감사 블록이 없는 정의로 되돌아간다. **오류 없이 조용히 되돌아간다.**
+- 화면 코드는 바뀌지 않는다. 적용하지 않아도 제출·업로드는 지금처럼 동작하고 `audit_logs`에
+  기록만 계속 빠진다. 그래서 프런트 배포와 순서를 맞출 필요가 없다.
+- **감사 기록 실패가 본래 작업을 되돌리지 않는다.** 세 함수 모두 `log_audit` 호출을
+  `BEGIN … EXCEPTION WHEN OTHERS THEN NULL`로 감쌌다. plpgsql 함수 본문은 한 트랜잭션이라,
+  감사 기록에서 난 예외가 밖으로 새면 방금 끝난 제출·업로드가 통째로 롤백되기 때문이다.
+  **대가는 감사 기록이 조용히 빠질 수 있다는 것이다** — 화면에도 오류에도 뜨지 않는다.
+  그래서 아래 확인을 파일럿에서 실제로 돌려 봐야 한다.
+- 소급 기록은 없다. 적용 시각 **이후**의 호출부터 남는다. 그 이전 제출은 `review_history`로만 본다.
+
+적용 후 확인은 `supabase/APPLY_2026-09-02_followup.sql`의 「적용 후 확인」 6개 쿼리를 쓴다
+(함수 존재·`prosecdef = false` · 실행 권한 · 본문에 `log_audit` 포함 · 실제 적재 · 제출 이력과의 건수 대조).
+그중 (4)(6)은 **적용 직후에는 0행이 정상**이고, SME 제출 1건·직무정보 업로드 1건을 실제로 돌린 뒤에 봐야 한다.
+
+미확인 — 파일럿에서 확인.
+
+**이어서 ⑧ `APPLY_2026-09-02_assignment_guard.sql`(배정 해제 안전장치) — ⑦ 바로 뒤에 적용한다.**
+
+- **왜 필요한가.** "제출된 응답이 있으면 배정 해제를 막는다"가 클라이언트에만 있었다. 서버에는 그 판정이
+  없어 ① 관리자가 확인 모달을 보는 사이에 SME가 제출하거나, ② 관리자가 작성 중 배정을 해제한 뒤
+  SME가 **이미 열어 둔** 마법사에서 제출하면, `SUBMITTED`인 검토가 `active = false` 배정에 매달린다.
+  그 행은 진행 매트릭스·검토현황·워크벤치·Export·SME 목록이 전부 `active = true`로 걸러
+  **어디에도 보이지 않는다**(관리자에게는 "미제출", SME에게는 "제출 완료"). 트리거가 ①을, 제출 게이트가 ②를 막는다.
+- **⑦보다 먼저 실행하면 안 된다.** 이 파일의 `submit_review`는 ⑦이 만든 정의(감사 기록 포함)를 그대로 옮기고
+  배정 확인만 더한 것이다. 순서를 뒤집으면 ⑦이 그 확인을 지운 정의로 되돌린다. **오류 없이 조용히 되돌아간다.**
+- **되돌리려면** 트리거를 지우고(`DROP TRIGGER … review_assignments_guard_deactivate`) ⑦을 다시 실행한다.
+  제출된 응답이 있는 배정을 부득이 내려야 할 때는 트리거를 지우지 말고
+  `ALTER TABLE public.review_assignments DISABLE TRIGGER review_assignments_guard_deactivate;`로 잠시 끈 뒤
+  `ENABLE TRIGGER`로 되돌린다. 그 사이의 해제는 감사에 남지 않는다.
+
+적용 후 확인은 `supabase/APPLY_2026-09-02_assignment_guard.sql`의 「적용 후 확인」 4개 쿼리를 쓴다
+(트리거 존재 · `submit_review`에 배정 확인 포함 + `prosecdef = false` · 트리거가 실제로 42501을 내는지 ·
+적용 이전에 이미 생긴 "보이지 않는 제출" 찾기). 마지막 (4)가 **0행이면 그 상태는 없다.**
+
+미확인 — 파일럿에서 확인.
+
+### 1-9. Edge Function 배포
 
 SQL과 별개로, 아래 두 함수는 Supabase CLI로 따로 배포해야 화면이 동작한다.
 
@@ -272,39 +316,35 @@ Pages는 하위 경로에서 서빙되므로 워크플로가 `GITHUB_PAGES=true`
 `profiles.role`은 `authenticated`의 UPDATE 권한 목록에 들어 있지 않다(1-3의 확인 쿼리 (3)).
 값을 바꾸려면 Supabase 대시보드/SQL Editor 또는 `admin-create-user` Edge Function을 쓴다.
 
-### 3-2. 시드 계정 — 무엇을 지우나
+### 3-2. 시드 계정 — 운영 DB에는 없다
 
-`supabase/seed.sql`이 만드는 계정은 정확히 둘이다. 비밀번호가 README와 이 저장소에 공개되어 있다.
+`supabase/seed.sql`은 **로컬 Supabase 전용**이다. 만드는 계정은 둘이고 비밀번호가 저장소에 공개되어 있다.
 
 - `admin@jobreview.local` / `admin1234` → `profiles.role = 'admin'`
 - `sme@jobreview.local` / `sme1234` → `profiles.role = 'sme'`
 
-### 3-3. 전환 순서 — 반드시 이 순서다
+**운영 프로젝트(`yktdlcpovntegiwfnied`)에서는 이 스크립트가 실행된 적이 없다.**
+2026-09-02 실측 — 이 계정으로 인증하면 GoTrue가 `400 invalid_credentials`를 준다.
+따라서 아래 3-3은 "지우는 절차"가 아니라 **"없는 관리자를 만드는 절차"**다.
+운영 DB에서 `seed.sql`을 실행해 관리자를 만들지 않는다. 비밀번호가 공개된 계정이 운영에 생긴다.
 
-**먼저 만들고, 로그인이 되는 것을 확인하고, 그 다음에 지운다.**
-순서를 바꾸면 관리자가 하나도 없는 상태가 되어 계정 관리 화면에 들어갈 수 없다.
+### 3-3. 관리자 계정 개설 — 반드시 이 순서다
 
-1. [ ] **운영 관리자 계정을 먼저 만든다.**
-   `/admin-users`(관리자 계정 관리) 화면 또는 Supabase 대시보드 Authentication → Users를 쓴다.
-   대시보드로 만들었다면 `public.profiles`에 같은 `id`로 행을 넣고 `role = 'admin'`, `active = true`를 준다.
-2. [ ] **새 계정으로 로그인해 본다.** Phase 0 이후 신규 계정은 `must_change_password = true`로 시작하므로
-   첫 로그인에서 비밀번호 변경 화면이 뜬다. 여기서 새 비밀번호(10자 이상 권장, §8 S2)로 바꾼 뒤
-   관리자 화면이 정상적으로 열리는지 확인한다.
-3. [ ] **그 다음에 시드 계정을 지운다.**
+관리자를 만드는 앱 경로(`/admin-users` 화면, `profiles` INSERT 정책)는 둘 다 호출자가 이미
+관리자일 것을 요구한다. **활성 관리자가 0명이면 화면으로는 복구가 불가능하고, SQL Editor가 유일한 경로다.**
 
-   ```sql
-   delete from auth.users
-   where email in ('admin@jobreview.local', 'sme@jobreview.local');
-   ```
-
-   `auth.users`에서 지우면 `public.profiles`는 `on delete cascade`로 함께 사라진다.
-4. [ ] 삭제 확인:
-
-   ```sql
-   select count(*) from public.profiles where email like '%@jobreview.local';   -- 0
-   ```
-5. [ ] **운영 DB에서는 `supabase/seed.sql`을 다시 실행하지 않는다.** 재실행하면 시드 계정이 되살아난다.
-   (`seed.sql`은 idempotent라 이미 있으면 비밀번호를 원래의 `admin1234`/`sme1234`로 되돌려 놓는다.)
+1. [ ] **원인을 먼저 확정한다.** `supabase/DIAGNOSE_2026-09-02_login.sql`(SELECT만 한다)의 7개 질의를 위에서부터 실행한다.
+   관리자가 정말 0명인지, 로그인 계정만 있고 프로필이 없는지, 같은 이메일이 서로 다른 `id`로 갈라져 있는지가 여기서 갈린다.
+2. [ ] **Phase 0 마이그레이션을 먼저 적용한다.** `supabase/APPLY_2026-09-01_phase0.sql`.
+   **순서를 바꾸면 안 된다** — Phase 0는 `must_change_password` 컬럼을 *새로 만들 때에만* 기존 행을 `false`로 내린다.
+   관리자를 먼저 만들면 그 행도 백필 대상이 되어, 임시 비밀번호를 그대로 쓴 채 강제 변경 화면을 건너뛴다.
+3. [ ] **`supabase/BOOTSTRAP_2026-09-02_admin.sql`을 실행한다.** 상단 세 줄(이메일·임시 비밀번호·이름)만 고친다.
+   프로필이 이미 있으면 **그 `id`를 그대로 재사용**한다 — 새 `id`로 만들면 `review_assignments.sme_id` 등
+   `profiles(id)`를 참조하는 기존 데이터가 전부 끊긴다.
+4. [ ] **새 계정으로 로그인해 본다.** `must_change_password = true`로 시작하므로 첫 로그인에서 비밀번호 변경 화면이 뜬다.
+   새 비밀번호(10자 이상, §8 S2)로 바꾼 뒤 관리자 화면이 열리는지 확인한다.
+5. [ ] **임시 비밀번호를 정리한다.** SQL Editor의 질의 기록에 평문으로 남는다.
+   변경을 마친 뒤에는 그 값을 메신저·문서 어디에도 남기지 않는다.
 
 ### 3-4. SME 계정 발급
 
@@ -508,9 +548,16 @@ SELECT action, count(*) FROM public.audit_logs GROUP BY 1 ORDER BY 2 DESC;
 현재 코드가 남기는 `action` 값 전부다(`logAudit` / `log_audit` 호출 지점을 저장소 전수 확인한 결과).
 여기 없는 행위는 `audit_logs`에 남지 않는다 — 0건이라고 "경로가 안 돈" 것이 아니다.
 
+**★ 표시 세 줄(행위 이름 넷)은 `supabase/APPLY_2026-09-02_followup.sql`을 적용한 뒤에만 남는다.** 그 SQL 적용 전에는
+제출·재제출·재검토 요청·직무정보(4시트) 업로드가 `audit_logs`에 남지 않는다(제출 이력 자체는
+`review_history`에 남는다 — 아래 「여기 없는 것」 참조). 적용 여부는 §1-8의 확인 쿼리로 본다.
+
 | 행위(`action`) | 뜻 | 남기는 곳 |
 |---|---|---|
+| ★ `REVIEW_SUBMITTED` / `REVIEW_RESUBMITTED` | SME의 제출·재제출 | `submit_review` RPC 안 (`supabase/APPLY_2026-09-02_followup.sql`) |
 | `REVIEW_APPROVED` / `REVIEW_REJECTED` | 관리자의 승인·반려 | `decide_review` RPC 안 (`supabase/APPLY_2026-09-01_phase1.sql:1161`) |
+| ★ `REVIEW_REREVIEW_REQUESTED` | 재검토 요청 | `request_rereview` RPC 안 (`supabase/APPLY_2026-09-02_followup.sql`). 화면 호출부는 아직 없다 |
+| ★ `JOB_DATA_UPLOADED` | **직무정보 4시트** 업로드 | `save_integrated_job_data` RPC 안 (`supabase/APPLY_2026-09-02_followup.sql`). meta에 모드(append/replace)와 5건수 |
 | `ADMIN_CREATED` / `SME_CREATED` | 계정 생성 | `src/components/modals/edgeApi.ts:66,68` → `:130` |
 | `ACCOUNT_DELETED` | 계정 삭제 | 같은 곳 `:76` |
 | `ACCOUNT_DEACTIVATED` / `ACCOUNT_ACTIVATED` | 계정 비활성/재활성 | 같은 곳 `:79` |
@@ -519,24 +566,39 @@ SELECT action, count(*) FROM public.audit_logs GROUP BY 1 ORDER BY 2 DESC;
 | `GUIDE_COMPLETED` | SME 시작 가이드 통과 | `src/pages/GuidePage.tsx:166` |
 | `ORG_UNITS_UPLOADED` | **조직 마스터** 업로드 | `src/lib/integratedJobApi.ts:129` |
 | `SME_ROSTER_LINKED` | SME 명부 반영(조직 연결 + 배정 생성) | `src/lib/integratedJobApi.ts:207` |
+| `ASSIGNMENT_ADDED` | 관리자가 SME 배정을 추가(되살리기 포함) | `src/lib/assignmentApi.ts:291` (`/assignments-admin` 화면) |
+| `ASSIGNMENT_DEACTIVATED` | 관리자가 SME 배정을 해제(`active = false`) | `src/lib/assignmentApi.ts:337` (같은 화면) |
 | `SURVEY_SETTINGS_SAVED` | 운영 설정 저장 | `src/lib/settingsApi.ts:260` |
 | `FTE_REQUIRED_ON` / `FTE_REQUIRED_OFF` | FTE 게이트 스위치 | `src/lib/settingsApi.ts:268` |
 | `EXPORT_DOWNLOADED` | E1~E5 내려받기 | `src/pages/ExportsPage.tsx:205` |
 | `SNAPSHOT_EXPORTED` | 수동 스냅샷 실행 | `src/lib/snapshotApi.ts:240` |
 | `MAIL_SENT` / `MAIL_SIMULATED` | 메일 실발송 / 시뮬레이션 | `src/lib/mailApi.ts:279` |
 
-**여기 없는 것 — 헷갈리기 쉬운 셋.**
+**여기 없는 것 — 헷갈리기 쉬운 다섯.**
 
-- **제출·재제출**은 `audit_logs`에 남지 않는다. `submit_review`가 `review_history`에만 한 줄 남긴다
-  (`supabase/APPLY_2026-09-01_phase1.sql:1052`). 제출 이력을 볼 때는 `audit_logs`가 아니라
-  `review_history`(또는 Export E5 '상태 전이 이력' 시트)를 본다.
-- **재검토 요청**(`request_rereview`)도 `review_history`에만 남는다(`:1217`). 다만 관리자 화면의
-  반려 버튼은 이 RPC가 아니라 `decide_review`를 부르므로(`src/components/JobDetailPage.tsx:460`),
-  화면에서 한 반려는 위 표의 `REVIEW_REJECTED`로 남는다.
-- **직무정보(4시트) 업로드**는 어디에도 남지 않는다. `audit_logs`에 남는 업로드는 조직 마스터뿐이고,
-  `upload_history` 표는 만들어만 두고 쓰는 코드가 없다(빈 표다).
+- **감사 기록이 빠져도 아무 데도 안 뜬다.** 세 RPC의 `log_audit` 호출은 예외를 삼킨다(§1-8의 이유).
+  제출은 됐는데 감사 한 줄이 안 남는 경우가 조용히 생길 수 있다. 그래서 건수를 대조한다 —
+  `review_history`의 `SUBMITTED`/`RESUBMITTED` 건수와 `audit_logs`의 `REVIEW_SUBMITTED`/
+  `REVIEW_RESUBMITTED` 건수가 (적용 시각 이후 구간에서) 같아야 한다.
+  대조 쿼리는 `supabase/APPLY_2026-09-02_followup.sql`의 확인 (6)이다.
+- **소급 기록은 없다.** `APPLY_2026-09-02_followup.sql` 적용 **이전**의 제출·업로드는 `audit_logs`에
+  없다. 그 구간은 `review_history`(또는 Export E5 '상태 전이 이력' 시트)로만 본다.
+- **화면의 반려는 `REVIEW_REJECTED`다.** 관리자 화면의 반려 버튼은 `request_rereview`가 아니라
+  `decide_review`를 부른다(`src/components/JobDetailPage.tsx:460`). `REVIEW_REREVIEW_REQUESTED`가
+  0건인 것은 정상이다 — 그 RPC는 화면 호출부 없이 권한만 살아 있고, 그래서 감사 기록을 붙여 두었다.
+- **`REVIEW_REJECTED`의 `meta`에는 반려 사유 전문이 들어간다.** `decide_review`가 관리자 입력 원문을
+  그대로 `meta.reason`에 넣고, 그 값은 Export E5 '관리자 행위 로그' 시트의 '상세' 열로 나간다.
+  다른 행위의 `meta`에는 자유 서술을 넣지 않지만(재검토 요청은 길이만) **반려만 예외다.**
+  즉 반려 사유의 보관처는 `review_history.note`와 `audit_logs.meta` 두 곳이다 —
+  §8 S6의 보관·삭제·열람 통제 범위를 잡을 때 `audit_logs`를 빼면 안 된다.
+  (`src/lib/exportSchema.ts:481`의 "개인정보는 이미 meta에 넣지 않는다"는 주석은 이 예외를 반영하지 못한
+  상태로 남아 있다. 어느 쪽으로 맞출지는 `docs/OPEN_ISSUES.md` §8 S5의 「남은 작업」 6번이다.)
+- **`upload_history` 표는 여전히 비어 있다.** 만들어만 두고 쓰는 코드가 없다. 업로드 감사는
+  `audit_logs`의 `ORG_UNITS_UPLOADED`(조직 마스터) · `SME_ROSTER_LINKED`(SME 명부) ·
+  `JOB_DATA_UPLOADED`(직무정보 4시트) 셋으로 본다. 통합 업로드 한 번이 최대 세 줄을 남기는데,
+  중복이 아니라 서로 다른 단계다.
 
-자세한 사유와 남은 작업은 `docs/OPEN_ISSUES.md`의 「§8 S5 미이행 — 남은 작업」에 있다.
+자세한 사유와 남은 작업은 `docs/OPEN_ISSUES.md`의 「§8 S5 — 이번 후속으로 닫은 것과 남은 것」에 있다.
 
 ```sql
 -- 메일 발송 이력(시뮬레이션 여부 포함)

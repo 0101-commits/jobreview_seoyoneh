@@ -1,14 +1,14 @@
 /*
-# Demo accounts seed
+# Demo accounts seed — LOCAL DEVELOPMENT ONLY. DO NOT RUN ON THE PRODUCTION PROJECT.
 
-Creates the two demo accounts documented in README.md so a freshly provisioned
-project can be logged into immediately.
+이 스크립트는 로컬 Supabase 전용이다. 비밀번호가 이 저장소에 평문으로 들어 있으므로,
+운영 프로젝트에서 실행하면 그 순간 공개된 비밀번호를 가진 관리자가 운영에 생긴다.
+운영 관리자 계정은 supabase/BOOTSTRAP_2026-09-02_admin.sql 로만 만든다.
 
 - admin@jobreview.local / admin1234  -> profiles.role = 'admin'
 - sme@jobreview.local   / sme1234    -> profiles.role = 'sme'
 
-Idempotent: re-running only refreshes the password and profile row.
-These are development credentials. Change or remove them before production use.
+Idempotent: 재실행하면 비밀번호를 위 값으로 되돌려 놓는다(그래서 더욱 운영에서 실행하면 안 된다).
 */
 
 DO $$

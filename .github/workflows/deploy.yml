@@ -25,6 +25,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      # eslint는 오류에서만 실패한다(경고는 exit 0). 지금 남은 경고는 react-refresh 계열뿐이라
+      # 배포를 막지 않으면서 새로 들어오는 오류만 잡는다.
+      - run: npm run lint
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
