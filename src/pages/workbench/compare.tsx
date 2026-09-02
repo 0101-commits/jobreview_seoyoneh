@@ -18,6 +18,7 @@ import { SIGNAL_LABELS, WORKSHOP_REASONS, WORKSHOP_THRESHOLDS } from '@/lib/work
 import { workshopDecisionOf } from '@/lib/workshopRules';
 import { fetchAllJobsResult, mapReviewStatus, type JobListItem } from '@/lib/jobApi';
 import { toSuitabilityLabel, type SmeReviewFeedback, type Suitability, type SuitabilityLabel } from '@/lib/reviewApi';
+import { fteSuggestedNameChip } from '@/pages/sme-review/copy';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -440,6 +441,22 @@ function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFe
 function FteSection({ comparison, smes }: { comparison: JobComparison; smes: SmeReviewFeedback[] }) {
   const rows = comparison.fteRows;
 
+  /*
+    과업 수정 제안명(v2 §5-3). SME 화면의 STEP 3 행 머리와 같은 문언을 여기에도 붙인다 —
+    "어느 과업의 배분인지"가 양쪽에서 같은 말로 읽혀야 워크숍에서 헷갈리지 않는다.
+    같은 과업에 SME마다 다른 제안명을 냈으면 모두 나열한다(그것 자체가 이견 정보다).
+  */
+  const suggestedNames = new Map<string, string[]>();
+  for (const sme of smes) {
+    for (const t of sme.feedback.tasks) {
+      const name = t.suggestion.trim();
+      if (!name) continue;
+      const list = suggestedNames.get(`task:${t.task_id}`) ?? [];
+      if (!list.includes(name)) list.push(name);
+      suggestedNames.set(`task:${t.task_id}`, list);
+    }
+  }
+
   return (
     <section className="border border-border bg-card shadow-sm">
       <SectionHead
@@ -494,6 +511,11 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
                         {row.targetType === 'SUGGESTED' && (
                           <span className="text-[11px] text-foreground-subtle">신규 제안</span>
                         )}
+                        {(suggestedNames.get(row.key) ?? []).map((name) => (
+                          <span key={name} className="block t-caption font-medium text-primary">
+                            {fteSuggestedNameChip(name)}
+                          </span>
+                        ))}
                         {flagged && <ReasonChip text={reason} tone="warning" />}
                       </th>
                       {smes.map((sme) => (
@@ -531,6 +553,11 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
                           {row.targetType === 'SUGGESTED' && (
                             <span className="text-[11px] text-foreground-subtle">신규 제안</span>
                           )}
+                          {(suggestedNames.get(row.key) ?? []).map((name) => (
+                            <span key={name} className="block t-caption font-medium text-primary">
+                              {fteSuggestedNameChip(name)}
+                            </span>
+                          ))}
                           {reason && <ReasonChip text={reason} tone="warning" />}
                         </span>
                         <PctCell

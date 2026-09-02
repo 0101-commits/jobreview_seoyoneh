@@ -20,12 +20,12 @@ import { Toast, useToast } from '@/components/ui/Toast';
 import { fetchJobDetailResult, type JobDetail } from '@/lib/jobApi';
 import {
   buildDraftPayload,
-  client,
   fetchReviewFeedback,
   getOrCreateReviewForJob,
   saveReviewDraft,
   submitReview,
   toFeedbackState,
+  type FteAllocationPayload,
   type MissingItem,
   type ReviewState,
   type ReviewStatus,
@@ -35,7 +35,6 @@ import {
   endReviewSession,
   fetchFteAllocations,
   fetchMyInquiries,
-  saveFteAllocations,
   startReviewSession,
   type FteAllocationInput,
   type Inquiry,
@@ -99,76 +98,19 @@ const hhmm = (iso: string | null) =>
 const toStepNo = (n: number): StepNo => (n >= 1 && n <= 5 ? (n as StepNo) : 5);
 
 /**
- * 신규 과업 제안의 DB id를 이름으로 찾는다.
+ * 화면의 배분을 서버 payload로 바꾼다(v2 F5).
  *
- * FTE의 SUGGESTED 행은 new_task_suggestions(id)를 참조하는데, 화면의 신규 제안은 저장 전까지 id가 없다.
- * 서버 save_review_draft도 신규 과업 제안을 이름 기준으로 맞춰 id를 유지하므로
- * (supabase/migrations/20260901030000_phase1_submit_gate.sql) 이름이 화면과 DB의 공통 키다.
- *
- * ponytail: 같은 이름의 제안이 두 줄이면 구분하지 않는다 — 서버 저장 함수도 같은 한계를 명시하고 있다.
- *           제안 행에 클라이언트가 만드는 안정 키가 생기면 두 곳을 함께 걷어낸다.
- *           surveyApi.ts에는 이 조회가 없어 여기서 직접 읽는다(Phase 1 파일은 이번 작업 범위 밖이다).
+ * 신규 제안은 DB id 대신 client_key로 가리킨다 — 서버가 초안 저장과 같은 트랜잭션에서 id로 푼다.
+ * 그래서 "제안을 먼저 저장해 id를 얻고 → 그 id로 배분을 저장" 하던 2단계와, 이름으로 되짚던
+ * 보정 코드가 전부 사라졌다. 대상 전부를 매번 보낸다(부분 전송은 서버 합계를 화면과 어긋나게 한다).
  */
-async function fetchSuggestionIdsByName(reviewId: string): Promise<Map<string, string>> {
-  const { data, error } = await client().from('new_task_suggestions').select('id, name').eq('review_id', reviewId);
-  if (error) throw new Error(`신규 과업 제안을 확인하지 못했습니다. ${error.message}`);
-  const byName = new Map<string, string>();
-  for (const raw of data || []) {
-    const row = raw as { id?: unknown; name?: unknown };
-    const name = typeof row.name === 'string' ? row.name.trim() : '';
-    if (name && typeof row.id === 'string' && !byName.has(name)) byName.set(name, row.id);
-  }
-  return byName;
-}
-
-/**
- * 투입 비중 저장. 초안 저장(save_review_draft) 뒤에 불러야 한다 — 신규 제안이 DB에 들어간 다음이라야
- * 참조할 id가 생긴다. 배분이 하나도 없으면 행을 만들지 않는다(서버 게이트가 "미배분"과
- * "합계 부족"을 다른 안내로 구분한다).
- */
-async function persistFte(reviewId: string, targets: FteTarget[], rows: FteRow[]): Promise<void> {
-  const pctByKey = new Map(rows.map((r) => [r.key, r.pct]));
-  const anyFilled = targets.some((t) => (pctByKey.get(t.key) || 0) > 0);
-  if (!anyFilled) {
-    await saveFteAllocations(reviewId, []);
-    return;
-  }
-
-  const ids = targets.some((t) => t.targetType === 'SUGGESTED')
-    ? await fetchSuggestionIdsByName(reviewId)
-    : new Map<string, string>();
-
-  const allocations: FteAllocationInput[] = [];
-  const lost: string[] = [];
-  for (const target of targets) {
-    const pct = pctByKey.get(target.key) || 0;
-    if (target.targetType === 'EXISTING') {
-      if (target.taskId) allocations.push({ target_type: 'EXISTING', task_id: target.taskId, suggestion_id: null, pct });
-      continue;
-    }
-    const suggestionId = ids.get(target.name.trim());
-    if (suggestionId) allocations.push({ target_type: 'SUGGESTED', task_id: null, suggestion_id: suggestionId, pct });
-    else if (pct > 0) lost.push(target.name);
-  }
-
-  // 여기까지 오면 신규 제안은 방금 save_review_draft로 저장된 뒤다. 그런데도 id를 못 찾았다면
-  // 화면에는 있는 비중이 서버에는 없는 상태다 — 합계 100%인데 제출만 막히는 모양이 된다.
-  // 조용히 빼고 저장하면 사용자가 끝까지 알 수 없으므로, 저장 자체를 실패로 돌려 저장 칩에 사유를 띄운다.
-  if (lost.length > 0)
-    throw new Error(
-      `신규 제안 과업 ${lost.length}건(${lost.join(', ')})의 투입 비중을 저장하지 못했습니다. STEP 2에서 과업 명칭을 확인한 뒤 다시 저장해 주세요.`,
-    );
-
-  await saveFteAllocations(reviewId, allocations);
-}
-
-/**
- * 저장된 배분과 지금 화면의 배분이 같은지 비교할 지문. 대상 목록·이름·값이 모두 같으면 같은 지문이다.
- * (SUGGESTED는 이름이 DB의 공통 키라 이름도 함께 본다 — 이름만 고쳐도 저장 대상이 달라진다.)
- */
-function fteSignature(targets: FteTarget[], rows: FteRow[]): string {
+function ftePayload(targets: FteTarget[], rows: FteRow[]): FteAllocationPayload[] {
   const pct = new Map(rows.map((r) => [r.key, r.pct]));
-  return JSON.stringify(targets.map((t) => [t.key, t.name, pct.get(t.key) || 0]));
+  return targets.map((t) =>
+    t.targetType === 'EXISTING'
+      ? { target_type: 'EXISTING' as const, task_id: t.taskId, client_key: null, pct: pct.get(t.key) || 0 }
+      : { target_type: 'SUGGESTED' as const, task_id: null, client_key: t.clientKey, pct: pct.get(t.key) || 0 },
+  );
 }
 
 export function ReviewWorkspace({
@@ -236,11 +178,6 @@ export function ReviewWorkspace({
   const savingRef = useRef(false);
   // 진행 중인 저장. 제출·이탈 저장이 자동 저장과 겹치지 않도록 이 약속을 먼저 기다린다.
   const inflightRef = useRef<Promise<void> | null>(null);
-  // 마지막으로 저장에 성공한 배분의 지문(null이면 아직 이 화면에서 저장한 적이 없다).
-  // saveFteAllocations는 delete → insert 두 번의 왕복이라 트랜잭션이 아니다. STEP 1 의견을 타이핑하는
-  // 동안에도 매번 이 두 줄을 돌리면, insert만 실패하는 순간(RLS·제약·순단) 이미 채운 배분이 통째로
-  // 비어 버린다 — 화면은 여전히 100%라 사용자는 알 수 없다. 값이 그대로면 아예 부르지 않는다.
-  const savedFteRef = useRef<string | null>(null);
 
   // ── 직무 상세 + 검토 세션 + 저장된 배분 복원 ──────────────────────
   useEffect(() => {
@@ -260,7 +197,6 @@ export function ReviewWorkspace({
     setSaveState('idle');
     setSaveError('');
     revRef.current = 0;
-    savedFteRef.current = null;
 
     (async () => {
       const res = await fetchJobDetailResult(jobId);
@@ -276,10 +212,9 @@ export function ReviewWorkspace({
       // 상세를 읽은 뒤 검토 세션을 연다. 배정이 없으면 여기서 안내 문구가 나온다.
       try {
         const state = await getOrCreateReviewForJob(user.id, jobId);
-        const [saved, allocations, suggestionIds] = await Promise.all([
+        const [saved, allocations] = await Promise.all([
           fetchReviewFeedback(state.review_id),
           fetchFteAllocations(state.review_id),
-          fetchSuggestionIdsByName(state.review_id),
         ]);
         if (cancelled) return;
         setReview(state);
@@ -287,7 +222,7 @@ export function ReviewWorkspace({
         setFeedback(toFeedbackState(saved));
         setNewTasks(saved.newTasks);
         setNewSkills(saved.newSkills);
-        setRows(restoreRows(allocations, saved.newTasks, suggestionIds));
+        setRows(restoreRows(allocations));
         setSaveState(state.last_saved_at ? 'saved' : 'idle');
       } catch (e) {
         if (cancelled) return;
@@ -324,45 +259,35 @@ export function ReviewWorkspace({
   // STEP 2 결과가 그대로 반영된다: 유지 Task + 이름이 채워진 신규 제안 Task. 삭제 제안 Task는 빼고 건수만 센다.
   // 대상을 만드는 규칙은 STEP 3 화면(fte.tsx)이 내보낸 함수를 그대로 쓴다 — 규칙이 두 벌로 갈라지면
   // 화면에 보이는 목록과 저장되는 목록이 어긋난다.
-  const { targets, excludedCount } = useMemo(
+  const { targets, excluded } = useMemo(
     () => buildFteTargets(jobDetail?.tasks || [], feedback, newTasks),
     [jobDetail, feedback, newTasks],
   );
 
-  // 대상이 바뀌면 배분 값을 맞춰 준다. STEP 3 화면에도 같은 정렬 가드가 있지만 그쪽은 STEP 3에 있는 동안만
-  // 돈다. STEP 2에서 과업을 지우고 곧장 STEP 5로 가는 경로까지 덮으려면 셸에도 있어야 한다
-  // (값이 이미 맞으면 양쪽 다 아무것도 하지 않는다).
-  // 신규 제안(SUGGESTED)의 값은 이름으로 먼저 찾고, 기존 Task와 이름이 바뀐 제안만 키로 찾는다.
-  // 신규 제안의 키가 배열 인덱스라(계약 FteTarget.key) 앞의 제안을 지우면 뒤의 키가 한 칸씩 밀리는데,
-  // 키를 먼저 보면 밀려온 제안이 방금 지운 제안의 비중을 그대로 물려받는다 — 키가 "맞아 버려서"
-  // 이름 폴백이 아예 실행되지 않기 때문이다(?? 는 undefined일 때만 넘어간다).
-  // 반대로 이름을 고친 제안은 이름으로 못 찾으므로 키가 뒤를 받아 값이 유지된다.
-  const prevTargets = useRef<FteTarget[]>([]);
+  /*
+    대상이 바뀌면 배분 값을 맞춘다.
+
+    키가 안정적이라(task-{id} · sug-{client_key}) 이제 하는 일은 두 가지뿐이다.
+      ① 대상 순서대로 값을 다시 세운다(없던 대상은 0%).
+      ② 대상에서 빠진 과업의 값은 지우지 않고 그대로 둔다 — "주차"다.
+    ②가 STEP 3의 「되살리기」를 뒷받침한다: 삭제 제안을 해제하면 직전 비중이 그대로 돌아온다.
+    주차 행은 ftePctMap이 대상 기준으로 걸러 내므로 합계·저장에는 들어가지 않는다.
+    (인덱스 밀림을 이름으로 보정하던 옛 코드는 client_key 도입으로 사라졌다 — v2 F5.)
+  */
   useEffect(() => {
     setRows((prev) => {
       const byKey = new Map(prev.map((r) => [r.key, r.pct]));
-      const byName = new Map(
-        prevTargets.current.filter((t) => t.targetType === 'SUGGESTED').map((t) => [t.name, byKey.get(t.key) ?? 0]),
-      );
-      const next = targets.map((t) => ({
-        key: t.key,
-        pct: (t.targetType === 'SUGGESTED' ? byName.get(t.name) : undefined) ?? byKey.get(t.key) ?? 0,
-      }));
-      prevTargets.current = targets;
-      const same = prev.length === next.length && prev.every((r, i) => r.key === next[i].key && r.pct === next[i].pct);
-      return same ? prev : next;
+      const keys = new Set(targets.map((t) => t.key));
+      const next = targets.map((t) => ({ key: t.key, pct: byKey.get(t.key) ?? 0 }));
+      const parked = prev.filter((r) => !keys.has(r.key) && r.key.startsWith('task-') && r.pct > 0);
+      const merged = [...next, ...parked];
+      const same =
+        prev.length === merged.length && prev.every((r, i) => r.key === merged[i].key && r.pct === merged[i].pct);
+      return same ? prev : merged;
     });
   }, [targets]);
 
   const fteSum = fteTotal(targets, rows);
-
-  /** 배분이 지난 저장 이후로 바뀌었을 때만 쓴다(위 savedFteRef 주석 참고). */
-  const persistFteIfChanged = useCallback(async (reviewId: string, tg: FteTarget[], rw: FteRow[]) => {
-    const sig = fteSignature(tg, rw);
-    if (sig === savedFteRef.current) return;
-    await persistFte(reviewId, tg, rw);
-    savedFteRef.current = sig;
-  }, []);
 
   // 저장 시점의 최신 값을 읽기 위한 참조. 저장 함수를 매 입력마다 새로 만들지 않으려는 목적이다.
   const snapshot = useRef({ feedback, newTasks, newSkills, targets, rows });
@@ -381,8 +306,11 @@ export function ReviewWorkspace({
     const task = (async () => {
       try {
         const { feedback: f, newTasks: nt, newSkills: ns, targets: tg, rows: rw } = snapshot.current;
-        const next = await saveReviewDraft(current.review_id, buildDraftPayload(f, { newTasks: nt, newSkills: ns }));
-        await persistFteIfChanged(current.review_id, tg, rw);
+        // 초안과 배분이 한 RPC(한 트랜잭션)로 간다 — 중간에 배분만 비는 구간이 없다(v2 F5).
+        const next = await saveReviewDraft(
+          current.review_id,
+          buildDraftPayload(f, { newTasks: nt, newSkills: ns, fte: ftePayload(tg, rw) }),
+        );
         // 응답을 기다리는 사이 제출이 끝났거나 다른 검토로 옮겼으면 결과를 반영하지 않는다.
         // 반영하면 제출 완료 화면이 초안 상태로 되돌아가 잠금 배너가 사라지고 제출 버튼이 되살아난다
         // (그 뒤의 편집·재제출은 서버가 전부 거절한다).
@@ -402,7 +330,7 @@ export function ReviewWorkspace({
     })();
     inflightRef.current = task;
     return task;
-  }, [persistFteIfChanged]);
+  }, []);
 
   /** 진행 중인 자동 저장이 끝날 때까지 기다린다(저장은 한 번에 하나만 돈다). */
   const waitForSave = useCallback(async () => {
@@ -623,17 +551,15 @@ export function ReviewWorkspace({
     setSubmitting(true);
     try {
       // 진행 중인 자동 저장을 먼저 끝내고, 제출이 끝날 때까지 자동 저장을 잠근다.
-      // 겹치면 두 저장의 배분 delete→insert가 엇갈려(서버 함수는 트랜잭션이 아니다) 서버가 합계를
-      // 읽는 순간 배분 행이 비거나, 늦게 도착한 초안 저장이 제출 완료 상태를 초안으로 되돌린다.
+      // 겹치면 늦게 도착한 초안 저장이 제출 완료 상태를 초안으로 되돌린다.
       await waitForSave();
       savingRef.current = true;
       const rev = revRef.current;
       const { feedback: f, newTasks: nt, newSkills: ns, targets: tg, rows: rw } = snapshot.current;
-      const payload = buildDraftPayload(f, { newTasks: nt, newSkills: ns });
       // 제출 RPC는 서버에서 FTE 합계를 다시 더한다(§7-2 제출 게이트 ③).
-      // 배분을 먼저 저장해 두지 않으면 화면은 100%인데 서버 합계는 0이라 제출이 막힌다.
+      // 배분이 같은 payload에 실려 가므로(v2 F5) 저장과 합계 계산이 한 트랜잭션 안에서 이어진다.
+      const payload = buildDraftPayload(f, { newTasks: nt, newSkills: ns, fte: ftePayload(tg, rw) });
       const saved = await saveReviewDraft(current.review_id, payload);
-      await persistFteIfChanged(current.review_id, tg, rw);
 
       const res = await submitReview(current.review_id, payload);
 
@@ -878,7 +804,7 @@ export function ReviewWorkspace({
                     setRows(next);
                     markDirty();
                   }}
-                  excludedCount={excludedCount}
+                  excluded={excluded}
                   showNav={false}
                 />
               )}
@@ -1016,25 +942,17 @@ export function ReviewWorkspace({
 }
 
 /**
- * 저장된 배분을 화면 키로 되돌린다.
- * SUGGESTED 행은 DB id로 저장돼 있어 이름을 거쳐 신규 제안 순서(sug-{index})로 돌아온다.
+ * 저장된 배분을 화면 키로 되돌린다(v2 F5).
+ * 신규 제안 행은 client_key로 저장·조회되므로 이름을 거칠 일이 없다.
  */
-function restoreRows(
-  allocations: FteAllocationInput[],
-  savedNewTasks: SuggestionInput[],
-  suggestionIds: Map<string, string>,
-): FteRow[] {
-  const nameById = new Map([...suggestionIds].map(([name, id]) => [id, name]));
+function restoreRows(allocations: FteAllocationInput[]): FteRow[] {
   const rows: FteRow[] = [];
   for (const a of allocations) {
     if (a.target_type === 'EXISTING') {
       if (a.task_id) rows.push({ key: `task-${a.task_id}`, pct: a.pct });
-      continue;
+    } else if (a.client_key) {
+      rows.push({ key: `sug-${a.client_key}`, pct: a.pct });
     }
-    const name = a.suggestion_id ? nameById.get(a.suggestion_id) : undefined;
-    if (!name) continue;
-    const index = savedNewTasks.findIndex((t) => t.name.trim() === name);
-    if (index >= 0) rows.push({ key: `sug-${index}`, pct: a.pct });
   }
   return rows;
 }

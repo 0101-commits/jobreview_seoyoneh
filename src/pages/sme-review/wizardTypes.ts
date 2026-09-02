@@ -31,25 +31,34 @@ export interface StepGateResult {
 // ── STEP 3 투입 비중(FTE) ───────────────────────────────────────────
 
 /**
- * FTE 배분 대상 한 줄(§6-2 STEP 3 "대상 목록").
+ * FTE 배분 대상 한 줄(§6-2 STEP 3 "대상 목록" · v2 §5-3).
  * STEP 2 결과가 실시간 반영된다 — 유지 Task + SME가 추가한 신규 제안 Task.
- * 삭제 제안한 Task는 이 목록에 아예 만들지 않고, 제외 건수만 안내로 표시한다.
+ * 삭제 제안한 Task는 이 목록에 만들지 않고 excluded로 따로 돌려준다(되살리기 안내가 쓴다).
  *
- * key: 화면 상태(FteRow)와 짝을 맞추는 키. 행이 사라져도 다른 행의 값이 밀리지 않게 인덱스가 아닌
- *      안정된 문자열을 쓴다. 기존 Task는 `task-${taskId}`, 신규 제안은 `sug-${suggestionIndex}`.
- * suggestionIndex: 신규 제안 Task는 임시저장 전이면 DB id가 아직 없다. 그래서 화면에서는
- *      newTasks 배열의 인덱스로만 식별하고, 저장 시점에 surveyApi(saveFteAllocations)에 넘기기 전
- *      실제 suggestion_id로 바꿔 준다는 전제다. 이 값이 화면 상태와 DB 사이의 유일한 연결고리다.
- * isNew: true면 그림 6-A의 "SME 추가 제안 과업" 라벨을 붙인다.
+ * key: 화면 상태(FteRow)와 짝을 맞추는 키. 기존 Task는 `task-${taskId}`,
+ *      신규 제안은 `sug-${clientKey}`다. 배열 인덱스를 쓰지 않으므로 앞의 제안을 지워도
+ *      뒤의 값이 밀리지 않고, 제안 이름을 고쳐도 배분이 그대로 따라온다(v2 F5).
+ * clientKey: 신규 제안의 안정 키. 서버가 이 값으로 new_task_suggestions 행을 찾는다.
+ * suitability·suggestedName: STEP 2에서 남긴 판정과 수정 제안명. 배분 행 머리에 함께 그린다.
+ * activities: 「다시 보기」 펼침에서 의견을 받는 세부활동 목록(결정 D2). 배분 대상은 아니다.
  */
 export interface FteTarget {
   key: string;
   targetType: 'EXISTING' | 'SUGGESTED';
   taskId: string | null;
-  suggestionIndex: number | null;
+  clientKey: string | null;
   name: string;
   description: string;
   isNew: boolean;
+  suitability: string;
+  suggestedName: string;
+  activities: { id: string; name: string }[];
+}
+
+/** 삭제 제안으로 배분 대상에서 빠진 과업. STEP 3에서 되살릴 수 있어야 하므로 이름까지 들고 온다. */
+export interface FteExcluded {
+  taskId: string;
+  name: string;
 }
 
 /** 배분 값 한 줄. pct는 0~100 정수(§6-2 입력 방식). key는 짝이 되는 FteTarget.key다. */
@@ -99,8 +108,8 @@ export interface FteStepProps extends StepProps {
   targets: FteTarget[];
   rows: FteRow[];
   setRows: (rows: FteRow[]) => void;
-  /** 삭제 제안으로 목록에서 빠진 Task 수. 0이면 안내를 표시하지 않는다. */
-  excludedCount: number;
+  /** 삭제 제안으로 목록에서 빠진 과업. 빈 배열이면 안내를 표시하지 않는다. */
+  excluded: FteExcluded[];
 }
 
 // ── 가이드·문의 ─────────────────────────────────────────────────────

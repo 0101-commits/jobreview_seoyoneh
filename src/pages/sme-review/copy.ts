@@ -166,6 +166,38 @@ export const fteExcludedLine = (count: number) => `삭제 제안 ${count}건은 
 /** §6-2 대상 목록 — SME가 추가한 신규 제안 Task에 붙는 라벨. 그림 6-A의 "SME 추가 제안 과업". */
 export const FTE_SUGGESTED_BADGE = 'SME 추가 제안 과업';
 
+/*
+ * ── v2 STEP 3 보완 편집(기획안 dcab2660 §5-3) ─────────────────────
+ * 5단계 구조를 유지한 채 STEP 3 각 행에서 STEP 2 결과를 되돌아보고 고칠 수 있게 하는 조각들.
+ * 아래 문장은 기획안 §5-3 화면 명세의 문언을 그대로 옮긴 것이다.
+ */
+
+/** 행 머리의 「→ 제안명: …」 칩. 수정 제안이 있을 때만 붙는다. */
+export const fteSuggestedNameChip = (name: string) => `→ 제안명: ${name}`;
+
+/** 행을 펼쳐 STEP 2 항목을 그 자리에서 고치는 버튼. 접힘/펼침 두 라벨을 함께 둔다. */
+export const FTE_REOPEN_BUTTON = '다시 보기';
+export const FTE_REOPEN_CLOSE_BUTTON = '닫기';
+
+/** 펼침 안쪽 안내 — 여기서 고친 내용이 STEP 2와 같은 저장임을 밝힌다. */
+export const FTE_REOPEN_NOTE = '여기서 고친 내용은 STEP 2와 같은 저장이에요(같은 항목, 같은 자동 저장).';
+
+/** 목록 하단 — 과업을 이 화면에서 바로 추가한다. */
+export const FTE_ADD_TASK_BUTTON = '과업 추가 제안';
+
+/** 삭제 제안으로 빠진 행 안내 + 되살리기. 이전 비중이 잔여로 돌아왔다는 사실까지 말한다. */
+export const fteExcludedRestoreLine = (count: number, pct: number) =>
+  pct > 0
+    ? `삭제 제안 ${count}건은 배분 대상에서 제외되었습니다 · 이전 비중 ${pct}%가 잔여로 돌아왔어요`
+    : `삭제 제안 ${count}건은 배분 대상에서 제외되었습니다`;
+export const FTE_RESTORE_BUTTON = '되살리기';
+
+/** 세부활동 의견(결정 D2) — 배분 단위가 아니라 의견 단위임을 라벨에서 밝힌다. */
+export const ACTIVITY_SECTION_LABEL = '세부활동';
+export const ACTIVITY_NOTE_HINT = '세부활동은 비중 배분 대상이 아니에요. 고칠 점이 있으면 의견만 남겨 주세요.';
+export const activityCommentLabel = (name: string) => `${name} 의견`;
+export const ACTIVITY_REMOVE_LABEL = '이 세부활동은 삭제가 필요해요';
+
 /** §6-2 입력 방식 — 행별 ±5% 스텝퍼의 증감 폭. 안내 문구가 이 값을 인용하므로 여기 둔다. */
 export const FTE_STEP_PCT = 5;
 

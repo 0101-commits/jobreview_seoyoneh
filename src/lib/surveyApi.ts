@@ -24,13 +24,16 @@ export type InquiryStatus = 'OPEN' | 'ANSWERED' | 'CLOSED';
 // ── 저장 payload 타입 ───────────────────────────────────────────────
 
 /**
- * FTE 배분 한 줄. target_type에 따라 task_id / suggestion_id 중 하나만 채운다.
- * pct는 numeric(5,2)이라 소수점 둘째 자리까지만 의미가 있다.
+ * 저장된 FTE 배분 한 줄(읽기 전용).
+ *
+ * 저장은 이제 이 파일이 하지 않는다 — save_review_draft(p_fte)가 초안과 같은 트랜잭션에서
+ * 처리한다(v2 F5). 여기 남은 것은 화면 복원을 위한 조회뿐이다.
+ * 신규 제안 행은 DB id 대신 client_key로 되돌린다: 화면의 키가 그 값이기 때문이다.
  */
 export interface FteAllocationInput {
   target_type: FteTargetType;
   task_id: string | null;
-  suggestion_id: string | null;
+  client_key: string | null;
   pct: number;
 }
 
@@ -119,55 +122,31 @@ export async function endReviewSession(sessionId: string): Promise<void> {
 // ── 과업별 투입 비중(FTE) ───────────────────────────────────────────
 
 export async function fetchFteAllocations(reviewId: string): Promise<FteAllocationInput[]> {
+  // new_task_suggestions를 함께 읽어 client_key를 가져온다(FK 임베드). 화면 키가 그 값이라,
+  // 여기서 풀어 두면 복원할 때 이름으로 되짚는 과정이 없어진다(v2 F5).
   const { data, error } = await client()
     .from('task_fte_allocations')
-    .select('target_type, task_id, suggestion_id, pct')
+    .select('target_type, task_id, pct, new_task_suggestions(client_key)')
     .eq('review_id', reviewId);
   if (error) fail('투입 비중을 불러오지', error.message);
 
   return (data || []).map((raw) => {
     const r = raw as Row;
+    const sug = (r.new_task_suggestions || null) as { client_key?: unknown } | null;
     return {
       target_type: r.target_type === 'SUGGESTED' ? 'SUGGESTED' : 'EXISTING',
       task_id: str(r.task_id) || null,
-      suggestion_id: str(r.suggestion_id) || null,
+      client_key: sug ? str(sug.client_key) || null : null,
       pct: num(r.pct),
     };
   });
 }
 
-/**
- * 투입 비중 저장. reviewApi의 신규 제안 저장과 같은 결로 "지금 화면 전체 상태"를 통째로 보낸다.
- * 일부만 보내면 STEP 2에서 삭제 제안한 과업의 옛 비중이 남아 합계 100%가 서버에서만 깨진다.
- *
- * 교체 방식은 delete 후 insert를 골랐다. upsert + 사라진 행 delete가 아니라 이 쪽인 이유는,
- * 이 테이블의 유일성이 (review_id, task_id)와 (review_id, suggestion_id) 두 갈래로 갈려
- * 한 번의 onConflict로 묶이지 않기 때문이다. 두 갈래를 나눠 upsert 하면 호출이 오히려 늘어난다.
- *
- * ponytail: delete와 insert가 한 트랜잭션이 아니다. insert가 실패하면 그 순간 저장분이 비는데,
- * 화면은 매번 전체 상태를 보내므로 다음 자동 저장(2.5초)에서 복구된다. 실패를 삼키지 않고
- * throw 하는 이유도 이것이다 — 화면이 저장 실패를 표시해야 사용자가 이탈하지 않는다.
- * 한 번의 실패도 허용할 수 없게 되면 save_review_draft처럼 RPC 한 번으로 옮긴다.
+/*
+ * (삭제) saveFteAllocations — v2 F5.
+ * delete → insert 두 왕복이라 트랜잭션이 아니었고, 자동저장 도중 순단이 나면 배분 0행 상태가
+ * 남았다(화면은 100%였다). 이제 save_review_draft(p_fte)가 초안 저장과 한 트랜잭션에서 처리한다.
  */
-export async function saveFteAllocations(reviewId: string, rows: FteAllocationInput[]): Promise<void> {
-  const db = client();
-
-  const { error: deleteError } = await db.from('task_fte_allocations').delete().eq('review_id', reviewId);
-  if (deleteError) fail('투입 비중을 저장하지', deleteError.message);
-
-  if (rows.length === 0) return;
-
-  const { error: insertError } = await db.from('task_fte_allocations').insert(
-    rows.map((r) => ({
-      review_id: reviewId,
-      target_type: r.target_type,
-      task_id: r.target_type === 'EXISTING' ? r.task_id : null,
-      suggestion_id: r.target_type === 'SUGGESTED' ? r.suggestion_id : null,
-      pct: r.pct,
-    })),
-  );
-  if (insertError) fail('투입 비중을 저장하지', insertError.message);
-}
 
 // ── 문의 ────────────────────────────────────────────────────────────
 
