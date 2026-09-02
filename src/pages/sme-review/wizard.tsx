@@ -20,6 +20,7 @@ import {
   GATE_STEP2_NEW_TASK_NAME,
   SAVE_CHIP_DIRTY,
   SAVE_CHIP_ERROR,
+  SAVE_CHIP_ERROR_HELP,
   SAVE_CHIP_IDLE,
   SAVE_CHIP_JUST_NOW,
   SAVE_CHIP_RETRY,
@@ -259,7 +260,13 @@ export function SaveStatusChip({
             )}
             {retrying ? SAVE_CHIP_SAVING : SAVE_CHIP_ERROR}
           </span>
-          {!retrying && <span className="min-w-0">{error}</span>}
+          {/* 사유(서버 메시지)만으로는 "내가 쓴 내용이 사라졌는지"를 알 수 없다.
+              무엇이 잘못됐는지와 무엇을 하면 되는지를 한 덩어리로 붙여 준다. */}
+          {!retrying && (
+            <span className="min-w-0">
+              {error} {SAVE_CHIP_ERROR_HELP}
+            </span>
+          )}
           {/* 저장 중에도 비활성으로 만들지 않는다 — 중복 호출은 셸의 savingRef가 이미 막는다. */}
           <Button
             size="sm"
@@ -300,23 +307,55 @@ export function SaveStatusChip({
 /**
  * "다음 단계"에서 막혔을 때 그 자리에 띄우는 사유 목록.
  * role="alert"라 화면 낭독기가 즉시 읽는다 — 버튼을 비활성으로 두면 왜 막혔는지 알 방법이 없다.
+ *
+ * 포커스도 함께 옮긴다(나타난 순간 한 번만 — 아래 주석). 사유는 버튼 위쪽에 나타나므로, 포커스가 '다음 단계' 버튼에 남아 있으면
+ * 확대경 사용자는 화면 밖에 뜬 안내를 못 보고, 키보드 사용자는 사유를 읽으려고 Shift+Tab을 되짚어야 한다.
+ *
+ * 두 겹으로 나눈 이유 — 바깥 상자(tabIndex=-1)로 포커스를 옮기고 role="alert"는 안쪽에 둔다.
+ * 한 요소에 둘을 겹치면 낭독기가 alert로 한 번, 포커스 이동으로 또 한 번 같은 내용을 읽는다.
+ * (GOV.UK 오류 요약 패턴과 같은 구조다.)
  */
 export function GateNotice({ reasons }: { reasons: string[] }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  // 포커스는 "이 안내가 화면에 나타난 순간" 한 번만 옮긴다.
+  //
+  // 사유 문구를 의존성으로 두면 안 된다. 사유는 입력에 따라 실시간으로 다시 쓰이므로
+  // ("잔여 5%" → "잔여 3%"), 안내가 떠 있는 동안 STEP 3 비중 칸에 한 글자를 치거나 ± 스텝퍼를
+  // 누를 때마다 포커스가 이 상자로 끌려온다. 그 상태에서는 키보드·화면 낭독기 사용자가 값을
+  // 아예 입력할 수 없다(WCAG 2.1.1 키보드 · 3.2.2 입력 시 변화). 문구가 바뀐 사실은 안쪽
+  // role="alert"가 알아서 다시 읽어 주므로 포커스를 뺏을 이유가 없다.
+  //
+  // "사용자가 명시적으로 요청한 순간"과 "문구만 갱신된 순간"의 구분은 마운트로 한다.
+  // 이 컴포넌트는 SmeReviewPage의 showGate가 true일 때만 그려지고, showGate는 단계를 옮길 때마다
+  // false로 돌아간다(goToStep · step 변경 useEffect). 즉 '다음 단계'를 눌러 게이트가 방금 실패로
+  // 전환된 순간이 곧 이 컴포넌트의 마운트다. 반대로 안내가 이미 떠 있는데 버튼을 다시 누르면
+  // setShowGate(true)가 같은 값이라 부모가 다시 그리지 않으므로, 그 재요청은 이 안에서 관측할
+  // 방법이 없다 — 다만 그때는 안내가 이미 버튼 바로 위에 보이는 상태다.
+  const focusMoved = useRef(false);
+  useEffect(() => {
+    if (focusMoved.current || reasons.length === 0) return;
+    focusMoved.current = true;
+    boxRef.current?.focus();
+  }, [reasons.length]);
+
   if (reasons.length === 0) return null;
   return (
     <div
-      role="alert"
-      className="mt-5 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning"
+      ref={boxRef}
+      tabIndex={-1}
+      className="mt-5 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warning"
     >
-      <p className="flex items-center gap-1.5 font-medium">
-        <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
-        {GATE_BLOCKED_HEADING}
-      </p>
-      <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs leading-5">
-        {reasons.map((reason) => (
-          <li key={reason}>{reason}</li>
-        ))}
-      </ul>
+      <div role="alert">
+        <p className="flex items-center gap-1.5 font-medium">
+          <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
+          {GATE_BLOCKED_HEADING}
+        </p>
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs leading-5">
+          {reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

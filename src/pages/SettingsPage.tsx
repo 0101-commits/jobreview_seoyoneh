@@ -257,7 +257,7 @@ function SettingsForm({
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="mb-1 text-sm text-foreground-subtle">
-            §6-3 ⓒ 설정 · 마감일 · 예상 소요 · 가이드 문구 · 문의 담당
+            마감일 · 예상 소요 · 가이드 문구 · 문의 담당
           </p>
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">운영 설정</h2>
         </div>
@@ -328,7 +328,7 @@ function SettingsForm({
             </h3>
             <Field
               label="조사 마감일"
-              description="대시보드·SME 화면의 D-day가 이 날짜에서 계산됩니다(§6-3 ⓐ). 비워 두면 D-day 지표가 표시되지 않습니다."
+              description="대시보드·SME 화면의 D-day가 이 날짜에서 계산됩니다. 비워 두면 D-day 지표가 표시되지 않습니다."
               type="date"
               value={form.due_date ?? ''}
               onChange={(v) => patch({ due_date: v || null })}
@@ -342,7 +342,7 @@ function SettingsForm({
             <h3 className="mb-3 text-sm font-semibold text-foreground">예상 소요</h3>
             <Field
               label="직무당 예상 소요(분)"
-              description={`가이드 카드 ④의 "예상 소요는 직무당 약 N분" 문장에 그대로 들어갑니다(§6-1). 비워 두면 그 문장이 통째로 빠집니다 — 앱이 숫자를 지어내지 않습니다. 1~${EXPECTED_MINUTES_MAX} 사이의 정수로 입력해 주세요.`}
+              description={`시작 가이드의 "예상 소요는 직무당 약 N분" 문장에 그대로 들어갑니다. 비워 두면 그 문장이 통째로 빠집니다 — 앱이 숫자를 지어내지 않습니다. 1~${EXPECTED_MINUTES_MAX} 사이의 정수로 입력해 주세요.`}
               type="number"
               value={minutesText}
               onChange={(v) => {
@@ -353,10 +353,9 @@ function SettingsForm({
             />
             {/* §12 오픈이슈 1번 — 이 값은 파일럿 실측으로 확정된다. 지금 입력값은 잠정치다. */}
             <p className="mt-2 text-xs leading-5 text-foreground-muted">
-              이 값은 파일럿 실측 중앙값으로 확정할 잠정치입니다(§12 오픈이슈 1번, 착수보고 11면 &ldquo;착수 후
-              확정&rdquo;). 실측 중앙값은 SME 화면에 노출하지 않고 관리자만 봅니다 — 지금은 Export E5
-              &lsquo;소요 실측 요약&rsquo;(직무당 중앙값)에서 확인할 수 있습니다. 대시보드 지표로 올리는 일은
-              §10 P5에서 정합니다.
+              이 값은 파일럿 실측 중앙값으로 확정할 잠정치입니다(착수보고 11면 &ldquo;착수 후 확정&rdquo;).
+              실측 중앙값은 SME 화면에 노출하지 않고 관리자만 봅니다 — 관리자 대시보드의 &lsquo;직무당 소요
+              중앙값(실측)&rsquo; 카드와 Export E5 &lsquo;소요 실측 요약&rsquo;에서 확인할 수 있습니다.
             </p>
           </section>
 
@@ -370,7 +369,7 @@ function SettingsForm({
              * 그래서 이 입력은 고정 문언 아래에 붙는 별도 안내로만 쓴다.
              */}
             <p className="mb-3 text-xs leading-5 text-foreground-muted">
-              시작 가이드(§6-1)의 고정 문언 <strong className="font-semibold text-foreground">아래에 덧붙는</strong>{' '}
+              시작 가이드의 고정 문언 <strong className="font-semibold text-foreground">아래에 덧붙는</strong>{' '}
               추가 안내입니다. 착수보고 문언은 제품 문구이므로 이 입력으로 대체되지 않습니다.
             </p>
             <label className="block">
@@ -447,14 +446,14 @@ function SettingsForm({
             >
               {form.fte_required ? (
                 <>
-                  켜짐 — 서버(submit_review)가 제출 시 배분 행 존재와 합계 100%를 검사합니다(§7-2 제출 게이트 ③).
+                  켜짐 — 제출할 때 서버가 배분 행 존재와 합계 100%를 다시 검사합니다.
                   합계가 100%가 아니면 STEP 3으로 되돌려 보냅니다.
                 </>
               ) : (
                 <>
                   <AlertTriangle size={13} className="mr-1 inline align-[-2px]" aria-hidden="true" />
                   <strong className="font-semibold">끄면 투입 비중 합계 100% 검사 없이 제출됩니다.</strong> 배분을 한
-                  줄도 하지 않은 검토도 제출·승인까지 갈 수 있어, §9 E2(직무·조직별 투입 비중 분포)의 원천 데이터가
+                  줄도 하지 않은 검토도 제출·승인까지 갈 수 있어, Export E2(직무·조직별 투입 비중 분포)의 원천 데이터가
                   비어 있는 채로 산출됩니다. 화면 쪽 안내는 남지만 서버 검사는 사라집니다.
                 </>
               )}

@@ -247,6 +247,13 @@ Deno.serve(async (req: Request) => {
       }
 
       // Auto-create review assignments for all jobs in the SME's company
+      //
+      // 주의(§2 R6): 이 호출은 회사의 활성 직무 '전부'를 이 SME에게 배정한다.
+      // R6("직무별 최소 인원의 SME 1~2명")과 충돌하고, §6-3 ⓐ의 「직무별 SME 배정 수」 점검이
+      // 언제나 전원 배정으로 나온다. 그래도 여기서 끄지 않는다 — 지금은 계정을 만든 직후
+      // 배정을 만드는 유일한 경로라, 끄면 새 SME의 배정이 0이 되어 관리자 흐름이 끊긴다.
+      // 직무를 골라 배정하려면 통합 업로드의 SME 명부(시트 ④) → link_sme_roster를 쓴다
+      // (마이그레이션 20260902010000). 그쪽은 기존 배정을 지우지 않고 명부에 있는 쌍만 더한다.
       if (smeData.company_id) {
         const { error: syncErr } = await adminClient.rpc("sync_sme_assignments", {
           p_sme_id: smeUserId,

@@ -41,9 +41,11 @@ import {
   fetchCurrentJobCount,
   fetchExistingJobNames,
   fetchFixedCompanyId,
+  linkSmeRoster,
   saveIntegratedJobData,
   saveOrgUnits,
   type IntegratedSaveResult,
+  type SmeRosterLinkResult,
   type UploadMode,
 } from '@/lib/integratedJobApi';
 
@@ -60,9 +62,20 @@ const STEPS = [
 const SAVE_PHASES = ['회사 정보 확인 중', '직무정보 전송 및 반영 중'] as const;
 /** 조직 마스터 Sheet가 있을 때만 붙는 단계. 없으면 기존과 똑같이 2단계입니다. */
 const ORG_SAVE_PHASE = '조직 마스터 반영 중';
+/** SME 명부 Sheet가 있을 때만 붙는 단계. 조직 마스터가 먼저 저장돼야 조직코드를 풀 수 있습니다. */
+const SME_SAVE_PHASE = 'SME 명부 연결 중';
 
 /** 시트 ④의 범위 한계를 화면·코드 양쪽에 같은 문장으로 남깁니다. */
-const SME_SHEET_NOTICE = '명부는 검증만 수행하며 계정 생성은 SME 계정 관리 화면에서 합니다';
+const SME_SHEET_NOTICE =
+  '명부는 이미 등록된 계정의 소속 조직·배정직무만 반영하며 계정 생성은 SME 계정 관리 화면에서 합니다';
+
+/** 못 찾은 이메일·조직코드·직무명을 화면에 나열할 때 앞쪽 몇 개만 보여 주고 나머지는 건수로 줄입니다. */
+const NAME_LIST_LIMIT = 10;
+
+function listPreview(items: string[]): string {
+  const head = items.slice(0, NAME_LIST_LIMIT).join(', ');
+  return items.length > NAME_LIST_LIMIT ? `${head} 외 ${items.length - NAME_LIST_LIMIT}건` : head;
+}
 
 export function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -73,6 +86,7 @@ export function UploadPage() {
   const [savePhase, setSavePhase] = useState(0);
   const [saveResult, setSaveResult] = useState<IntegratedSaveResult | null>(null);
   const [orgSavedCount, setOrgSavedCount] = useState(0);
+  const [rosterResult, setRosterResult] = useState<SmeRosterLinkResult | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [currentJobCount, setCurrentJobCount] = useState<number | null | undefined>(undefined);
@@ -86,6 +100,7 @@ export function UploadPage() {
     setState('idle');
     setSaveResult(null);
     setOrgSavedCount(0);
+    setRosterResult(null);
     setSaveError(null);
     if (inputRef.current) inputRef.current.value = '';
   }, []);
@@ -96,6 +111,7 @@ export function UploadPage() {
     setParseError(null);
     setSaveResult(null);
     setOrgSavedCount(0);
+    setRosterResult(null);
     setSaveError(null);
     setState('validating');
 
@@ -125,6 +141,7 @@ export function UploadPage() {
     setSaveError(null);
     setSaveResult(null);
     setOrgSavedCount(0);
+    setRosterResult(null);
 
     try {
       const companyId = await fetchFixedCompanyId();
@@ -136,11 +153,13 @@ export function UploadPage() {
         companyId,
       });
       setSaveResult(result);
-      // 조직 마스터 Sheet가 있을 때만 이어서 저장합니다. SME 명부는 저장하지 않습니다(계정 생성은 별도 화면).
+      // 조직 마스터 → SME 명부 순서로 이어서 반영합니다. 순서를 바꾸면 안 됩니다 —
+      // 명부의 조직코드는 방금 저장한 org_units에서만 풀 수 있습니다.
       //
-      // 조직 마스터는 위 RPC(단일 트랜잭션) 밖의 별도 저장입니다. 여기서 실패해도 직무·과업·Skill은
+      // 둘 다 위 RPC(단일 트랜잭션) 밖의 별도 저장입니다. 여기서 실패해도 직무·과업·Skill은
       // 이미 커밋된 뒤라, 전체 실패로 되돌리면 관리자는 아무것도 안 들어간 줄 알고 같은 파일을
-      // 처음부터 다시 올립니다. 그래서 실패해도 완료 요약은 그대로 띄우고 조직 실패만 따로 알립니다.
+      // 처음부터 다시 올립니다. 그래서 실패해도 완료 요약은 그대로 띄우고 실패한 단계만 따로 알립니다.
+      // 두 단계 모두 멱등이라 「다시 시도」로 같은 파일을 다시 올려도 행이 늘지 않습니다.
       if (validation.orgRows.length > 0) {
         setSavePhase(2);
         try {
@@ -149,6 +168,22 @@ export function UploadPage() {
           setSaveError(
             `조직 마스터를 저장하지 못했어요. ${error instanceof Error ? error.message : ''} ` +
               '직무·과업·Skill은 저장되었습니다. 조직 마스터만 다시 시도해 주세요.',
+          );
+        }
+      }
+      // SME 명부: 이미 등록된 계정의 소속 조직(§9 E2 조직축·R8)과 배정직무(R6)만 반영합니다.
+      // 계정은 만들지 않습니다 — 계정이 없는 사람은 결과 요약에 명단으로 남깁니다.
+      if (validation.smeRows.length > 0) {
+        setSavePhase(validation.orgRows.length > 0 ? 3 : 2);
+        try {
+          setRosterResult(await linkSmeRoster({ companyId, rows: validation.smeRows }));
+        } catch (error) {
+          // 조직 마스터도 실패했다면 두 문장을 함께 보여 줍니다(알림 영역이 whitespace-pre-line입니다).
+          setSaveError(
+            (prev) =>
+              `${prev ? `${prev}\n` : ''}SME 명부를 반영하지 못했어요. ` +
+              `${error instanceof Error ? error.message : ''} ` +
+              '직무·과업·Skill은 저장되었습니다. 명부만 다시 시도해 주세요.',
           );
         }
       }
@@ -183,7 +218,11 @@ export function UploadPage() {
   const canUpload = Boolean(validation?.valid) && (state === 'validated' || state === 'done');
 
   const savePhases = useMemo(
-    () => (validation && validation.orgRows.length > 0 ? [...SAVE_PHASES, ORG_SAVE_PHASE] : [...SAVE_PHASES]),
+    () => [
+      ...SAVE_PHASES,
+      ...(validation && validation.orgRows.length > 0 ? [ORG_SAVE_PHASE] : []),
+      ...(validation && validation.smeRows.length > 0 ? [SME_SAVE_PHASE] : []),
+    ],
     [validation],
   );
 
@@ -234,6 +273,8 @@ export function UploadPage() {
               ['세부활동', saveResult.activityCount],
               ['Skill', saveResult.skillCount],
               ...(orgSavedCount > 0 ? [['조직', orgSavedCount]] : []),
+              ...(rosterResult ? [['소속 조직 연결', rosterResult.linkedCount]] : []),
+              ...(rosterResult ? [['배정직무 추가', rosterResult.assignmentCreatedCount]] : []),
             ].map(([label, value]) => (
               <div key={label as string}>
                 <dt className="text-xs opacity-80">{label}</dt>
@@ -241,6 +282,7 @@ export function UploadPage() {
               </div>
             ))}
           </dl>
+          {rosterResult && <RosterSummary result={rosterResult} />}
         </div>
       )}
 
@@ -341,7 +383,7 @@ export function UploadPage() {
             <Info size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
             <span>
               두 Sheet가 하나의 작업으로 검증되고 저장됩니다. {ORG_SHEET_NAME} Sheet가 있으면 이어서 반영하고,{' '}
-              {SME_SHEET_NOTICE}.
+              {SME_SHEET_NOTICE}. 기존 배정은 지우지 않고 명부에 있는 직무만 더합니다.
             </span>
           </div>
 
@@ -363,6 +405,7 @@ export function UploadPage() {
               jobRows={validation.jobRows.length}
               skillRows={validation.skillRows.length}
               orgRows={validation.orgRows.length}
+              smeRows={validation.smeRows.length}
             />
           )}
 
@@ -382,6 +425,41 @@ export function UploadPage() {
         />
       )}
     </>
+  );
+}
+
+// ── SME 명부 반영 결과 ──────────────────────────────────────────────
+
+/**
+ * 무엇이 반영됐고 무엇이 남았는지를 한 화면에서 정확히 알립니다.
+ * 계정이 없어 연결하지 못한 사람, 조직 마스터에 없는 조직코드, 등록된 직무에서 찾지 못한 직무명은
+ * 조용히 사라지면 관리자가 영영 모릅니다 — 그래서 건수와 함께 실제 값을 나열합니다.
+ */
+function RosterSummary({ result }: { result: SmeRosterLinkResult }) {
+  return (
+    <div className="mt-3 space-y-1 border-t border-success-border pt-3 text-xs leading-5">
+      <p>
+        이미 등록된 계정 {result.linkedCount.toLocaleString()}명의 소속 조직을 연결하고, 배정직무{' '}
+        {result.assignmentCreatedCount.toLocaleString()}건을 추가했습니다.
+        {result.assignmentCreatedCount === 0 && ' (이미 배정된 직무는 그대로 두었습니다.)'}
+      </p>
+      {result.unmatchedEmails.length > 0 && (
+        <p>
+          계정이 없는 {result.unmatchedEmails.length.toLocaleString()}명은 SME 계정 관리에서 먼저 만들어 주세요.{' '}
+          {listPreview(result.unmatchedEmails)}
+        </p>
+      )}
+      {result.missingOrgCodes.length > 0 && (
+        <p>
+          조직코드 {listPreview(result.missingOrgCodes)}는 조직 마스터에 없어 소속 조직을 연결하지 못했습니다.
+        </p>
+      )}
+      {result.unknownJobNames.length > 0 && (
+        <p>
+          직무명 {listPreview(result.unknownJobNames)}는 등록된 직무에서 찾지 못해 배정하지 않았습니다.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -442,12 +520,14 @@ function SaveProgress({
   jobRows,
   skillRows,
   orgRows,
+  smeRows,
 }: {
   phase: number;
   phases: string[];
   jobRows: number;
   skillRows: number;
   orgRows: number;
+  smeRows: number;
 }) {
   const label = phases[Math.min(phase, phases.length - 1)];
   return (
@@ -471,7 +551,8 @@ function SaveProgress({
       </div>
       <p className="mt-2 text-[11px] leading-4 text-foreground-subtle">
         직무·과업 {jobRows.toLocaleString()}행, Skill {skillRows.toLocaleString()}행
-        {orgRows > 0 ? `, 조직 ${orgRows.toLocaleString()}행` : ''}을 한 번의 작업으로 저장합니다. 서버가 한 번에
+        {orgRows > 0 ? `, 조직 ${orgRows.toLocaleString()}행` : ''}
+        {smeRows > 0 ? `, SME 명부 ${smeRows.toLocaleString()}행` : ''}을 한 번의 작업으로 저장합니다. 서버가 한 번에
         처리하므로 건별 진행률은 표시되지 않아요.
       </p>
     </div>
@@ -1018,7 +1099,7 @@ function PreviewPanel({ validation }: { validation: IntegratedValidationResult }
       </div>
 
       <p className="mt-2 text-xs text-foreground-muted">
-        {active.key === 'sme' ? '검증만 수행하는' : '중복 제외 후 저장될'} {total.toLocaleString()}행 중 상위{' '}
+        {active.key === 'sme' ? '소속 조직·배정직무를 반영할' : '중복 제외 후 저장될'} {total.toLocaleString()}행 중 상위{' '}
         {Math.min(limit, total).toLocaleString()}행입니다.
         {errorRows.size > 0 && ` 오류가 있는 행은 붉게 표시했습니다.`}
       </p>

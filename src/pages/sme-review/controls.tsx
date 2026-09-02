@@ -1,7 +1,7 @@
 // SME 검토 화면 전용 공통 조각.
 // 적합성 3지선다 / 자동 높이 textarea / 항목 카드 / 신규 제안 편집기.
 // 이전에는 같은 마크업이 5곳에 복붙돼 있었고 섹션마다 색 언어가 달랐다. 여기 하나로 모은다.
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useId, useLayoutEffect, useRef } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import type { SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback, Suitability } from '@/types';
+import { NOTE_REQUIRED_HINT, REQUIRED_MARK_SR } from './copy';
 
 type Choice = Exclude<Suitability, ''>;
 
@@ -40,6 +41,23 @@ const TONE_TEXT: Record<Choice, string> = {
 };
 
 /**
+ * 필수 입력 표시. 별표는 붉은 글자 하나라 색각 이상 사용자에게는 그냥 기호이고,
+ * 화면 낭독기는 문장부호로 흘려 읽거나 아예 읽지 않는다. 그래서 낭독용 문구를 나란히 둔다.
+ * (예전에는 title 속성으로만 뜻을 달아 두었는데, title은 마우스를 올려야만 보여 키보드·낭독기
+ *  사용자에게는 없는 것과 같았다.)
+ */
+function RequiredMark() {
+  return (
+    <>
+      <em className="not-italic text-destructive" aria-hidden="true">
+        *
+      </em>
+      <span className="sr-only">{REQUIRED_MARK_SR}</span>
+    </>
+  );
+}
+
+/**
  * 적합성 3지선다. role="radiogroup" + aria-checked, 좌우/상하 방향키 이동.
  * 클릭으로 고르면 nextFocusId 쪽으로 포커스를 넘겨 다음 항목으로 바로 이어지게 한다
  * (방향키 이동 중에는 넘기지 않는다 — 그러면 방향키 탐색 자체가 끊긴다).
@@ -60,9 +78,22 @@ export function SuitabilityControl({
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const advance = () => {
-    if (!nextFocusId) return;
+    // 방금 누른 버튼. 목록이 다시 그려진 뒤에도 이 노드가 문서에 남아 있는지로 "사라졌는지"를 판별한다.
+    const pressed = document.activeElement;
     // 목록이 다시 그려진 뒤에 찾아야 한다(평가 즉시 접히거나 필터에서 빠질 수 있다).
-    requestAnimationFrame(() => document.getElementById(nextFocusId)?.focus());
+    requestAnimationFrame(() => {
+      if (nextFocusId) {
+        const next = document.getElementById(nextFocusId);
+        if (next) {
+          next.focus();
+          return;
+        }
+      }
+      // 넘길 곳이 없는 마지막 항목에서, 평가하자마자 카드가 한 줄 요약으로 접히면
+      // 방금 누른 버튼이 통째로 사라져 포커스가 body로 떨어진다(이후 Tab이 화면 맨 처음부터 다시 시작).
+      // 접힌 요약 버튼이 같은 focusId를 물려받으므로 그쪽으로 되돌린다 — 사용자는 방금 평가한 항목에 머문다.
+      if (focusId && pressed && !document.contains(pressed)) document.getElementById(focusId)?.focus();
+    });
   };
 
   const onKeyDown = (e: React.KeyboardEvent, i: number) => {
@@ -115,6 +146,11 @@ export function AutoTextarea({
   maxRows = 10,
   id,
   disabled,
+  // 표준 aria 속성 이름 그대로 받는다. Field가 래퍼 모드에서 이 이름들로 넘기므로
+  // 다른 이름을 쓰면(예전 describedBy) 조용히 버려져 라벨·설명·필수 표시가 보조기기에 닿지 않는다.
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -123,6 +159,10 @@ export function AutoTextarea({
   maxRows?: number;
   id?: string;
   disabled?: boolean;
+  /** 이 칸을 설명하는 안내문의 id. 조건부 필수 안내를 붙이는 데 쓴다. */
+  'aria-describedby'?: string;
+  'aria-invalid'?: true;
+  'aria-required'?: true;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -141,6 +181,9 @@ export function AutoTextarea({
       ref={ref}
       value={value}
       disabled={disabled}
+      aria-describedby={ariaDescribedBy}
+      aria-invalid={ariaInvalid}
+      aria-required={ariaRequired}
       onChange={(e) => onChange(e.target.value)}
       rows={minRows}
       placeholder={placeholder}
@@ -162,22 +205,19 @@ export function FeedbackNotes({
   minRows?: number;
 }) {
   const needsComment = !!feedback.suitability && feedback.suitability !== '적합';
+  // 조건부 필수 안내는 두 칸이 함께 가리킨다 — 필수인 것은 어느 한 칸이 아니라 "둘 중 하나"이기 때문이다.
+  // (서버 submit_review도 comment·suggestion이 둘 다 비었을 때만 부족 항목으로 잡는다.)
+  const hintId = useId();
   return (
     <>
       <label>
-        <span className="label">
-          개선 필요사항{' '}
-          {needsComment && (
-            <em className="not-italic text-destructive" title="적합이 아니면 사유를 적어 주세요.">
-              *
-            </em>
-          )}
-        </span>
+        <span className="label">개선 필요사항 {needsComment && <RequiredMark />}</span>
         <AutoTextarea
           value={feedback.comment}
           onChange={(v) => onChange({ comment: v })}
           placeholder="의견을 입력해 주세요."
           minRows={minRows}
+          aria-describedby={needsComment ? hintId : undefined}
         />
       </label>
       <label>
@@ -187,8 +227,17 @@ export function FeedbackNotes({
           onChange={(v) => onChange({ suggestion: v })}
           placeholder="수정안을 입력해 주세요."
           minRows={minRows}
+          aria-describedby={needsComment ? hintId : undefined}
         />
       </label>
+      {/* 별표만으로는 "무엇을 하면 되는지"가 없다. 조건이 켜졌을 때만 그 조건을 문장으로 밝힌다. */}
+      {needsComment && (
+        // col-span-full — 이 조각은 카드형(3열)·섹션형(2열) 두 격자 안에 들어간다.
+        // 열 수를 가정하지 않고 마지막 줄 전체를 쓰게 해야 두 화면 모두에서 두 칸 아래에 놓인다.
+        <p id={hintId} className="col-span-full text-xs leading-5 text-foreground-muted">
+          {NOTE_REQUIRED_HINT}
+        </p>
+      )}
     </>
   );
 }
@@ -368,6 +417,10 @@ export function SuggestionEditor({
   const patch = (i: number, v: Partial<SuggestionInput>) =>
     onChange(items.map((item, idx) => (idx === i ? { ...item, ...v } : item)));
 
+  // 제안 줄마다 다른 id가 필요하다(같은 화면에 여러 줄이 있고, 과업·Skill 편집기가 동시에 뜬다).
+  const idBase = useId();
+  const warnId = (i: number) => `${idBase}-warn-${i}`;
+
   return (
     <div className="mt-4">
       {items.length > 0 && (
@@ -390,13 +443,16 @@ export function SuggestionEditor({
               <div className="grid gap-3 lg:grid-cols-3">
                 <label>
                   <span className="label">
-                    {kind}명 <em className="not-italic text-destructive">*</em>
+                    {kind}명 <RequiredMark />
                   </span>
+                  {/* 이름이 비면 이 줄은 저장되지 않는다. 그 사유를 칸에 직접 연결해 두면
+                      화면 낭독기가 칸에 들어설 때 함께 읽어 준다(아래 경고문을 눈으로 찾지 않아도 된다). */}
                   <input
                     className="input"
                     value={item.name}
                     onChange={(e) => patch(i, { name: e.target.value })}
                     placeholder={`추가할 ${kind}명을 입력해 주세요.`}
+                    aria-describedby={item.name.trim() ? undefined : warnId(i)}
                   />
                 </label>
                 <label>
@@ -417,8 +473,12 @@ export function SuggestionEditor({
                 </label>
               </div>
               {!item.name.trim() && (
-                <p className="mt-2 text-xs text-warning">
-                  {kind}명이 비어 있으면 저장되지 않아요. 이름을 입력하거나 이 제안을 삭제해 주세요.
+                <p id={warnId(i)} className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-warning">
+                  {/* 색(주황)만으로 경고를 알리지 않도록 아이콘을 함께 둔다. */}
+                  <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    {kind}명이 비어 있으면 저장되지 않아요. 이름을 입력하거나 이 제안을 삭제해 주세요.
+                  </span>
                 </p>
               )}
             </li>

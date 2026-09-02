@@ -25,7 +25,9 @@ import type { JobDetail } from '@/lib/jobApi';
 import type { SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback } from '@/types';
 import {
+  FTE_DONE_LINE,
   FTE_EQUAL_SPLIT_BUTTON,
+  FTE_INPUT_HINT,
   FTE_INTRO,
   FTE_MOONLIGHTING_NOTE,
   FTE_NEXT_BLOCKED_BUTTON,
@@ -39,8 +41,12 @@ import {
   PREV_STEP_BUTTON,
   STEP_TITLES,
   fteExcludedLine,
+  fteGaugeValueText,
+  fteInputLabel,
   fteOverLine,
   fteRemainingLine,
+  fteStepDownLabel,
+  fteStepUpLabel,
   fteTooManySmallNote,
   fteZeroPctNote,
 } from './copy';
@@ -147,12 +153,19 @@ export function buildFteTargets(
 
 // ── 합계 게이지 ─────────────────────────────────────────────────────
 
-/** 100% 미만이면 잔여, 초과면 초과분을 안내한다. 색만으로 알리지 않도록 아이콘을 함께 둔다. */
+/**
+ * 100% 미만이면 잔여, 초과면 초과분을 안내한다. 색만으로 알리지 않도록 아이콘·문구를 함께 둔다.
+ * 100%(완료)도 문구를 비워 두지 않는다 — 비워 두면 "다 됐다"를 알리는 단서가 초록색 하나뿐이라
+ * 색각 이상 사용자와 화면 낭독기 사용자에게는 미달 상태와 구분되지 않는다.
+ */
 function statusOf(total: number) {
   if (total > 100) return { text: fteOverLine(total - 100), tone: 'text-destructive', Icon: AlertTriangle };
   if (total < 100) return { text: fteRemainingLine(100 - total), tone: 'text-foreground-muted', Icon: Info };
-  return { text: '', tone: 'text-success', Icon: CheckCircle2 };
+  return { text: FTE_DONE_LINE, tone: 'text-success', Icon: CheckCircle2 };
 }
+
+/** 비중 입력 칸이 모두 함께 참조하는 단위·범위 안내(aria-describedby)의 id. 화면에는 한 번만 그린다. */
+const PCT_HINT_ID = 'fte-pct-hint';
 
 /**
  * 그림 6-A 우측 패널(xl 이상) / 모바일 하단 고정 바. 같은 내용을 배치만 바꿔 두 번 그린다.
@@ -175,6 +188,11 @@ function TotalGauge({
   const fillTone = total > 100 ? 'bg-destructive' : done ? 'bg-success' : 'bg-primary';
 
   // 합계 변화는 화면을 보지 않아도 알아야 한다 — 숫자와 사유를 한 덩어리로 읽힌다.
+  //
+  // 알림을 어디에 걸었는가: progressbar가 아니라 이 읽기 영역에 aria-live="polite"를 건다.
+  // progressbar 자체에 aria-live를 걸면 값이 바뀔 때마다 낭독기가 "배분 합계 95%"를 한 번,
+  // 바로 아래 문단("95% / 100%, 잔여 5%를 배분해 주세요")을 또 한 번 읽어 같은 내용이 겹친다.
+  // 진행 막대는 값을 들고만 있고(aria-valuenow·valuetext), 변화를 말하는 일은 이 영역이 맡는다.
   const readout = (
     <div aria-live="polite" className={layout === 'side' ? 'mt-3 text-center' : 'min-w-0'}>
       <p className="text-sm font-semibold text-foreground">
@@ -210,12 +228,15 @@ function TotalGauge({
       // lg 이상에서는 좌측에 고정 사이드바(w-64)가 있다. inset-x-0으로 두면 바가 그 위를 덮어
       // 사이드바 하단의 로그아웃 버튼을 가린다(같은 z-30이라 나중에 그려지는 바가 이긴다).
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card px-4 py-3 lg:left-64 xl:hidden">
+        {/* aria-valuenow는 filled(0~100)로 자른다 — 105%처럼 max를 넘는 값은 ARIA가 정의하지 않은
+            상태라 낭독기마다 다르게(또는 아예 읽지 않고) 처리한다. 실제 합계와 사유는 valuetext가 말한다. */}
         <div
           role="progressbar"
           aria-label={FTE_TOTAL_LABEL}
-          aria-valuenow={total}
+          aria-valuenow={filled}
           aria-valuemin={0}
           aria-valuemax={100}
+          aria-valuetext={fteGaugeValueText(total)}
           className="h-2 w-full overflow-hidden rounded-inner bg-muted"
         >
           <div className={`h-full rounded-inner ${fillTone}`} style={{ width: `${filled}%` }} />
@@ -234,9 +255,10 @@ function TotalGauge({
       <div
         role="progressbar"
         aria-label={FTE_TOTAL_LABEL}
-        aria-valuenow={total}
+        aria-valuenow={filled}
         aria-valuemin={0}
         aria-valuemax={100}
+        aria-valuetext={fteGaugeValueText(total)}
         className="mx-auto mt-4 grid h-28 w-28 place-items-center rounded-full"
         style={{
           background: `conic-gradient(${
@@ -382,6 +404,12 @@ export function FteStep({
 
       <p className="mb-5 text-sm leading-6 text-foreground-muted">{FTE_INTRO}</p>
 
+      {/* 입력 칸 공통 안내. 그림 6-A에 이 문장을 놓을 자리가 없어 화면에는 감추고 보조기기에만 읽힌다
+          (모든 입력 칸이 aria-describedby로 이 한 문장을 가리킨다). */}
+      <p id={PCT_HINT_ID} className="sr-only">
+        {FTE_INPUT_HINT}
+      </p>
+
       <div className="grid gap-6 xl:grid-cols-[1fr_16rem] xl:items-start">
         <div>
           {targets.length === 0 ? (
@@ -420,7 +448,9 @@ export function FteStep({
                         onClick={() => bump(t.key, -FTE_STEP_PCT)}
                         disabled={readOnly}
                         aria-disabled={pct === 0}
-                        aria-label={`${t.name} ${FTE_STEP_PCT}% 줄이기`}
+                        // 아이콘만 있는 버튼이라 이름을 직접 준다. 과업명이 빠지면 목록의 스텝퍼가
+                        // 전부 "5% 줄이기 버튼"으로 똑같이 읽혀 어느 과업인지 알 수 없다.
+                        aria-label={fteStepDownLabel(t.name)}
                         className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-element border border-border bg-card text-foreground-muted transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 ${
                           pct === 0 ? 'cursor-not-allowed opacity-50' : ''
                         }`}
@@ -432,7 +462,11 @@ export function FteStep({
                         inputMode="numeric"
                         value={String(pct)}
                         disabled={readOnly}
-                        aria-label={t.name}
+                        // 과업명만으로는 무엇을 넣는 칸인지 알 수 없어 "투입 비중"을 붙인다.
+                        // 단위·범위·화살표 키 조작은 목록 위 안내(PCT_HINT_ID)가 대신 읽힌다 —
+                        // 25개 행마다 같은 문장을 되풀이하지 않으려고 한 문장을 모두가 참조한다.
+                        aria-label={fteInputLabel(t.name)}
+                        aria-describedby={PCT_HINT_ID}
                         // 완전 제어 입력이라 칸이 비지 않는다("0"). 캐럿이 숫자 앞이나 사이에 있으면
                         // 25%를 치는 도중 "250"이 만들어지는데, 그대로 정규화하면 말없이 100%가 된다.
                         // 100을 넘는 입력은 무시해 직전 값을 그대로 둔다(React가 DOM 값을 되돌린다).
@@ -453,7 +487,7 @@ export function FteStep({
                         onClick={() => bump(t.key, FTE_STEP_PCT)}
                         disabled={readOnly}
                         aria-disabled={pct === 100}
-                        aria-label={`${t.name} ${FTE_STEP_PCT}% 늘리기`}
+                        aria-label={fteStepUpLabel(t.name)}
                         className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-element border border-border bg-card text-foreground-muted transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 ${
                           pct === 100 ? 'cursor-not-allowed opacity-50' : ''
                         }`}

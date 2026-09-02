@@ -323,26 +323,33 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           placeholder="name@company.com"
           autoComplete="off"
         />
+        {/*
+          감싼 div는 눈 아이콘 버튼을 겹쳐 놓기 위해 필요하다. 그래서 div를 없애는 대신
+          함수형 children으로 라벨·설명(aria-describedby)·필수 여부의 연결 대상만 입력 칸으로 내렸다.
+          (예전에는 Field가 이 div에 id를 달아 라벨이 div를 가리키고, 비밀번호 규칙 설명이 입력 칸에 닿지 않았다.)
+        */}
         <Field label="비밀번호" required description="8자 이상, 영문과 숫자를 포함해 주세요.">
-          <div className="relative">
-            <input
-              type={showPw ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호를 입력해 주세요"
-              aria-label="비밀번호"
-              autoComplete="new-password"
-              className="input pr-11"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw(!showPw)}
-              aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
-              className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-element text-foreground-subtle transition hover:text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-            </button>
-          </div>
+          {(a11y) => (
+            <div className="relative">
+              <input
+                {...a11y}
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호를 입력해 주세요"
+                autoComplete="new-password"
+                className="input pr-11"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-element text-foreground-subtle transition hover:text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+              </button>
+            </div>
+          )}
         </Field>
 
         {localError && <Alert tone="error">{localError}</Alert>}
@@ -608,26 +615,33 @@ function RecreateAuthModal({
         <Alert tone="warning">이 계정에는 로그인 계정이 없어요. 새 비밀번호로 로그인 계정을 만듭니다.</Alert>
         <Field label="이름" value={admin.name} onChange={() => {}} disabled />
         <Field label="이메일" value={admin.email} onChange={() => {}} disabled />
+        {/*
+          감싼 div는 눈 아이콘 버튼을 겹쳐 놓기 위해 필요하다. 그래서 div를 없애는 대신
+          함수형 children으로 라벨·설명(aria-describedby)·필수 여부의 연결 대상만 입력 칸으로 내렸다.
+          (예전에는 Field가 이 div에 id를 달아 라벨이 div를 가리키고, 비밀번호 규칙 설명이 입력 칸에 닿지 않았다.)
+        */}
         <Field label="비밀번호" required description="8자 이상, 영문과 숫자를 포함해 주세요.">
-          <div className="relative">
-            <input
-              type={showPw ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호를 입력해 주세요"
-              aria-label="비밀번호"
-              autoComplete="new-password"
-              className="input pr-11"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw(!showPw)}
-              aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
-              className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-element text-foreground-subtle transition hover:text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-            </button>
-          </div>
+          {(a11y) => (
+            <div className="relative">
+              <input
+                {...a11y}
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호를 입력해 주세요"
+                autoComplete="new-password"
+                className="input pr-11"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-element text-foreground-subtle transition hover:text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+              </button>
+            </div>
+          )}
         </Field>
         {localError && <Alert tone="error">{localError}</Alert>}
       </form>

@@ -17,12 +17,44 @@
   --background: 245 246 248;   /* #f5f6f8 현행 캔버스 */
   --card: 255 255 255;         /* #ffffff */
   --muted: 248 250 252;        /* #f8fafc */
-  --border: 226 232 240;       /* #e2e8f0 */
+  --border: 226 232 240;       /* #e2e8f0 — 구분선 전용. card 위 1.23:1이라 '보이는 경계'가 아니다 */
 
-  /* 텍스트 */
-  --foreground: 30 41 59;          /* #1e293b */
-  --foreground-muted: 100 116 139; /* #64748b */
-  --foreground-subtle: 148 163 184;/* #94a3b8 */
+  /*
+    입력 칸·폼 컨트롤 테두리 전용. WCAG 1.4.11 비텍스트 대비는 사용자 인터페이스 구성요소의
+    경계에 3:1을 요구하는데, --border(#e2e8f0)는 card(#ffffff) 위 1.23:1이라 입력 칸이 어디서
+    시작하는지 눈으로 알 수 없었다.
+
+    --border를 통째로 올리지 않고 토큰을 따로 둔 이유: --border는 카드 구분선·표 행 경계·단락
+    구분선까지 전 화면에서 쓰인다. 그 값을 3:1로 올리면 경계선이 전부 진해져 화면이 무거워진다.
+    "보여야 하는 것은 컨트롤의 경계"이므로 컨트롤에만 이 토큰을 쓴다.
+
+    #7c8ba1 대비비 — card #ffffff 3.46:1 · background #f5f6f8 3.20:1 · muted #f8fafc 3.31:1 ·
+    primary-subtle #edf8f7 3.19:1. 이 파일의 밝은 표면 전부에서 3:1을 넘는다.
+    값을 다시 밝히려면 위 네 조합의 대비비를 먼저 계산해 3:1 이상인지 확인하세요.
+  */
+  --border-input: 124 139 161; /* #7c8ba1 */
+
+  /*
+    텍스트 — 대비비는 WCAG 2.2 AA 본문 기준 4.5:1로 맞춥니다(§8 S8).
+    아래 수치는 이 파일의 표면 토큰(card #ffffff · background #f5f6f8 · muted #f8fafc ·
+    primary-subtle #edf8f7 · warning-muted #fffbeb · destructive-muted #fff1f2 · success-muted #ecfdf5)
+    전부에 대해 계산한 것이고, 괄호 안은 그중 가장 나쁜 조합입니다.
+
+    Phase 5 조정(2026-09-01) — 보조 텍스트 두 토큰이 AA에 미달해 값을 낮췄습니다.
+      · foreground-muted  #64748b → #5b6779
+        변경 전 4.33~4.76 (최악: destructive-muted 위 4.33 — 문의 모달 오류 상자의 보조 문장)
+        변경 후 5.22~5.74
+      · foreground-subtle #94a3b8 → #66707f
+        변경 전 2.33~2.56 (최악: destructive-muted 위 2.33 — 입력 칸 placeholder·"미입력" 표기 등 전부 미달)
+        변경 후 4.56~5.01
+    두 토큰의 명도 차가 좁아진 것은 의도한 결과입니다. 4.5:1을 넘기려면 흰 배경에서 5:1 언저리보다
+    밝을 수 없어, AA를 지키면서 "본문 > 보조 > 흐린 보조"의 순서만 유지할 수 있는 폭이 이만큼입니다
+    (foreground 13.5:1 > muted 5.74:1 > subtle 5.01:1, 흰 배경 기준).
+    값을 다시 밝히려면 그 조합의 대비비를 먼저 계산해 4.5:1 이상인지 확인하세요.
+  */
+  --foreground: 30 41 59;          /* #1e293b — 14.63:1 (background 위 13.53:1) */
+  --foreground-muted: 91 103 121;  /* #5b6779 — 5.74:1 (destructive-muted 위 5.22:1) */
+  --foreground-subtle: 102 112 127;/* #66707f — 5.01:1 (destructive-muted 위 4.56:1) */
 
   /* 브랜드 */
   --primary: 36 125 124;         /* #247d7c */
@@ -82,8 +114,20 @@
 @layer components {
   .label { @apply mb-2 block text-xs font-medium text-foreground-muted; }
   /* 좁은 화면에서는 손가락이 닿는 높이(44px)를 보장한다 — sm 이상에서는 표 밀도를 위해 그대로 둔다. */
-  .input { @apply w-full min-h-control-lg rounded-element border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; }
-  .textarea { @apply w-full resize-y rounded-element border border-border bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; }
+  .input { @apply w-full min-h-control-lg rounded-element border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; border-color: rgb(var(--border-input)); }
+  .textarea { @apply w-full resize-y rounded-element border bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; border-color: rgb(var(--border-input)); }
+
+  /*
+    .input/.textarea를 쓰지 않고 border-border 유틸을 직접 붙인 입력 칸이 아직 11곳 남아 있다
+    (JobDetailPage 9곳 · MailSendPanel textarea 1곳 · FteAnalyticsPage select 1곳). 그쪽도 같은 1.23:1
+    문제라, 파일마다 클래스를 고치는 대신 여기서 한 번에 받는다. 요소 선택자를 붙여 특이도가
+    .border-border(0,1,0)보다 높고(0,1,1), focus 변형(.focus\:border-primary:focus = 0,2,0)보다는
+    낮아 포커스 테두리는 그대로 primary로 뜬다.
+    ponytail: 특이도로 덮는 임시 조치다. 위 6곳이 .input/.textarea로 옮겨지면 이 블록은 지운다.
+  */
+  input.border-border,
+  select.border-border,
+  textarea.border-border { border-color: rgb(var(--border-input)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

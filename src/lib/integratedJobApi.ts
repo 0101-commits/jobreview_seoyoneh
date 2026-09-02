@@ -5,6 +5,7 @@ import {
   type IntegratedJobRow,
   type IntegratedOrgRow,
   type IntegratedSkillRow,
+  type IntegratedSmeRow,
 } from './integratedUploadUtils';
 
 export type UploadMode = 'append' | 'replace';
@@ -78,8 +79,8 @@ export async function fetchExistingJobNames(companyId: string): Promise<string[]
 }
 
 /**
- * 조직 마스터(시트 ③) 저장. 이 Phase에서 실제로 DB에 반영하는 것은 여기까지입니다.
- * SME 명부(시트 ④)는 계정 생성(Edge Function)·배정과 얽혀 있어 검증까지만 하고 저장하지 않습니다.
+ * 조직 마스터(시트 ③) 저장. SME 명부(시트 ④)의 조직코드를 풀 수 있는 유일한 원천이므로
+ * 명부 반영(linkSmeRoster)보다 반드시 먼저 저장합니다.
  *
  * 상위조직은 2패스로 연결합니다 — 1패스에서 코드·이름을 먼저 넣어 id를 확보하고,
  * 2패스에서 코드→id 표로 parent_id를 채웁니다. 파일 뒤쪽에 정의된 상위조직도 이 순서로 해결됩니다.
@@ -127,6 +128,93 @@ export async function saveOrgUnits(params: { companyId: string; rows: Integrated
 
   await logAudit('ORG_UNITS_UPLOADED', 'org_units', params.companyId, { count: rows.length });
   return rows.length;
+}
+
+/** SME 명부(시트 ④) 반영 결과. 못 찾은 값은 버리지 않고 그대로 화면에 나열합니다. */
+export interface SmeRosterLinkResult {
+  /** 소속 조직이 연결된 계정 수(이미 같은 조직이던 계정 포함). */
+  linkedCount: number;
+  /** 그중 이번 반영에서 실제로 조직이 바뀐 계정 수. */
+  changedCount: number;
+  /** 회사 범위 안에서 계정을 찾지 못한 이메일. 계정 생성은 SME 계정 관리 화면의 몫입니다. */
+  unmatchedEmails: string[];
+  /** org_units에 없어 소속 조직을 연결하지 못한 조직코드. */
+  missingOrgCodes: string[];
+  /** 새로 만들어진 배정 수. 이미 있던 배정은 손대지 않으므로 여기에 세지 않습니다. */
+  assignmentCreatedCount: number;
+  /** 등록된 활성 직무에서 찾지 못해 배정하지 못한 직무명. */
+  unknownJobNames: string[];
+  /** 새 배정에 붙인 검토(NOT_STARTED) 행 수. */
+  reviewCreatedCount: number;
+}
+
+const EMPTY_ROSTER_RESULT: SmeRosterLinkResult = {
+  linkedCount: 0,
+  changedCount: 0,
+  unmatchedEmails: [],
+  missingOrgCodes: [],
+  assignmentCreatedCount: 0,
+  unknownJobNames: [],
+  reviewCreatedCount: 0,
+};
+
+function toStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
+}
+
+/**
+ * SME 명부(시트 ④) 반영. 이미 등록된 계정의 소속 조직(profiles.org_unit_id)을 조직코드로 연결하고
+ * 「배정직무」를 review_assignments에 추가합니다. 계정은 만들지 않습니다 —
+ * 계정 생성은 지금까지처럼 SME 계정 관리 화면의 몫입니다.
+ *
+ * org_unit_id는 profiles의 컬럼 단위 GRANT 목록에 없어(REVOKE UPDATE 후 여섯 컬럼만 열려 있습니다)
+ * 클라이언트에서 직접 UPDATE할 수 없습니다. 그 컬럼을 authenticated에 열면 SME가 자기 소속 조직을
+ * 스스로 바꿀 수 있어 §9 E2의 조직축이 응답자 손에서 흔들리므로, 열지 않고 SECURITY DEFINER RPC로 갑니다
+ * (근거는 마이그레이션 20260902010000의 3항).
+ *
+ * 조직 마스터(시트 ③) 저장 이후에 부릅니다. 조직코드를 org_units에서 풀지 못하면 그 사람의
+ * 소속 조직만 비어 있는 채로 남고, 어떤 조직코드가 없었는지는 결과로 돌려줍니다.
+ */
+export async function linkSmeRoster(params: {
+  companyId: string;
+  rows: IntegratedSmeRow[];
+}): Promise<SmeRosterLinkResult> {
+  if (!supabase) throw new Error('데이터베이스 연결이 없습니다.');
+
+  const rows = params.rows.filter((row) => row.이메일);
+  if (rows.length === 0) return EMPTY_ROSTER_RESULT;
+
+  // 인자명은 마이그레이션의 link_sme_roster(p_company_id, p_rows)와 정확히 같아야 합니다.
+  const { data, error } = await supabase.rpc('link_sme_roster', {
+    p_company_id: params.companyId,
+    p_rows: rows,
+  });
+  if (error) throw new Error(`SME 명부를 반영하지 못했습니다. ${error.message}`);
+
+  const raw = (data || {}) as Record<string, unknown>;
+  const result: SmeRosterLinkResult = {
+    linkedCount: Number(raw.linkedCount ?? 0),
+    changedCount: Number(raw.changedCount ?? 0),
+    unmatchedEmails: toStringList(raw.unmatchedEmails),
+    missingOrgCodes: toStringList(raw.missingOrgCodes),
+    assignmentCreatedCount: Number(raw.assignmentCreatedCount ?? 0),
+    unknownJobNames: toStringList(raw.unknownJobNames),
+    reviewCreatedCount: Number(raw.reviewCreatedCount ?? 0),
+  };
+
+  // §8 S5. 조직 연결과 배정 생성은 한 번의 명부 반영이므로 한 건으로 남깁니다.
+  // 이메일·직무명 원문은 남기지 않고 건수만 남깁니다(감사 로그에 명부를 통째로 복사하지 않습니다).
+  await logAudit('SME_ROSTER_LINKED', 'profiles', params.companyId, {
+    rowCount: rows.length,
+    linked: result.linkedCount,
+    changed: result.changedCount,
+    unmatched: result.unmatchedEmails.length,
+    missingOrgCodes: result.missingOrgCodes.length,
+    assignmentsCreated: result.assignmentCreatedCount,
+    unknownJobs: result.unknownJobNames.length,
+  });
+
+  return result;
 }
 
 export async function saveIntegratedJobData(params: {
