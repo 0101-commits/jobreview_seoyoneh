@@ -653,6 +653,30 @@ export async function fetchAllJobs(companyId?: string | null): Promise<JobListIt
   return orEmpty(await fetchAllJobsResult(companyId), []);
 }
 
+/**
+ * 직무 한 건의 머리(이름·직군·직렬·회사) — v2 D3.
+ * 비교 뷰가 직무명 한 줄 때문에 전 직무 목록을 받던 자리를 대신한다.
+ */
+export async function fetchJobHeader(jobId: string): Promise<ApiResult<JobListItem | null>> {
+  if (!supabase) return fail('직무 조회', NO_DB);
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(`id, name, company_id, job_groups!inner(name), job_series!inner(name), companies!left(name)`)
+    .eq('id', jobId)
+    .maybeSingle();
+  if (error) return fail('직무 조회', error.message);
+  if (!data) return ok(null);
+  const j = data as Record<string, unknown>;
+  return ok({
+    id: j.id as string,
+    name: j.name as string,
+    group_name: (j['job_groups'] as Record<string, string>).name,
+    series_name: (j['job_series'] as Record<string, string>).name,
+    company_id: (j.company_id as string) || null,
+    company_name: ((j['companies'] as Record<string, string>) || { name: '' }).name || '',
+  });
+}
+
 export async function fetchAllJobsResult(companyId?: string | null): Promise<ApiResult<JobListItem[]>> {
   if (!supabase) return fail('직무 목록 조회', NO_DB);
   let query = supabase

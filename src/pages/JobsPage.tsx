@@ -59,6 +59,7 @@ export function JobsPage({
   onSelectJob,
   companyFilter,
   setCompanyFilter,
+  focusSmeId,
 }: {
   userId: string;
   /** 라우터 연결(담당 2) 후에는 URL이 원천이 된다. 주지 않으면 내부 상태로 동작한다. */
@@ -67,6 +68,8 @@ export function JobsPage({
   /** 공통 회사 필터(App 보유). 'all'이면 전 회사 직무를 함께 본다 — v2 F4로 회사명 하드코딩을 걷어냈다. */
   companyFilter: string;
   setCompanyFilter: (v: string) => void;
+  /** 검토 현황에서 넘어온 SME — 상세의 피드백 패널이 그 카드로 스크롤한다(v2 §6-5). */
+  focusSmeId?: string | null;
 }) {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<JobRow[]>([]);
@@ -165,7 +168,13 @@ export function JobsPage({
     // 직군·직렬 후보와 중복 검사는 그 직무가 속한 회사 기준이어야 한다('전체' 필터에서도).
     const jobCompanyId = rows.find((r) => r.id === selectedJobId)?.company_id ?? companyId;
     return (
-      <JobDetailPage jobId={selectedJobId} onBack={() => selectJob(null)} userId={userId} companyId={jobCompanyId} />
+      <JobDetailPage
+        jobId={selectedJobId}
+        onBack={() => selectJob(null)}
+        userId={userId}
+        companyId={jobCompanyId}
+        focusSmeId={focusSmeId}
+      />
     );
   }
 

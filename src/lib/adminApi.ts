@@ -1064,6 +1064,33 @@ export async function fetchWorkshopFlags(companyId?: string | null): Promise<Api
 }
 
 /**
+ * 워크숍 플래그 한 건(v2 D3). 비교 뷰가 직무 하나를 보려고 전 직무의 플래그를 받던 것을 대신한다.
+ * 저장된 결정이 없으면 ok(null)이다 — 조회 실패(fail)와 구분해야 화면이 오류를 오해하지 않는다.
+ */
+export async function fetchWorkshopFlag(jobId: string): Promise<ApiResult<WorkshopFlag | null>> {
+  if (!supabase) return fail('워크숍 플래그 조회', NO_DB);
+  const { data, error } = await supabase
+    .from('job_workshop_flags')
+    .select('job_id, flagged, source, reasons, decided_by, updated_at, jobs!inner(id, name, company_id, active)')
+    .eq('job_id', jobId)
+    .maybeSingle();
+  if (error) return fail('워크숍 플래그 조회', error.message);
+  if (!data) return ok(null);
+
+  const r = data as Row;
+  const job = one(r.jobs);
+  return ok({
+    jobId: str(r.job_id),
+    jobName: str(job.name),
+    flagged: r.flagged !== false,
+    source: str(r.source) === 'MANUAL' ? 'MANUAL' : 'AUTO',
+    reasons: Array.isArray(r.reasons) ? (r.reasons as unknown[]).map(str).filter(Boolean) : [],
+    decidedBy: str(r.decided_by) || null,
+    updatedAt: str(r.updated_at) || null,
+  } satisfies WorkshopFlag);
+}
+
+/**
  * 워크숍 플래그 저장(§6-3 ⓑ). 자동 규칙 실행과 수동 지정 버튼이 함께 쓴다.
  * 직무당 한 줄(job_id가 PK)이라 upsert 한 번이다.
  *
@@ -1280,6 +1307,14 @@ export interface DashboardStats {
   notStartedSme: number;
   /** 미답(OPEN) 문의 수. */
   openInquiries: number;
+  /**
+   * 상태별 배정 건수(v2 §6-5 "대시보드 KPI 단일화").
+   * 대시보드의 도넛·범례가 이 값을 쓴다. 예전에는 도넛이 get_review_status를, 상단 KPI가
+   * 이 함수를 써서 같은 화면의 두 수치가 다른 모집단을 말했다(U2).
+   */
+  statusCounts: Record<ReviewStatus, number>;
+  /** 배정된 SME 수(중복 없이). '전체 SME 수' 카드가 쓰던 값을 같은 모집단으로 옮긴 것이다. */
+  smeCount: number;
 }
 
 /**
@@ -1320,6 +1355,13 @@ export async function fetchDashboardStats(companyId?: string | null): Promise<Ap
 
   let assignedCount = 0;
   let submittedCount = 0;
+  const statusCounts: Record<ReviewStatus, number> = {
+    NOT_STARTED: 0,
+    IN_PROGRESS: 0,
+    SUBMITTED: 0,
+    RESUBMITTED: 0,
+    REVIEW_REQUESTED: 0,
+  };
   /** smeId → 하나라도 시작(NOT_STARTED가 아님)했는가. */
   const startedBySme = new Map<string, boolean>();
 
@@ -1328,6 +1370,7 @@ export async function fetchDashboardStats(companyId?: string | null): Promise<Ap
     const review = one(r.reviews);
     const status = (str(review.status) as ReviewStatus) || 'NOT_STARTED';
     assignedCount += 1;
+    statusCounts[status] = (statusCounts[status] ?? 0) + 1;
     if (status === 'SUBMITTED' || status === 'RESUBMITTED') submittedCount += 1;
 
     const smeId = str(r.sme_id);
@@ -1347,5 +1390,7 @@ export async function fetchDashboardStats(companyId?: string | null): Promise<Ap
     dDay: dueDate ? daysUntil(dueDate) : null,
     notStartedSme,
     openInquiries: inquiries.count ?? 0,
+    statusCounts,
+    smeCount: startedBySme.size,
   });
 }

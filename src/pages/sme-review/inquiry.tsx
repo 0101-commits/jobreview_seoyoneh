@@ -21,7 +21,15 @@ import type { InquiryButtonProps } from './wizardTypes';
  * 직무명을 넘기지 않아도 화면이 단계만 보여 주며 정상 동작한다. 마법사 셸에는 jobDetail.name이
  * 이미 있으므로 배치하는 쪽에서 한 글자만 더 적으면 된다.
  */
-export type InquiryButtonOwnProps = InquiryButtonProps & { jobName?: string };
+export type InquiryButtonOwnProps = InquiryButtonProps & {
+  jobName?: string;
+  /**
+   * 운영 설정의 문의 담당 표기(survey_settings.inquiry_contact).
+   * 설정 화면은 이 값을 "SME가 문의하기 화면에서 보게 되는 안내"라고 약속하는데 실제로는
+   * 어디에도 나오지 않았다(v2 F7). 값이 비어 있으면 줄 자체를 그리지 않는다.
+   */
+  inquiryContact?: string;
+};
 
 /** step은 1~5로 좁혀져 있지만, 배열 밖 접근이 화면 전체를 죽이지 않게 한 번 더 받는다. */
 function stepTitle(step: number): string {
@@ -35,7 +43,7 @@ async function currentSmeId(): Promise<string> {
   return data.user.id;
 }
 
-export function InquiryButton({ reviewId, step, jobName }: InquiryButtonOwnProps) {
+export function InquiryButton({ reviewId, step, jobName, inquiryContact }: InquiryButtonOwnProps) {
   const [open, setOpen] = useState(false);
   // 본문을 모달이 아니라 버튼 쪽에 둔다 — 실수로 닫아도, 저장에 실패해도 쓰던 글이 남는다.
   const [body, setBody] = useState('');
@@ -131,6 +139,12 @@ export function InquiryButton({ reviewId, step, jobName }: InquiryButtonOwnProps
             )}
             단계: <span className="font-medium text-foreground">{stepTitle(step)}</span> — 이 정보가 함께 전달됩니다.
           </p>
+
+          {inquiryContact && (
+            <p className="mt-2 t-caption leading-5 text-foreground-muted">
+              문의 담당: <span className="font-medium text-foreground">{inquiryContact}</span>
+            </p>
+          )}
 
           {!reviewId && (
             <p className="mt-2 text-xs leading-5 text-foreground-subtle">

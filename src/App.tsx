@@ -64,31 +64,69 @@ import type { Role, User } from '@/types';
 // ── 라우트 정의 ─────────────────────────────────────────────────────
 // 사이드바 메뉴 = 이 목록. 목록에 없는 화면(직무 상세·직무 검토)은 title에서만 이름을 찾는다.
 type NavItem = { to: string; label: string; sub: string; Icon: typeof LayoutDashboard };
+/**
+ * 사이드바 묶음(v2 §6-5). 13개 평면 메뉴를 준비 → 운영 → 검토 → 산출 → 설정 다섯 그룹으로 나눈다.
+ * 순서가 관리자 흐름(§5-2)과 같다 — 첫 사용에서 무엇부터 해야 하는지가 순서로 읽혀야 한다.
+ */
+type NavGroup = { title: string; items: NavItem[] };
 
-const adminNav: NavItem[] = [
-  { to: '/dashboard', label: '대시보드', sub: '전체 검토 현황을 확인하세요', Icon: LayoutDashboard },
-  { to: '/reviews', label: '검토 현황', sub: 'SME별 검토 진행 상태', Icon: BarChart3 },
-  // §5-2 라우트 표의 문언을 그대로 쓴다(진행 현황 · 검토 워크벤치 · 문의 인박스).
-  { to: '/progress', label: '진행 현황', sub: '조직×직무 매트릭스 · 리마인더', Icon: LayoutGrid },
-  { to: '/workbench', label: '검토 워크벤치', sub: '제출 큐 · SME 비교 · 승인/반려', Icon: ClipboardCheck },
-  { to: '/analytics/fte', label: 'FTE 분포', sub: '직무·조직별 투입 비중 집계', Icon: PieChart },
-  { to: '/inbox', label: '문의 인박스', sub: '문의 답변·상태 관리', Icon: Inbox },
-  { to: '/jobs', label: '직무정보 관리', sub: '등록된 직무정보를 관리하세요', Icon: FileSpreadsheet },
-  { to: '/upload', label: '직무정보 업로드', sub: 'Excel 파일로 일괄 등록', Icon: Upload },
-  { to: '/users', label: 'SME 계정 관리', sub: 'SME 계정을 등록·관리하세요', Icon: Users },
-  // SME 화면의 '/assignments'(내 검토 목록)와 다른 화면이다. 라벨에 'SME'를 붙여 구분한다.
-  { to: '/assignments-admin', label: 'SME 배정 관리', sub: '직무별 SME 1~2명(R6) 점검·조정', Icon: UserPlus },
-  { to: '/admin-users', label: '관리자 계정 관리', sub: '관리자 계정을 등록·관리하세요', Icon: UserCog },
-  { to: '/exports', label: '산출물 내보내기', sub: '계약 산출물 E1~E5 · 스냅샷', Icon: Download },
-  { to: '/settings', label: '운영 설정', sub: '마감일 · 안내문 · 예상 소요 · 문의 담당', Icon: Settings },
+const adminNav: NavGroup[] = [
+  {
+    title: '준비',
+    items: [
+      { to: '/upload', label: '직무정보 업로드', sub: 'Excel 파일로 일괄 등록', Icon: Upload },
+      { to: '/jobs', label: '직무정보 관리', sub: '등록된 직무정보를 관리하세요', Icon: FileSpreadsheet },
+      { to: '/users', label: 'SME 계정 관리', sub: 'SME 계정을 등록·관리하세요', Icon: Users },
+      { to: '/admin-users', label: '관리자 계정 관리', sub: '관리자 계정을 등록·관리하세요', Icon: UserCog },
+      // SME 화면의 '/assignments'(내 검토 목록)와 다른 화면이다. 라벨에 'SME'를 붙여 구분한다.
+      { to: '/assignments-admin', label: 'SME 배정 관리', sub: '직무별 SME 1~2명(R6) 점검·조정', Icon: UserPlus },
+    ],
+  },
+  {
+    title: '운영',
+    items: [
+      { to: '/dashboard', label: '대시보드', sub: '전체 검토 현황을 확인하세요', Icon: LayoutDashboard },
+      // §5-2 라우트 표의 문언을 그대로 쓴다(진행 현황 · 검토 워크벤치 · 문의 인박스).
+      { to: '/progress', label: '진행 현황', sub: '조직×직무 매트릭스 · 리마인더', Icon: LayoutGrid },
+      { to: '/inbox', label: '문의 인박스', sub: '문의 답변·상태 관리', Icon: Inbox },
+    ],
+  },
+  {
+    title: '검토',
+    items: [
+      { to: '/workbench', label: '검토 워크벤치', sub: '제출 큐 · SME 비교 · 승인/반려', Icon: ClipboardCheck },
+      { to: '/reviews', label: '검토 현황', sub: 'SME별 검토 진행 상태', Icon: BarChart3 },
+    ],
+  },
+  {
+    title: '산출',
+    items: [
+      { to: '/analytics/fte', label: 'FTE 분포', sub: '직무·조직별 투입 비중 집계', Icon: PieChart },
+      { to: '/exports', label: '산출물 내보내기', sub: '계약 산출물 E1~E5 · 스냅샷', Icon: Download },
+    ],
+  },
+  {
+    title: '설정',
+    items: [{ to: '/settings', label: '운영 설정', sub: '마감일 · 안내문 · 예상 소요 · 문의 담당', Icon: Settings }],
+  },
 ];
 
-const smeNav: NavItem[] = [
-  { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList },
-  { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3 },
-  { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText },
-  // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
-  { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen },
+const smeNav: NavGroup[] = [
+  {
+    title: '검토',
+    items: [
+      { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList },
+      { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3 },
+    ],
+  },
+  {
+    title: '도움',
+    items: [
+      { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText },
+      // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
+      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen },
+    ],
+  },
 ];
 
 const adminHome = '/dashboard';
@@ -353,7 +391,7 @@ function Shell({
   const [dirty, setDirty] = useState(false);
   const { pathname } = useLocation();
   const isAdmin = user.role === 'admin';
-  const nav = isAdmin ? adminNav : smeNav;
+  const navGroups = isAdmin ? adminNav : smeNav;
   const home = isAdmin ? adminHome : smeHome;
   const closeDrawer = useCallback(() => setMobileOpen(false), []);
 
@@ -384,11 +422,11 @@ function Shell({
     <DirtyContext.Provider value={guard}>
       <div className="min-h-screen bg-background text-foreground">
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
-          <SidebarBody items={nav} onNavigate={closeDrawer} onLogout={onLogout} />
+          <SidebarBody groups={navGroups} onNavigate={closeDrawer} onLogout={onLogout} />
         </aside>
 
         <MobileDrawer open={mobileOpen} onClose={closeDrawer}>
-          <SidebarBody items={nav} onNavigate={closeDrawer} onLogout={onLogout} />
+          <SidebarBody groups={navGroups} onNavigate={closeDrawer} onLogout={onLogout} />
         </MobileDrawer>
 
         {/* 이탈 확인 — 사이드바 이동·뒤로가기 버튼이 모두 이 한 창을 쓴다. */}
@@ -447,7 +485,9 @@ function Shell({
                   />
                   <Route
                     path="/reviews"
-                    element={<ReviewTable companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                    element={
+                      <ReviewsRoute companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
                   />
                   <Route
                     path="/progress"
@@ -528,11 +568,11 @@ function Shell({
 }
 
 function SidebarBody({
-  items,
+  groups,
   onNavigate,
   onLogout,
 }: {
-  items: NavItem[];
+  groups: NavGroup[];
   onNavigate: () => void;
   onLogout: () => void;
 }) {
@@ -550,10 +590,17 @@ function SidebarBody({
         </div>
       </div>
       {/* 짧은 뷰포트·확대에서도 메뉴가 잘리지 않도록 nav만 스크롤한다. */}
-      <nav aria-label="주요 메뉴" className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
-        {items.map(({ to, label, sub, Icon }) => (
-          <NavLink
-            key={to}
+      <nav aria-label="주요 메뉴" className="flex-1 space-y-5 overflow-y-auto px-3 py-6">
+        {groups.map((group) => (
+          <div key={group.title}>
+            {/* 그룹 제목은 조작이 아니라 이름표다 — 누를 수 없고, 낭독기에는 목록의 이름으로 읽힌다. */}
+            <p className="px-3 pb-1.5 t-caption font-semibold uppercase tracking-wider text-inverse-label-muted">
+              {group.title}
+            </p>
+            <div role="group" aria-label={group.title} className="space-y-1">
+              {group.items.map(({ to, label, sub, Icon }) => (
+              <NavLink
+                key={to}
             to={to}
             onClick={(e) => {
               // 확인이 비동기라 기본 이동을 먼저 막고, 확인이 끝난 뒤 직접 이동한다.
@@ -596,6 +643,9 @@ function SidebarBody({
               </>
             )}
           </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
       <div className="shrink-0 border-t border-inverse-label/10 p-3">
@@ -659,6 +709,27 @@ function DashboardRoute({
   );
 }
 
+/**
+ * 검토 현황(/reviews). 행을 열면 직무 상세의 SME 피드백 패널로 보낸다(v2 §6-5) —
+ * 예전에는 이 화면이 자기 상세 모달을 따로 갖고 있어 "직무 항목 의견만 보이는" 반쪽 화면이 됐다.
+ */
+function ReviewsRoute({
+  companyFilter,
+  setCompanyFilter,
+}: {
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
+}) {
+  const navigate = useNavigate();
+  return (
+    <ReviewTable
+      companyFilter={companyFilter}
+      setCompanyFilter={setCompanyFilter}
+      onOpenReview={(jobId, smeId) => navigate(`/jobs/${jobId}?sme=${smeId}`)}
+    />
+  );
+}
+
 /** 제출 큐(/workbench) → 비교 뷰(/workbench/:jobId). 다른 관리자 화면과 같이 URL을 App이 정한다. */
 function WorkbenchRoute({
   companyFilter,
@@ -696,6 +767,8 @@ function JobsRoute({
 }) {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  // 검토 현황에서 「보기」로 넘어오면 ?sme=<id>가 붙는다 — 그 SME 카드로 스크롤한다(v2 §6-5).
+  const [params] = useSearchParams();
   return (
     <JobsPage
       userId={userId}
@@ -703,6 +776,7 @@ function JobsRoute({
       onSelectJob={(next) => navigate(next ? `/jobs/${next}` : '/jobs')}
       companyFilter={companyFilter}
       setCompanyFilter={setCompanyFilter}
+      focusSmeId={params.get('sme')}
     />
   );
 }

@@ -47,6 +47,8 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
   // 관리자 설정값(survey_settings.expected_minutes). 없으면 null 그대로 둔다 —
   // copy.ts가 소요 문장을 통째로 빼 준다. 앱이 숫자를 지어내면 착수보고 11면의 근거가 사라진다.
   const [expectedMinutes, setExpectedMinutes] = useState<number | null>(null);
+  // 문의 담당 표기(survey_settings.inquiry_contact) — 마지막 카드(문의 채널 안내)에 붙인다(v2 F7).
+  const [inquiryContact, setInquiryContact] = useState('');
   // 관리자가 /settings에 적어 둔 추가 안내(survey_settings.guide_md).
   // §6-1 고정 문언 4장을 대체하지 않고 마지막 카드 아래에 덧붙인다 —
   // 원칙 P1이 착수보고 문언을 그대로 쓰라고 못박아, 통째로 갈아치울 수 있으면 이행 증빙이 무너진다.
@@ -91,6 +93,7 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
         if (alive) {
           setExpectedMinutes(settings?.expected_minutes ?? null);
           setGuideMd(settings?.guide_md ?? '');
+          setInquiryContact(settings?.inquiry_contact ?? '');
         }
       } catch (e) {
         // 설정값을 못 읽은 것과 설정값이 없는 것은 화면에서 같다 — 소요 문장을 뺀다.
@@ -241,6 +244,14 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
           운영 공지라 고정 문언 카드 안에 섞으면 §6-1의 문언이 어디까지인지 흐려진다.
           마크다운 렌더러는 들이지 않는다. 줄바꿈만 살려 원문 그대로 보여 준다(새 의존성 금지).
         */}
+        {/* 문의 담당 — 설정 화면이 "SME가 문의하기 화면에서 보게 되는 안내"라고 약속한 값이다(v2 F7). */}
+        {isLast && inquiryContact.trim() && (
+          <p className="mt-4 rounded-element border border-primary-border bg-primary-subtle px-4 py-3 t-label text-primary">
+            문의 담당: <span className="font-semibold">{inquiryContact}</span> · 검토 화면 오른쪽 아래 「문의하기」로
+            남기시면 기록과 함께 전달됩니다.
+          </p>
+        )}
+
         {isLast && guideMd.trim() && (
           <section
             aria-label="추가 안내"

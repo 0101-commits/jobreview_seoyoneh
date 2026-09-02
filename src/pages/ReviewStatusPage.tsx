@@ -8,17 +8,11 @@ import {
   type Company,
   type ReviewStatusRow,
 } from '@/lib/jobApi';
-import {
-  fetchReviewFeedback,
-  toSuitabilityLabel,
-  type JobFeedbackSection,
-  type ReviewFeedbackData,
-} from '@/lib/reviewApi';
+
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { FilterChips } from '@/components/ui/FilterChips';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
-import { ModalShell } from '@/components/ui/ModalShell';
 
 // ── 다른 화면에서 넘어올 때의 초기 필터 ──────────────────────────────
 // ponytail: 화면 사이로 필터를 넘길 통로가 없어 sessionStorage를 임시로 쓴다.
@@ -79,14 +73,6 @@ const STATUS_RANK: Record<string, number> = {
   RESUBMITTED: 4,
 };
 
-const SECTION_LABEL: Record<JobFeedbackSection, string> = {
-  NAME: '직무명',
-  DEFINITION: '직무 정의',
-  REQ_EDUCATION: '요구 학력',
-  REQ_MAJOR: '요구 전공',
-  REQ_CERTIFICATIONS: '요구 자격증',
-};
-
 type SortKey = 'sme' | 'job' | 'status' | 'submitted';
 
 const PAGE_SIZE = 20;
@@ -106,9 +92,16 @@ function pageItems(current: number, totalPages: number): (number | '…')[] {
 export function ReviewTable({
   companyFilter,
   setCompanyFilter,
+  onOpenReview,
 }: {
   companyFilter: string;
   setCompanyFilter: (v: string) => void;
+  /**
+   * 행을 열 때 어디로 가는가(v2 §6-5). 직무 상세의 SME 피드백 패널로 보낸다 —
+   * 과업·Skill 의견까지 한 화면에서 보이는 유일한 자리다.
+   * 주지 않으면(옛 배선) 아무 일도 하지 않는다.
+   */
+  onOpenReview?: (jobId: string, smeId: string) => void;
 }) {
   const prefilter = useRef<ReviewTablePrefilter | null>(takePrefilter()).current;
 
@@ -122,7 +115,6 @@ export function ReviewTable({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-  const [detailRow, setDetailRow] = useState<ReviewStatusRow | null>(null);
 
   // 대시보드에서 넘어왔다면 그쪽 회사 필터를 그대로 이어받는다.
   useEffect(() => {
@@ -311,7 +303,7 @@ export function ReviewTable({
                   <tr
                     className="group cursor-pointer border-b border-border last:border-0 hover:bg-primary-subtle"
                     key={r.review_id || `${r.sme_id}-${r.job_id}`}
-                    onClick={() => setDetailRow(r)}
+                    onClick={() => onOpenReview?.(r.job_id, r.sme_id)}
                   >
                     <th
                       scope="row"
@@ -350,7 +342,7 @@ export function ReviewTable({
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDetailRow(r);
+                          onOpenReview?.(r.job_id, r.sme_id);
                         }}
                       >
                         보기
@@ -413,113 +405,13 @@ export function ReviewTable({
         )}
       </div>
 
-      {detailRow && <ReviewDetailModal row={detailRow} onClose={() => setDetailRow(null)} />}
     </>
   );
 }
 
-// ── 검토 내용 요약 패널 ─────────────────────────────────────────────
-// 담당 4가 JobDetailPage에 만드는 SME 피드백 패널로 통합 필요.
-// 여기서는 항목 이름(과업·스킬 명칭)까지 다시 조회하지 않고 저장된 개수와 직무 항목 의견만 보여준다.
-
-function ReviewDetailModal({ row, onClose }: { row: ReviewStatusRow; onClose: () => void }) {
-  const [data, setData] = useState<ReviewFeedbackData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!row.review_id) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    fetchReviewFeedback(row.review_id)
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : '검토 내용을 불러오지 못했습니다.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [row.review_id]);
-
-  const jobFeedback = (data?.job || []).filter((f) => f.suitability || f.comment || f.suggestion);
-
-  return (
-    <ModalShell
-      title={`${row.sme_name} · ${row.job_name}`}
-      description={`${row.group_name} · ${row.series_name} · ${mapReviewStatus(row.review_status)}`}
-      size="lg"
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>
-            닫기
-          </Button>
-        </div>
-      }
-    >
-      {loading ? (
-        <p className="py-6 text-center text-sm text-foreground-subtle">불러오는 중…</p>
-      ) : error ? (
-        <p className="flex items-start gap-2 border border-destructive-border bg-destructive-muted p-3 text-sm text-destructive">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{error} 잠시 후 다시 열어 주세요.</span>
-        </p>
-      ) : !row.review_id || !data ? (
-        <p className="py-6 text-center text-sm text-foreground-subtle">
-          아직 검토를 시작하지 않았어요. SME가 저장하면 내용이 표시됩니다.
-        </p>
-      ) : (
-        <div className="space-y-5 text-sm">
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              ['직무 항목 의견', jobFeedback.length],
-              ['과업 의견', data.tasks.length],
-              ['스킬 의견', data.skills.length],
-              ['신규 제안', data.newTasks.length + data.newSkills.length],
-            ].map(([label, n]) => (
-              <div key={label as string} className="border border-border bg-muted p-3">
-                <dt className="text-xs text-foreground-muted">{label}</dt>
-                <dd className="mt-1 text-lg font-semibold text-foreground">{n}</dd>
-              </div>
-            ))}
-          </dl>
-
-          {jobFeedback.length === 0 ? (
-            <p className="text-foreground-subtle">직무 항목에 남긴 의견이 없어요.</p>
-          ) : (
-            <ul className="space-y-3">
-              {jobFeedback.map((f) => (
-                <li key={f.section} className="border border-border p-3">
-                  <p className="flex flex-wrap items-center gap-2">
-                    <b className="text-foreground">{SECTION_LABEL[f.section] || f.section}</b>
-                    <span className="text-xs text-foreground-muted">
-                      {toSuitabilityLabel(f.suitability) || '판단 없음'}
-                    </span>
-                  </p>
-                  {f.comment && <p className="mt-2 whitespace-pre-wrap text-foreground-muted">{f.comment}</p>}
-                  {f.suggestion && (
-                    <p className="mt-2 whitespace-pre-wrap border-l-2 border-primary-border pl-3 text-foreground-muted">
-                      제안: {f.suggestion}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <p className="text-xs text-foreground-subtle">
-            과업·스킬별 상세 의견은 직무정보 관리 화면의 직무 상세에서 확인할 수 있어요.
-          </p>
-        </div>
-      )}
-    </ModalShell>
-  );
-}
+/*
+ * (삭제) ReviewDetailModal — v2 §6-5.
+ * "직무정보 관리 화면의 SME 피드백 패널로 통합 필요"라는 주석과 함께 직무 항목 의견만 보여 주던
+ * 반쪽 모달이었다(U7). 이제 행을 열면 /jobs/:jobId?sme=<id>로 가서 과업·Skill 의견까지
+ * 한 화면에서 본다 — 같은 사실을 말하는 화면이 하나가 된다.
+ */

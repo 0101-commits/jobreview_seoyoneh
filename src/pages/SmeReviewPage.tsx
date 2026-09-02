@@ -22,6 +22,7 @@ import {
   buildDraftPayload,
   fetchReviewFeedback,
   getOrCreateReviewForJob,
+  saveLastStep,
   saveReviewDraft,
   submitReview,
   toFeedbackState,
@@ -35,6 +36,7 @@ import {
   endReviewSession,
   fetchFteAllocations,
   fetchMyInquiries,
+  fetchSurveySettings,
   startReviewSession,
   type FteAllocationInput,
   type Inquiry,
@@ -147,6 +149,8 @@ export function ReviewWorkspace({
   const [rejectedReason, setRejectedReason] = useState('');
   /** 답변이 도착한 내 문의(§6-3 ⓒ). 검토 대상 직무와 무관하게 SME 본인 기준이다. */
   const [answeredInquiries, setAnsweredInquiries] = useState<Inquiry[]>([]);
+  /** 운영 설정의 문의 담당 표기. 문의 모달에서 보여 준다(v2 F7). 없으면 빈 문자열이다. */
+  const [inquiryContact, setInquiryContact] = useState('');
 
   const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
   const [newTasks, setNewTasks] = useState<SuggestionInput[]>([]);
@@ -254,6 +258,20 @@ export function ReviewWorkspace({
       cancelled = true;
     };
   }, [user.id]);
+
+  // 문의 담당 표기(v2 F7). 부가 정보라 실패해도 화면은 그대로 간다.
+  useEffect(() => {
+    if (!user.company_id) return;
+    let cancelled = false;
+    fetchSurveySettings(user.company_id)
+      .then((settings) => {
+        if (!cancelled) setInquiryContact(settings?.inquiry_contact ?? '');
+      })
+      .catch((e) => console.warn('[SmeReviewPage] 문의 담당 표기 조회 실패 — 표기만 생략한다.', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [user.company_id]);
 
   // ── FTE 배분 대상(§6-2 STEP 3 "대상 목록") ────────────────────────
   // STEP 2 결과가 그대로 반영된다: 유지 Task + 이름이 채워진 신규 제안 Task. 삭제 제안 Task는 빼고 건수만 센다.
@@ -513,6 +531,13 @@ export function ReviewWorkspace({
     },
     [onStepChange],
   );
+
+  // 지금 보고 있는 단계를 서버에도 남긴다(v2 §6-5) — 다른 기기에서 이어하기의 근거다.
+  // 부수 기록이라 실패해도 화면은 그대로 간다(saveLastStep이 삼킨다).
+  useEffect(() => {
+    if (!reviewId) return;
+    void saveLastStep(reviewId, step);
+  }, [reviewId, step]);
 
   // 단계가 바뀌면 이전 단계의 게이트 안내를 지운다.
   useEffect(() => {
@@ -906,7 +931,12 @@ export function ReviewWorkspace({
 
       {/* 문의는 전 단계 공통이다. 직무(review)와 지금 단계가 문의에 자동으로 붙는다(§6-1).
           jobName은 저장에 쓰이지 않고 "무엇이 함께 전달되는지"를 작성 폼에서 보여 주는 표시용이다. */}
-      <InquiryButton reviewId={review?.review_id || null} step={step} jobName={jobDetail?.name} />
+      <InquiryButton
+        reviewId={review?.review_id || null}
+        step={step}
+        jobName={jobDetail?.name}
+        inquiryContact={inquiryContact}
+      />
 
       {confirmOpen && (
         <ModalShell

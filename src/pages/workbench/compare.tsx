@@ -8,7 +8,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, RotateCw, Users } from 'lucide-
 import {
   decideReview,
   fetchJobComparison,
-  fetchWorkshopFlags,
+  fetchWorkshopFlag,
   type FteRow,
   type JobComparison,
   type ReviewDecision,
@@ -16,7 +16,7 @@ import {
 } from '@/lib/adminApi';
 import { SIGNAL_LABELS, WORKSHOP_REASONS, WORKSHOP_THRESHOLDS } from '@/lib/workshopThresholds';
 import { workshopDecisionOf } from '@/lib/workshopRules';
-import { fetchAllJobsResult, mapReviewStatus, type JobListItem } from '@/lib/jobApi';
+import { fetchJobHeader, mapReviewStatus, type JobListItem } from '@/lib/jobApi';
 import { toSuitabilityLabel, type SmeReviewFeedback, type Suitability, type SuitabilityLabel } from '@/lib/reviewApi';
 import { fteSuggestedNameChip } from '@/pages/sme-review/copy';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -146,12 +146,11 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
     (async () => {
       // 세 조회는 서로를 기다릴 이유가 없다. 하나가 실패해도 나머지는 그대로 보여 준다
       // (adminApi가 예외 대신 ApiResult를 주는 이유가 이것이다).
-      // ponytail: 직무명 한 줄·플래그 한 줄 때문에 목록을 통째로 받는다(각 쿼리 1회).
-      // adminApi에 단건 조회(fetchJobHeader·fetchWorkshopFlag)가 생기면 그것으로 바꾼다 — 화면 계약은 그대로다.
-      const [cmp, jobs, flags] = await Promise.all([
+      // v2 D3: 직무명 한 줄·플래그 한 줄을 단건으로 읽는다(예전에는 전 직무·전 플래그를 받아 하나를 골랐다).
+      const [cmp, jobResult, flagResult] = await Promise.all([
         fetchJobComparison(jobId),
-        fetchAllJobsResult(null),
-        fetchWorkshopFlags(null),
+        fetchJobHeader(jobId),
+        fetchWorkshopFlag(jobId),
       ]);
       if (cancelled) return;
       if (cmp.ok) {
@@ -165,20 +164,20 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
         setComparison(null);
         setError(cmp.error);
       }
-      if (jobs.ok) {
-        setJob(jobs.data.find((j) => j.id === jobId) ?? null);
+      if (jobResult.ok) {
+        setJob(jobResult.data);
         setJobError('');
       } else {
         setJob(null);
-        setJobError(jobs.error);
+        setJobError(jobResult.error);
       }
       // 저장된 결정이 없는 것(null)과 못 불러온 것을 구분한다 — 후자면 패널 대신 오류를 띄운다.
-      if (flags.ok) {
-        setFlag(flags.data.find((f) => f.jobId === jobId) ?? null);
+      if (flagResult.ok) {
+        setFlag(flagResult.data);
         setFlagError('');
       } else {
         setFlag(null);
-        setFlagError(flags.error);
+        setFlagError(flagResult.error);
       }
       setLoading(false);
     })();

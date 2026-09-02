@@ -47,6 +47,11 @@ interface Props {
   onBack: () => void;
   userId: string;
   companyId?: string | null;
+  /**
+   * 이 SME의 검토 카드로 스크롤·강조한다(v2 §6-5).
+   * 검토 현황 화면이 상세 모달을 없애고 이 화면으로 보내면서 "어느 SME를 보러 왔는지"를 넘긴다.
+   */
+  focusSmeId?: string | null;
 }
 
 /** 목록에서 중간 항목을 지워도 뒤 입력칸의 포커스·한글 조합이 엉키지 않도록 행마다 고정 키를 붙인다. */
@@ -95,7 +100,7 @@ const JOB_FIELD_LABEL: Record<string, string> = {
   'req-certifications': '관련 자격증/면허',
 };
 
-export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
+export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: Props) {
   const [detail, setDetail] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -952,6 +957,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
           onFocusField={focusField}
           labelFor={labelFor}
           onRequestRereview={setRereviewTarget}
+          focusSmeId={focusSmeId}
         />
       </div>
 
@@ -1028,7 +1034,23 @@ interface PanelProps {
   onRequestRereview: (review: SmeReviewFeedback) => void;
 }
 
-function SmeFeedbackPanel({ data, loading, error, onRetry, onFocusField, labelFor, onRequestRereview }: PanelProps) {
+function SmeFeedbackPanel({
+  data,
+  loading,
+  error,
+  onRetry,
+  onFocusField,
+  labelFor,
+  onRequestRereview,
+  focusSmeId,
+}: PanelProps & { focusSmeId?: string | null }) {
+  // 검토 현황에서 넘어온 경우 그 SME 카드로 스크롤한다. 목록이 도착한 뒤 한 번만 움직인다.
+  useEffect(() => {
+    if (!focusSmeId || data.length === 0) return;
+    const el = document.getElementById(`sme-card-${focusSmeId}`);
+    el?.scrollIntoView({ block: 'center' });
+  }, [focusSmeId, data.length]);
+
   return (
     <aside className="rounded-container border border-border bg-card p-5 shadow-1 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
       <div className="mb-4 flex items-center gap-2">
@@ -1070,6 +1092,7 @@ function SmeFeedbackPanel({ data, loading, error, onRetry, onFocusField, labelFo
           {data.map((review) => (
             <ReviewCard
               key={review.review_id}
+              focused={review.sme_id === focusSmeId}
               review={review}
               onFocusField={onFocusField}
               labelFor={labelFor}
@@ -1087,11 +1110,14 @@ function ReviewCard({
   onFocusField,
   labelFor,
   onRequestRereview,
+  focused = false,
 }: {
   review: SmeReviewFeedback;
   onFocusField: (key: string) => void;
   labelFor: (key: string) => { kind: string; name: string };
   onRequestRereview: (review: SmeReviewFeedback) => void;
+  /** 검토 현황에서 이 SME를 보러 온 경우 — 테두리로 표시한다(색만으로 알리지 않게 스크롤도 함께). */
+  focused?: boolean;
 }) {
   // 저장된 값 → 화면 라벨 변환은 reviewApi의 변환기를 그대로 쓴다.
   const items = Object.entries(toFeedbackState(review.feedback))
@@ -1102,7 +1128,10 @@ function ReviewCard({
   const canRerequest = review.status === 'SUBMITTED' || review.status === 'RESUBMITTED';
 
   return (
-    <article className="rounded-element border border-border p-4">
+    <article
+      id={`sme-card-${review.sme_id}`}
+      className={`rounded-element border p-4 ${focused ? 'border-primary bg-primary-subtle' : 'border-border'}`}
+    >
       <header className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm font-semibold text-foreground">{review.sme_name || '이름 미등록'}</span>
         {review.organization && <span className="text-xs text-foreground-subtle">{review.organization}</span>}

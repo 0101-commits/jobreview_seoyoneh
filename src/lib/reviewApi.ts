@@ -213,6 +213,11 @@ export interface MyAssignment {
   status: ReviewStatus;
   last_saved_at: string | null;
   submitted_at: string | null;
+  /**
+   * 마지막으로 본 마법사 단계(1~5). 기기 간 이어하기의 근거다(v2 §6-5).
+   * 예전에는 localStorage에만 있어 다른 기기에서는 언제나 STEP 1이었다.
+   */
+  last_step: number | null;
 }
 
 /** 화면 복원용 저장 내용 전체. */
@@ -264,7 +269,7 @@ export async function fetchMyAssignments(smeId: string): Promise<MyAssignment[]>
       id,
       job_id,
       jobs!inner(id, name, job_groups!inner(name), job_series!inner(name)),
-      reviews(id, status, last_saved_at, submitted_at)
+      reviews(id, status, last_saved_at, submitted_at, last_step)
     `,
     )
     .eq('sme_id', smeId)
@@ -290,9 +295,23 @@ export async function fetchMyAssignments(smeId: string): Promise<MyAssignment[]>
         status: (review ? (review.status as ReviewStatus) : 'NOT_STARTED') || 'NOT_STARTED',
         last_saved_at: review ? str(review.last_saved_at) || null : null,
         submitted_at: review ? str(review.submitted_at) || null : null,
+        // 컬럼이 없는 DB(Phase D 마이그레이션 미적용)에서는 undefined로 와 null이 된다 — 이어하기만 꺼진다.
+        last_step: review && review.last_step != null ? Number(review.last_step) : null,
       };
     })
     .sort((a, b) => a.job_name.localeCompare(b.job_name, 'ko'));
+}
+
+/**
+ * 마지막으로 본 단계를 서버에 남긴다(v2 §6-5).
+ *
+ * 부수 기록이라 실패를 던지지 않는다 — 이어하기 표시가 한 번 못 따라가는 것보다 단계 이동이
+ * 막히는 편이 나쁘다. 마이그레이션 전 DB에서는 컬럼이 없어 실패하는데, 그때도 조용히 넘긴다
+ * (콘솔에는 남긴다).
+ */
+export async function saveLastStep(reviewId: string, step: number): Promise<void> {
+  const { error } = await client().from('reviews').update({ last_step: step }).eq('id', reviewId);
+  if (error) console.warn(`[reviewApi] 이어하기 단계를 저장하지 못했습니다(${step}): ${error.message}`);
 }
 
 /** 배정에 붙은 검토 세션을 가져온다. 없으면 NOT_STARTED로 만든다. */
