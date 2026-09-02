@@ -11,19 +11,18 @@
 // SME 계정도 RLS상 본인 세션은 읽을 수 있으므로(20260901020000 review_sessions_access_select),
 // 화면만 감추는 방식은 "안 보이는" 것일 뿐 "못 얻는" 것이 아니다.
 //
-// ── exportApi.ts(E5)와의 관계 · 왜 여기서 다시 세는가 ──
-// 같은 계산이 exportApi.ts에 이미 있다(loadDurations = 검토별 분 합계, median). 다만 둘 다
-// 모듈 안에서만 쓰는 비공개 함수이고 이번 작업에서 exportApi.ts는 수정 대상이 아니다.
-// 밖에서 부를 수 있는 것은 collectE5(companyId) 하나인데,
-//   ① audit_logs 전체·상태 전이 이력까지 끌어와 시트 3장을 만든다 — 대시보드 카드 한 장에는 과한 비용이고
-//   ② review_sessions.step을 아예 조회하지 않아 단계별 중앙값을 낼 수 없다(§6-1 "부담 최소화"의 실측 근거).
-// 그래서 이 파일이 세션을 한 번 읽어 직접 집계한다. 대신 규칙(①~③)·상한(SESSION_CAP_MINUTES)·
-// 표본 기준(isComparableReview)은 exportApi와 같은 값을 쓴다 — 한쪽만 바꾸면 대시보드 숫자와
-// E5 파일의 숫자가 갈리고, 그 순간 이 값은 근거가 아니라 분쟁거리가 된다.
-// exportApi.ts를 손댈 수 있게 되면 loadDurations·median에 export만 붙여 여기서 import하는 편이 낫다.
+// ── exportApi.ts(E5)와의 관계 (v2 D2) ──
+// 같은 계산이 두 벌이면 대시보드 카드와 E5 파일의 숫자가 갈리고, 그 순간 이 값은 근거가 아니라
+// 분쟁거리가 된다. 그래서 상한(SESSION_CAP_MINUTES)과 중앙값 계산(median)은 exportApi에서
+// 그대로 가져와 쓴다 — 이 파일에는 더 이상 사본이 없다.
+// 세션 조회 자체는 여기서 한 번 더 한다: E5의 collectE5는 audit_logs·상태 전이까지 끌어와
+// 시트 3장을 만들고(대시보드 카드 한 장에는 과한 비용), review_sessions.step을 조회하지 않아
+// 단계별 중앙값을 낼 수 없다(§6-1 "부담 최소화"의 실측 근거).
+// 모집단 기준(isComparableReview = 제출된 검토)은 양쪽이 같다.
 
 import { supabase } from './supabase';
 import { isComparableReview } from './adminApi';
+import { SESSION_CAP_MINUTES, median } from './exportApi';
 import { fetchOperationSettings } from './settingsApi';
 import { STEP_TITLES } from '@/pages/sme-review/copy';
 import type { ApiResult } from './jobApi';
@@ -40,18 +39,6 @@ const round1 = (v: number): number => Math.round(v * 10) / 10;
 
 // ── 집계 규칙 상수 ──────────────────────────────────────────────────
 
-/**
- * 한 세션 구간의 상한(분). 넘으면 버리지 않고 이 값으로 자른다.
- *
- * 기획안에 없는 값이라 근거를 적는다: §10 P3의 목표가 "직무당 총 소요 20~30분"이므로
- * 마법사 한 단계에 한 시간을 넘게 머무는 것은 작성이 아니라 화면을 켜 둔 채 자리를 비운 것으로 본다.
- * 버리지 않고 자르는 이유는, 그 구간을 통째로 버리면 실제로 오래 걸린 검토가 표본에서 사라져
- * 중앙값이 반대로 낮아지기 때문이다. 파일럿 실측으로 다시 볼 값이라 상수로 뺐다(§12 오픈이슈 1).
- * exportApi.ts의 SESSION_CAP_MINUTES와 같은 값이어야 한다.
- *
- * 모듈 안에서만 쓴다(밖에서 부르는 곳이 없다). 값을 밖에서 보여 줄 일이 생기면 그때 열면 된다.
- */
-const SESSION_CAP_MINUTES = 60;
 
 /**
  * 중앙값을 숫자로 말하기 위한 최소 표본 수. 이것도 기획안에 없는 값이라 근거를 적는다.
@@ -193,13 +180,6 @@ async function loadSessions(reviewIds: string[]): Promise<Row[]> {
 // ── 내부: 집계 ──────────────────────────────────────────────────────
 
 /** 짝수 개면 가운데 두 값의 평균, 홀수 개면 가운데 값. 빈 배열이면 null(0이 아니다). */
-function median(values: number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
 /**
  * 세션 행 → 검토별·(검토,단계)별 소요 합계(분).
  *

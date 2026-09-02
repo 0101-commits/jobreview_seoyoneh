@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fetchAllPages, fetchPagesByIds } from './paging';
 import { fetchAllJobsResult, type ApiResult } from './jobApi';
 import { fetchJobReviewFeedback, type ReviewStatus, type SmeReviewFeedback, type Suitability } from './reviewApi';
 import type { FteTargetType, InquiryStatus } from './surveyApi';
@@ -306,22 +307,25 @@ export async function fetchProgressMatrix(companyId?: string | null): Promise<Ap
   if (!tree.ok) return tree;
   if (!jobList.ok) return jobList;
 
-  let query = supabase
-    .from('review_assignments')
-    .select(
-      `
+  // 배정은 1,000행을 넘길 수 있다(직무 251 × SME 1~2명이면 이미 근접한다).
+  // 잘린 응답은 화면에서 "미배정"으로 보이므로 끝까지 읽는다(v2 D1 — lib/paging.ts).
+  const { rows: data, error } = await fetchAllPages(() => {
+    let query = supabase!
+      .from('review_assignments')
+      .select(
+        `
       id, sme_id, job_id,
       profiles!inner(id, name, org_unit_id),
       jobs!inner(id, name, company_id, active),
       reviews(id, status, last_saved_at, approved_at)
     `,
-    )
-    .eq('active', true)
-    .eq('jobs.active', true);
-  if (companyId) query = query.eq('jobs.company_id', companyId);
-
-  const { data, error } = await query;
-  if (error) return fail('진행 현황 조회', error.message);
+      )
+      .eq('active', true)
+      .eq('jobs.active', true);
+    if (companyId) query = query.eq('jobs.company_id', companyId);
+    return query;
+  });
+  if (error) return fail('진행 현황 조회', error);
 
   const orgNodes = flattenOrgTree(tree.data);
   const orgNameById = new Map(orgNodes.map((n) => [n.id, n.name]));
@@ -721,32 +725,36 @@ export async function fetchSubmissionQueue(companyId?: string | null): Promise<A
   const queued = [...buckets.values()].filter((b) => b.submittedReviewIds.length > 0);
   const reviewIds = [...reviewToJob.keys()];
 
-  // 신호 계산용 원본. 제출된 검토가 없으면 조회를 건너뛴다(.in([])은 무의미한 왕복이다).
-  const empty = { data: [] as unknown[], error: null as { message: string } | null };
+  /*
+    신호 계산용 원본.
+    v2 D1·D4: 예전에는 review_id 수백 개를 .in() 하나에 실어 URL 길이 한계에 기대고 있었고,
+    응답도 1,000행에서 잘렸다(제출 200건 × 과업 25개면 task_feedback만 5,000행이다).
+    이제 청크로 나눠 끝까지 읽는다(lib/paging.ts). 제출된 검토가 없으면 왕복하지 않는다.
+  */
   const [jobFb, taskFb, skillFb, fte, suggestions, flags] = await Promise.all([
-    reviewIds.length
-      ? supabase.from('job_feedback').select('review_id, section, suitability').in('review_id', reviewIds)
-      : Promise.resolve(empty),
-    reviewIds.length
-      ? supabase.from('task_feedback').select('review_id, task_id, suitability').in('review_id', reviewIds)
-      : Promise.resolve(empty),
-    reviewIds.length
-      ? supabase.from('skill_feedback').select('review_id, skill_id, suitability').in('review_id', reviewIds)
-      : Promise.resolve(empty),
-    reviewIds.length
-      ? supabase
-          .from('task_fte_allocations')
-          .select('review_id, target_type, task_id, suggestion_id, pct')
-          .in('review_id', reviewIds)
-      : Promise.resolve(empty),
-    reviewIds.length
-      ? supabase.from('new_task_suggestions').select('id, review_id, name').in('review_id', reviewIds)
-      : Promise.resolve(empty),
+    fetchPagesByIds(reviewIds, (ids) =>
+      supabase!.from('job_feedback').select('review_id, section, suitability').in('review_id', ids),
+    ),
+    fetchPagesByIds(reviewIds, (ids) =>
+      supabase!.from('task_feedback').select('review_id, task_id, suitability').in('review_id', ids),
+    ),
+    fetchPagesByIds(reviewIds, (ids) =>
+      supabase!.from('skill_feedback').select('review_id, skill_id, suitability').in('review_id', ids),
+    ),
+    fetchPagesByIds(reviewIds, (ids) =>
+      supabase!
+        .from('task_fte_allocations')
+        .select('review_id, target_type, task_id, suggestion_id, pct')
+        .in('review_id', ids),
+    ),
+    fetchPagesByIds(reviewIds, (ids) =>
+      supabase!.from('new_task_suggestions').select('id, review_id, name').in('review_id', ids),
+    ),
     fetchWorkshopFlags(companyId),
   ]);
 
   const firstError = [jobFb, taskFb, skillFb, fte, suggestions].find((r) => r.error)?.error;
-  if (firstError) return fail('제출 큐 조회', firstError.message);
+  if (firstError) return fail('제출 큐 조회', firstError);
   if (!flags.ok) return flags;
   const flagByJob = new Map(flags.data.map((f) => [f.jobId, f]));
 
@@ -761,12 +769,12 @@ export async function fetchSubmissionQueue(companyId?: string | null): Promise<A
   };
 
   const suggestionName = new Map<string, string>();
-  for (const raw of suggestions.data || []) {
+  for (const raw of suggestions.rows) {
     const r = raw as Row;
     suggestionName.set(str(r.id), str(r.name));
     inputOf(str(r.review_id))?.newTasks.push({ reviewId: str(r.review_id), name: str(r.name) });
   }
-  for (const raw of jobFb.data || []) {
+  for (const raw of jobFb.rows) {
     const r = raw as Row;
     inputOf(str(r.review_id))?.suitability.push({
       key: `job:${str(r.section)}`,
@@ -775,7 +783,7 @@ export async function fetchSubmissionQueue(companyId?: string | null): Promise<A
       value: (str(r.suitability) as Suitability) || null,
     });
   }
-  for (const raw of taskFb.data || []) {
+  for (const raw of taskFb.rows) {
     const r = raw as Row;
     inputOf(str(r.review_id))?.suitability.push({
       key: `task:${str(r.task_id)}`,
@@ -784,7 +792,7 @@ export async function fetchSubmissionQueue(companyId?: string | null): Promise<A
       value: (str(r.suitability) as Suitability) || null,
     });
   }
-  for (const raw of skillFb.data || []) {
+  for (const raw of skillFb.rows) {
     const r = raw as Row;
     inputOf(str(r.review_id))?.suitability.push({
       key: `skill:${str(r.skill_id)}`,
@@ -793,7 +801,7 @@ export async function fetchSubmissionQueue(companyId?: string | null): Promise<A
       value: (str(r.suitability) as Suitability) || null,
     });
   }
-  for (const raw of fte.data || []) {
+  for (const raw of fte.rows) {
     const r = raw as Row;
     const suggested = str(r.target_type) === 'SUGGESTED';
     const name = suggested ? suggestionName.get(str(r.suggestion_id)) ?? '' : '';
@@ -872,30 +880,31 @@ export async function fetchJobComparison(jobId: string): Promise<ApiResult<JobCo
   const submitted = smes.filter((s) => isComparableReview(s.status));
   const reviewIds = submitted.map((s) => s.review_id);
 
-  const empty = { data: [] as unknown[], error: null as { message: string } | null };
+  // v2 D1: 제안·배분은 검토 수에 비례해 늘어난다(제출 2명 × 과업 25개 = 50행이지만 워크숍 대상
+  // 직무를 모아 보는 경로에서는 훨씬 커진다). 청크 + 끝까지 읽기로 통일했다(lib/paging.ts).
   const [tasks, suggestions, fte] = await Promise.all([
-    supabase.from('job_tasks').select('id, name').eq('job_id', jobId).eq('active', true),
-    reviewIds.length
-      ? supabase.from('new_task_suggestions').select('id, review_id, name').in('review_id', reviewIds)
-      : Promise.resolve(empty),
-    reviewIds.length
-      ? supabase
-          .from('task_fte_allocations')
-          .select('review_id, target_type, task_id, suggestion_id, pct')
-          .in('review_id', reviewIds)
-      : Promise.resolve(empty),
+    fetchAllPages(() => supabase!.from('job_tasks').select('id, name').eq('job_id', jobId).eq('active', true)),
+    fetchPagesByIds(reviewIds, (ids) =>
+      supabase!.from('new_task_suggestions').select('id, review_id, name').in('review_id', ids),
+    ),
+    fetchPagesByIds(reviewIds, (ids) =>
+      supabase!
+        .from('task_fte_allocations')
+        .select('review_id, target_type, task_id, suggestion_id, pct')
+        .in('review_id', ids),
+    ),
   ]);
 
   const firstError = [tasks, suggestions, fte].find((r) => r.error)?.error;
-  if (firstError) return fail('SME 응답 비교 조회', firstError.message);
+  if (firstError) return fail('SME 응답 비교 조회', firstError);
 
   const taskName = new Map<string, string>();
-  for (const raw of tasks.data || []) {
+  for (const raw of tasks.rows) {
     const r = raw as Row;
     taskName.set(str(r.id), str(r.name));
   }
   const suggestionName = new Map<string, string>();
-  for (const raw of suggestions.data || []) {
+  for (const raw of suggestions.rows) {
     const r = raw as Row;
     suggestionName.set(str(r.id), str(r.name));
   }
@@ -932,7 +941,7 @@ export async function fetchJobComparison(jobId: string): Promise<ApiResult<JobCo
     }
   }
 
-  for (const raw of fte.data || []) {
+  for (const raw of fte.rows) {
     const r = raw as Row;
     const suggested = str(r.target_type) === 'SUGGESTED';
     const name = suggested
@@ -1328,12 +1337,16 @@ export interface DashboardStats {
 export async function fetchDashboardStats(companyId?: string | null): Promise<ApiResult<DashboardStats>> {
   if (!supabase) return fail('대시보드 지표 조회', NO_DB);
 
-  let assignmentQuery = supabase
-    .from('review_assignments')
-    .select('sme_id, jobs!inner(company_id, active), reviews(status)')
-    .eq('active', true)
-    .eq('jobs.active', true);
-  if (companyId) assignmentQuery = assignmentQuery.eq('jobs.company_id', companyId);
+  // 배정 전량을 읽는다 — 잘리면 응답률·미시작 SME 수가 조용히 낮아진다(v2 D1).
+  const assignmentPages = fetchAllPages(() => {
+    let q = supabase!
+      .from('review_assignments')
+      .select('id, sme_id, jobs!inner(company_id, active), reviews(status)')
+      .eq('active', true)
+      .eq('jobs.active', true);
+    if (companyId) q = q.eq('jobs.company_id', companyId);
+    return q;
+  });
 
   let inquiryQuery = supabase
     .from('inquiries')
@@ -1342,14 +1355,14 @@ export async function fetchDashboardStats(companyId?: string | null): Promise<Ap
   if (companyId) inquiryQuery = inquiryQuery.eq('profiles.company_id', companyId);
 
   const [assignments, settings, inquiries] = await Promise.all([
-    assignmentQuery,
+    assignmentPages,
     companyId
       ? supabase.from('survey_settings').select('due_date').eq('company_id', companyId).maybeSingle()
       : Promise.resolve({ data: null as Row | null, error: null as { message: string } | null }),
     inquiryQuery,
   ]);
 
-  if (assignments.error) return fail('대시보드 지표 조회', assignments.error.message);
+  if (assignments.error) return fail('대시보드 지표 조회', assignments.error);
   if (settings.error) return fail('마감일 조회', settings.error.message);
   if (inquiries.error) return fail('미답 문의 수 조회', inquiries.error.message);
 
@@ -1365,7 +1378,7 @@ export async function fetchDashboardStats(companyId?: string | null): Promise<Ap
   /** smeId → 하나라도 시작(NOT_STARTED가 아님)했는가. */
   const startedBySme = new Map<string, boolean>();
 
-  for (const raw of assignments.data || []) {
+  for (const raw of assignments.rows) {
     const r = raw as Row;
     const review = one(r.reviews);
     const status = (str(review.status) as ReviewStatus) || 'NOT_STARTED';

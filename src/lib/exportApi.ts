@@ -222,7 +222,7 @@ const round1 = (v: number): number => Math.round(v * 10) / 10;
 const byKorean = (a: string, b: string) => a.localeCompare(b, 'ko');
 
 /** 짝수 개면 가운데 두 값의 평균. 홀수 개면 가운데 값. 빈 배열이면 null(0 이 아니다). */
-function median(values: number[]): number | null {
+export function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
@@ -468,7 +468,7 @@ async function loadFteFacts(
  *
  * 쿼리 1회(검토 id 청크당).
  */
-const SESSION_CAP_MINUTES = 60;
+export const SESSION_CAP_MINUTES = 60;
 
 async function loadDurations(reviewIds: string[]): Promise<Map<string, number>> {
   const rows = await fetchByIds('검토 소요 조회', reviewIds, (ids) =>

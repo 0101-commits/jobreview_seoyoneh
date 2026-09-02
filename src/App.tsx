@@ -184,6 +184,55 @@ const DirtyContext = React.createContext<{ setDirty: (d: boolean) => void; reque
   requestLeave: (run) => run(),
 });
 
+/*
+ * 유휴 자동 로그아웃(§8 S3 · 결정 D8 = 30분).
+ *
+ * 왜 필요한가: 현장 SME가 공용 PC를 쓰는 것을 전제한다. persistSession이 기본으로 켜져 있어
+ * 브라우저를 닫아도 세션이 남고, 다음 사람이 그 화면을 그대로 이어 볼 수 있었다.
+ *
+ * 왜 이 방식인가: 서버 강제가 아니라 화면의 완충 장치다(진짜 방어선은 Auth의 JWT 만료·refresh
+ * 재사용 감지 설정이며 그 점검표는 OPERATIONS에 있다). 그래서 조작 흔적(키·포인터·스크롤)이
+ * 30분 없으면 로그아웃하고, 1분 전에 한 번 알린다 — 작성 중인 내용이 있으면 미리 저장할 수 있게.
+ */
+const IDLE_LIMIT_MS = 30 * 60 * 1000;
+const IDLE_WARN_MS = 60 * 1000;
+
+function useIdleLogout(active: boolean, onIdle: () => void) {
+  const [warnLeft, setWarnLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      setWarnLeft(null);
+      return;
+    }
+    let last = Date.now();
+    const bump = () => {
+      last = Date.now();
+      setWarnLeft((prev) => (prev === null ? prev : null));
+    };
+    // passive: 스크롤 성능을 건드리지 않는다. capture: 입력이 어느 요소에서 나도 받는다.
+    const events = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'visibilitychange'] as const;
+    for (const type of events) window.addEventListener(type, bump, { passive: true, capture: true });
+
+    const timer = setInterval(() => {
+      const idle = Date.now() - last;
+      if (idle >= IDLE_LIMIT_MS) {
+        onIdle();
+        return;
+      }
+      const left = IDLE_LIMIT_MS - idle;
+      setWarnLeft(left <= IDLE_WARN_MS ? Math.ceil(left / 1000) : null);
+    }, 5000);
+
+    return () => {
+      clearInterval(timer);
+      for (const type of events) window.removeEventListener(type, bump, { capture: true });
+    };
+  }, [active, onIdle]);
+
+  return warnLeft;
+}
+
 // ── 세션 ────────────────────────────────────────────────────────────
 
 /** 로그인된 auth 사용자 → 화면이 쓰는 User. 권한이 없으면 사유를 담아 throw 한다. */
@@ -311,6 +360,9 @@ function App() {
     setUser(null);
   }, []);
 
+  // 유휴 30분 로그아웃(§8 S3 · D8). 로그인 상태에서만 돈다.
+  const idleLeft = useIdleLogout(Boolean(user), logout);
+
   // 재설정을 마치거나 포기했을 때 — 주소에서 /reset-password를 지워 새로고침해도 다시 열리지 않게 한다.
   const exitRecovery = useCallback(() => {
     window.history.replaceState(null, '', import.meta.env.BASE_URL);
@@ -362,6 +414,18 @@ function App() {
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
+      {/* 유휴 경고 — 남은 시간을 초 단위로 알린다. 아무 키·클릭이면 사라진다. */}
+      {idleLeft !== null && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-3"
+        >
+          <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 t-label text-warning shadow-2">
+            {idleLeft}초 후 자동 로그아웃돼요. 계속하시려면 화면을 클릭해 주세요.
+          </p>
+        </div>
+      )}
       {needsGuide ? (
         <GuidePage
           user={user}
