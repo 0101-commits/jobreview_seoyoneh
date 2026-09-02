@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { AutoTextarea } from '@/pages/sme-review/controls';
 import { WorkshopFlagPanel } from '@/pages/workbench/WorkshopFlagPanel';
 
@@ -280,7 +281,7 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
         </div>
       )}
 
-      {loading && <p className="rounded-container border border-border bg-card p-8 text-center text-sm text-foreground-subtle">불러오는 중…</p>}
+      {loading && <Skeleton.Card count={2} />}
 
       {!loading && !error && comparison && (
         <div className="space-y-5">

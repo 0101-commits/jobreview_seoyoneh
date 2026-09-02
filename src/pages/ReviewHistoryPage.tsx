@@ -7,6 +7,7 @@ import { fetchReviewStatusResult, mapReviewStatus, type ReviewStatusRow } from '
 import { supabase } from '@/lib/supabase';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { User } from '@/types';
 
 type HistoryEvent = { id: string; review_id: string; action: string; note: string; created_at: string };
@@ -83,7 +84,7 @@ export function HistoryPage({ user }: { user: User }) {
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-foreground-subtle">불러오는 중…</div>
+        <Skeleton.Card count={2} />
       ) : error ? (
         <div className="rounded-container border border-destructive-border bg-destructive-muted p-6 text-center">
           <AlertTriangle size={20} className="mx-auto mb-2 text-destructive" aria-hidden="true" />

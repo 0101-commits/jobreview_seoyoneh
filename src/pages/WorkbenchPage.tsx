@@ -6,6 +6,10 @@ import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { fetchSubmissionQueue, type SubmissionQueueItem } from '@/lib/adminApi';
 import { workshopDecisionOf } from '@/lib/workshopRules';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { DataTable } from '@/components/ui/DataTable';
+import { FallbackView } from '@/components/ui/FallbackView';
+import { SectionMessage } from '@/components/ui/SectionMessage';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 
 /**
@@ -87,145 +91,124 @@ export function WorkbenchPage({
       </div>
 
       {error && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-          <p className="flex items-start gap-2">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <span>제출 큐를 불러오지 못했어요. {error} 잠시 후 다시 시도해 주세요.</span>
-          </p>
-          <Button variant="secondary" size="sm" onClick={() => setReloadKey((k) => k + 1)} className="shrink-0">
-            <RotateCw size={14} aria-hidden="true" /> 다시 시도
-          </Button>
-        </div>
+        <SectionMessage
+          variant="negative"
+          className="mb-5"
+          heading="제출 큐를 불러오지 못했어요"
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+              <RotateCw size={14} aria-hidden="true" /> 다시 시도
+            </Button>
+          }
+        >
+          {error} 잠시 후 다시 시도해 주세요.
+        </SectionMessage>
       )}
 
-      <div className="rounded-container border border-border bg-card shadow-1">
-        {/* 표만 가로로 스크롤한다 — 390px에서 화면 전체가 옆으로 밀리지 않게. */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <caption className="px-5 py-3 text-left text-xs text-foreground-subtle">
-              제출이 있는 직무 목록입니다. 이견 신호가 많은 순, 신호 수가 같으면 먼저 제출된 순으로 정렬합니다.
-            </caption>
-            <thead>
-              <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                <th scope="col" className="sticky left-0 z-10 bg-muted px-5 py-3 font-medium">
-                  직무
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  제출일
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  SME
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  이견 신호
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  워크숍 후보
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  승인
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  비교
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-foreground-subtle">
-                    불러오는 중…
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-destructive">
-                    제출 큐를 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요.
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-foreground-subtle">
-                    아직 제출된 검토가 없습니다. SME가 제출하면 이 목록에 나타납니다.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((item) => <QueueRow key={item.jobId} item={item} onOpen={() => onOpenJob(item.jobId)} />)
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <p className="mb-2 t-caption text-foreground-subtle">
+        제출이 있는 직무 목록입니다. 이견 신호가 많은 순, 신호 수가 같으면 먼저 제출된 순으로 정렬합니다.
+      </p>
+
+      {loading ? (
+        <Skeleton.Table rows={5} cols={5} />
+      ) : error ? null : (
+        // v2 §6-5: 공용 DataTable — 좁은 화면에서는 줄 목록으로 쌓인다.
+        <DataTable
+          caption="제출 큐 — 제출이 있는 직무 목록"
+          minWidth="900px"
+          rows={rows}
+          rowKey={(item) => item.jobId}
+          onRowClick={(item) => onOpenJob(item.jobId)}
+          empty={
+            <FallbackView
+              heading="아직 제출된 검토가 없어요"
+              description="SME가 제출하면 이 목록에 나타나요. 진행 상황은 「진행 현황」에서 볼 수 있어요."
+            />
+          }
+          columns={[
+            {
+              key: 'job',
+              header: '직무',
+              sticky: true,
+              mobile: 'title',
+              cell: (item) => (
+                <>
+                  <p className="font-medium text-foreground">{item.jobName}</p>
+                  <p className="mt-1 t-caption text-foreground-subtle">
+                    {item.groupName} · {item.seriesName}
+                  </p>
+                </>
+              ),
+            },
+            {
+              key: 'submitted',
+              header: '제출일',
+              className: 'whitespace-nowrap',
+              cell: (item) => formatDate(item.submittedAt),
+            },
+            {
+              key: 'sme',
+              header: 'SME',
+              className: 'whitespace-nowrap',
+              cell: (item) => (
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={14} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
+                  {item.submittedSmeCount}/{item.assignedSmeCount}명 제출
+                </span>
+              ),
+            },
+            {
+              key: 'signals',
+              header: '이견 신호',
+              mobile: 'trailing',
+              cell: (item) => <SignalCell item={item} />,
+            },
+            { key: 'workshop', header: '워크숍 후보', cell: (item) => <WorkshopCell item={item} /> },
+            {
+              key: 'approved',
+              header: '승인',
+              className: 'whitespace-nowrap',
+              cell: (item) => `${item.approvedSmeCount}/${item.submittedSmeCount} 승인`,
+            },
+            {
+              key: 'compare',
+              header: '비교',
+              mobile: 'trailing',
+              cell: (item) => (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  aria-label={`${item.jobName} SME 응답 비교 열기`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenJob(item.jobId);
+                  }}
+                >
+                  비교 <ChevronRight size={14} aria-hidden="true" />
+                </Button>
+              ),
+            },
+          ]}
+        />
+      )}
     </>
   );
 }
 
-function QueueRow({ item, onOpen }: { item: SubmissionQueueItem; onOpen: () => void }) {
+/** 이견 신호 칸 — 색만으로 알리지 않도록 아이콘·건수·사유 문구를 함께 적는다. */
+function SignalCell({ item }: { item: SubmissionQueueItem }) {
   const groups = groupSignals(item);
-
+  if (item.signalCount === 0) return <span className="t-caption text-foreground-subtle">없음</span>;
   return (
-    <tr
-      className="group cursor-pointer border-b border-border last:border-0 hover:bg-primary-subtle"
-      onClick={onOpen}
-    >
-      <th
-        scope="row"
-        className="sticky left-0 z-10 bg-card px-5 py-4 text-left font-normal group-hover:bg-primary-subtle"
-      >
-        <p className="font-medium text-foreground">{item.jobName}</p>
-        <p className="mt-1 text-xs text-foreground-subtle">
-          {item.groupName} · {item.seriesName}
-        </p>
-      </th>
-
-      <td className="whitespace-nowrap px-5 py-4 text-foreground-muted">{formatDate(item.submittedAt)}</td>
-
-      <td className="whitespace-nowrap px-5 py-4 text-foreground-muted">
-        <span className="inline-flex items-center gap-1.5">
-          <Users size={14} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
-          {item.submittedSmeCount}/{item.assignedSmeCount}명 제출
-        </span>
-      </td>
-
-      <td className="px-5 py-4">
-        {item.signalCount === 0 ? (
-          <span className="text-xs text-foreground-subtle">없음</span>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {/* 색만으로 알리지 않는다 — 아이콘·건수·사유 문구를 함께 적는다. */}
-            <span className="inline-flex w-fit items-center gap-1 rounded border border-destructive-border bg-destructive-muted px-2 py-1 text-[11px] font-medium text-destructive">
-              <AlertTriangle size={12} className="shrink-0" aria-hidden="true" />
-              이견 신호 {item.signalCount}건
-            </span>
-            <span className="text-[11px] leading-5 text-foreground-muted">
-              {groups.map((g) => `${g.label} ${g.count}`).join(' · ')}
-            </span>
-          </div>
-        )}
-      </td>
-
-      <td className="px-5 py-4">
-        <WorkshopCell item={item} />
-      </td>
-
-      <td className="whitespace-nowrap px-5 py-4 text-foreground-muted">
-        {item.approvedSmeCount}/{item.submittedSmeCount} 승인
-      </td>
-
-      <td className="px-5 py-4">
-        <Button
-          variant="secondary"
-          size="sm"
-          aria-label={`${item.jobName} SME 응답 비교 열기`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen();
-          }}
-        >
-          비교 <ChevronRight size={14} aria-hidden="true" />
-        </Button>
-      </td>
-    </tr>
+    <div className="flex flex-col gap-1">
+      <span className="inline-flex w-fit items-center gap-1 rounded-inner border border-destructive-border bg-destructive-muted px-2 py-1 t-caption font-medium text-destructive">
+        <AlertTriangle size={12} className="shrink-0" aria-hidden="true" />
+        이견 신호 {item.signalCount}건
+      </span>
+      <span className="t-caption leading-5 text-foreground-muted">
+        {groups.map((g) => `${g.label} ${g.count}`).join(' · ')}
+      </span>
+    </div>
   );
 }
 

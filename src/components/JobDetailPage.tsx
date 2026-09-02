@@ -38,6 +38,7 @@ import {
 import { decideReview } from '@/lib/adminApi';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Field } from '@/components/ui/Field';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -486,9 +487,9 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-20 text-sm text-foreground-subtle">
-        <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-        직무 상세 정보를 불러오는 중이에요…
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+        <Skeleton.Card count={3} />
+        <Skeleton.Card count={1} />
       </div>
     );
   }

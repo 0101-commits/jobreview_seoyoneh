@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Inbox, MessageSquareText, RotateCw } from 'lucide-react';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { FallbackView } from '@/components/ui/FallbackView';
 import { FilterChips } from '@/components/ui/FilterChips';
 import { Button } from '@/components/ui/Button';
 import { Toast, useToast } from '@/components/ui/Toast';
@@ -287,26 +289,23 @@ export function InquiryInboxPage({
       />
 
       {loading ? (
-        <div className="py-12 text-center text-foreground-subtle">불러오는 중…</div>
+        <Skeleton.Card count={3} />
       ) : error ? (
-        <div
-          role="alert"
-          className="rounded-container border border-destructive-border bg-destructive-muted p-6 text-center"
-        >
-          <AlertTriangle size={20} className="mx-auto mb-2 text-destructive" aria-hidden="true" />
-          <p className="text-sm font-medium text-destructive">{error}</p>
-          <p className="mt-1 text-xs text-foreground-muted">
-            문의가 없는 것이 아니라 목록을 불러오지 못한 상태입니다. 네트워크를 확인한 뒤 다시 시도해 주세요.
-          </p>
-          <Button variant="secondary" size="sm" className="mt-4" onClick={() => setReloadKey((k) => k + 1)}>
-            <RotateCw size={14} aria-hidden="true" /> 다시 시도
-          </Button>
-        </div>
+        <FallbackView
+          kind="error"
+          heading={error}
+          description="문의가 없는 것이 아니라 목록을 불러오지 못한 상태예요. 네트워크를 확인한 뒤 다시 시도해 주세요."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+              <RotateCw size={14} aria-hidden="true" /> 다시 시도
+            </Button>
+          }
+        />
       ) : visible.length === 0 ? (
         <div className="rounded-container border border-border bg-card p-10 text-center">
           <Inbox size={22} className="mx-auto mb-2 text-foreground-subtle" aria-hidden="true" />
           <p className="text-sm font-medium text-foreground">
-            {rows.length === 0 ? '아직 도착한 문의가 없습니다' : '이 상태의 문의가 없습니다'}
+            {rows.length === 0 ? '아직 도착한 문의가 없어요' : '이 상태의 문의가 없어요'}
           </p>
           <p className="mt-1 text-xs leading-5 text-foreground-muted">
             {rows.length === 0

@@ -18,6 +18,11 @@ import { fetchCompaniesResult } from '@/lib/jobApi';
 import { Button } from '@/components/ui/Button';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { DataTable } from '@/components/ui/DataTable';
+import { FallbackView } from '@/components/ui/FallbackView';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { SectionMessage } from '@/components/ui/SectionMessage';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SmeManageButton } from '@/components/modals/SmeManageButton';
 import { SmeSingleCreateModal } from '@/components/modals/SmeSingleCreateModal';
 import { SmeBulkUploadModal } from '@/components/modals/SmeBulkUploadModal';
@@ -220,13 +225,9 @@ export function UsersPage({
       <Toast toast={toast} onDismiss={dismiss} />
 
       {companyError && (
-        <div
-          role="alert"
-          className="mb-4 flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning"
-        >
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{companyError}</span>
-        </div>
+        <SectionMessage variant="cautionary" className="mb-4">
+          {companyError}
+        </SectionMessage>
       )}
 
       <div className="mb-4 rounded-element border border-border bg-muted px-4 py-3 text-xs text-foreground-muted">
@@ -249,98 +250,114 @@ export function UsersPage({
         </div>
 
         {loading ? (
-          <div className="py-20 text-center text-sm text-foreground-subtle">불러오는 중…</div>
-        ) : loadError ? (
-          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <AlertTriangle size={24} className="text-destructive" aria-hidden="true" />
-            <p className="text-sm text-destructive">{loadError}</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                loadCompanies();
-                fetchSmes();
-              }}
-            >
-              <RotateCw size={14} aria-hidden="true" /> 다시 불러오기
-            </Button>
+          <div className="p-5">
+            <Skeleton.Table rows={6} cols={6} />
           </div>
+        ) : loadError ? (
+          <FallbackView
+            kind="error"
+            heading="SME 계정을 불러오지 못했어요"
+            description={loadError}
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  loadCompanies();
+                  fetchSmes();
+                }}
+              >
+                <RotateCw size={14} aria-hidden="true" /> 다시 불러오기
+              </Button>
+            }
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="bg-muted text-xs text-foreground-muted">
-                  <tr>
-                    {SORT_COLUMNS.map((col) => {
-                      const activeSort = sort.key === col.key;
-                      const Icon = !activeSort ? ChevronsUpDown : sort.asc ? ArrowUp : ArrowDown;
-                      return (
-                        <th
-                          key={col.key}
-                          scope="col"
-                          className="px-5 py-3 font-medium"
-                          aria-sort={activeSort ? (sort.asc ? 'ascending' : 'descending') : 'none'}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => toggleSort(col.key)}
-                            className="inline-flex items-center gap-1 rounded-inner transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                          >
-                            {col.label}
-                            <Icon size={13} aria-hidden="true" className={activeSort ? 'text-primary' : 'opacity-50'} />
-                          </button>
-                        </th>
-                      );
-                    })}
-                    <th scope="col" className="px-5 py-3 font-medium">
-                      관리
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-16 text-center text-sm text-foreground-subtle">
-                        {query ? '검색 조건에 맞는 SME 계정이 없어요.' : '등록된 SME 계정이 없어요.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    pageRows.map((s) => (
-                      <tr key={s.id} className="border-t border-border">
-                        <td className="px-5 py-4 font-medium text-foreground">
-                          {s.name}
-                          <p className="mt-1 text-xs font-normal text-foreground-subtle">{s.email}</p>
-                        </td>
-                        <td className="px-5 py-4 text-foreground-muted">
-                          {s.company_name || (
-                            <span className="inline-flex items-center gap-1 text-warning">
-                              <AlertTriangle size={13} aria-hidden="true" /> 회사 미지정
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 text-foreground-muted">
-                          {s.organization}
-                          <p className="mt-1 text-xs text-foreground-subtle">{s.title}</p>
-                        </td>
-                        <td className="px-5 py-4 text-foreground-muted">{s.employee_number || '-'}</td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-inner px-2 py-1 text-xs ${
-                              s.active ? 'bg-success-muted text-success' : 'bg-muted text-foreground-muted'
-                            }`}
-                          >
-                            {s.active ? '● 활성' : '○ 비활성'}
+            {/* v2 §6-5: 공용 DataTable — 좁은 화면에서는 줄 목록으로 쌓인다. 정렬 버튼은 헤더로 넘긴다. */}
+            <DataTable
+              caption="SME 계정 목록"
+              minWidth="900px"
+              className="border-0"
+              rows={pageRows}
+              rowKey={(row) => row.id}
+              empty={
+                <FallbackView
+                  heading={query ? '검색 조건에 맞는 SME 계정이 없어요' : '등록된 SME 계정이 없어요'}
+                  description={
+                    query ? '검색어나 회사 필터를 바꿔 보세요.' : '「SME 개별 추가」 또는 Excel 일괄 업로드로 등록해 주세요.'
+                  }
+                />
+              }
+              columns={[
+                ...SORT_COLUMNS.map((col) => {
+                  const activeSort = sort.key === col.key;
+                  const Icon = !activeSort ? ChevronsUpDown : sort.asc ? ArrowUp : ArrowDown;
+                  const header = (
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(col.key)}
+                      aria-label={`${col.label} 기준으로 정렬`}
+                      className="inline-flex items-center gap-1 rounded-inner transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      {col.label}
+                      <Icon size={13} aria-hidden="true" className={activeSort ? 'text-primary' : 'opacity-50'} />
+                    </button>
+                  );
+                  if (col.key === 'name')
+                    return {
+                      key: col.key,
+                      header,
+                      mobile: 'title' as const,
+                      cell: (row: SmeListItem) => (
+                        <>
+                          <span className="font-medium text-foreground">{row.name}</span>
+                          <p className="mt-1 t-caption font-normal text-foreground-subtle">{row.email}</p>
+                        </>
+                      ),
+                    };
+                  if (col.key === 'company_name')
+                    return {
+                      key: col.key,
+                      header,
+                      cell: (row: SmeListItem) =>
+                        row.company_name || (
+                          <span className="inline-flex items-center gap-1 text-warning">
+                            <AlertTriangle size={13} aria-hidden="true" /> 회사 미지정
                           </span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <SmeManageButton sme={s} companies={companies} onChanged={fetchSmes} onToast={showToast} />
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        ),
+                    };
+                  if (col.key === 'organization')
+                    return {
+                      key: col.key,
+                      header,
+                      cell: (row: SmeListItem) => (
+                        <>
+                          {row.organization}
+                          <p className="mt-1 t-caption text-foreground-subtle">{row.title}</p>
+                        </>
+                      ),
+                    };
+                  if (col.key === 'employee_number')
+                    return { key: col.key, header, cell: (row: SmeListItem) => row.employee_number || '-' };
+                  return {
+                    key: col.key,
+                    header,
+                    mobile: 'trailing' as const,
+                    cell: (row: SmeListItem) => (
+                      <StatusBadge status={row.active ? '활성' : '비활성'} domain="account" size="sm" />
+                    ),
+                  };
+                }),
+                {
+                  key: 'manage',
+                  header: '관리',
+                  mobile: 'trailing' as const,
+                  cell: (row: SmeListItem) => (
+                    <SmeManageButton sme={row} companies={companies} onChanged={fetchSmes} onToast={showToast} />
+                  ),
+                },
+              ]}
+            />
 
             {visible.length > PAGE_SIZE && (
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm">

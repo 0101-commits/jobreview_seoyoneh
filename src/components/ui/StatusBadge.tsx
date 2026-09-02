@@ -38,7 +38,13 @@ export const INQUIRY_BADGE: Record<string, BadgeTone> = {
   종결: 'neutral',
 };
 
-const DICTS = { review: REVIEW_BADGE, inquiry: INQUIRY_BADGE } as const;
+/** 계정 상태(profiles.active). 관리자·SME 계정 목록이 함께 쓴다. */
+export const ACCOUNT_BADGE: Record<string, BadgeTone> = {
+  활성: 'positive',
+  비활성: 'neutral',
+};
+
+const DICTS = { review: REVIEW_BADGE, inquiry: INQUIRY_BADGE, account: ACCOUNT_BADGE } as const;
 
 export function StatusBadge({
   status,

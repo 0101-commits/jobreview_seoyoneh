@@ -17,7 +17,9 @@ import { fetchDashboardStats, type DashboardStats } from '@/lib/adminApi';
 import { fetchDurationStats, MIN_SAMPLE, type DurationStats } from '@/lib/durationApi';
 import { Button } from '@/components/ui/Button';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { DataTable } from '@/components/ui/DataTable';
 import { FallbackView } from '@/components/ui/FallbackView';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { setReviewTablePrefilter, type StatusChip } from '@/pages/ReviewStatusPage';
 
 const timeFormat: Intl.DateTimeFormatOptions = { dateStyle: 'long', timeStyle: 'short' };
@@ -503,92 +505,75 @@ export function Dashboard({
               전체보기
             </Button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    SME
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-medium">
-                    소속 / 직급
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-center font-medium">
-                    담당
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-center font-medium">
-                    제출 완료
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-center font-medium">
-                    작성 중
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-center font-medium">
-                    재검토 요청
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-center font-medium">
-                    미실시
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-foreground-subtle">
-                      불러오는 중…
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-destructive">
-                      검토 현황을 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요.
-                    </td>
-                  </tr>
-                ) : smeRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-foreground-subtle">
-                      검토 대상이 없습니다. 직무정보를 업로드하고 SME에게 배정해 주세요.
-                    </td>
-                  </tr>
-                ) : (
-                  smeRows.map((r) => (
-                    <tr
-                      className="cursor-pointer border-b border-border last:border-0 hover:bg-primary-subtle"
-                      key={r.name}
-                      onClick={() => openReviews('ALL', r.name)}
-                    >
-                      <th scope="row" className="px-4 py-3 text-left font-medium text-foreground">
-                        <button
-                          type="button"
-                          className="text-left underline-offset-2 hover:underline"
-                          onClick={() => openReviews('ALL', r.name)}
-                        >
-                          {r.name}
-                        </button>
-                      </th>
-                      <td className="px-4 py-3 text-foreground-muted">
-                        <span className="text-xs text-foreground-subtle">
-                          {r.organization} · {r.title}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-foreground-muted">{r.total}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-semibold text-success">{r.submitted}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-semibold text-warning">{r.inProgress}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-semibold text-destructive">{r.resubmit}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-semibold text-foreground-muted">{r.notStarted}</span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {loading ? (
+            <Skeleton.Table rows={4} cols={5} />
+          ) : error ? (
+            <FallbackView
+              kind="error"
+              compact
+              description="검토 현황을 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요."
+            />
+          ) : (
+            // v2 §6-5: 공용 DataTable — 좁은 화면에서는 줄 목록으로 쌓인다.
+            <DataTable
+              caption="SME별 검토 현황"
+              minWidth="620px"
+              className="border-0"
+              rows={smeRows}
+              rowKey={(r) => r.name}
+              onRowClick={(r) => openReviews('ALL', r.name)}
+              empty={
+                <FallbackView
+                  compact
+                  heading="검토 대상이 없어요"
+                  description="직무정보를 업로드하고 SME에게 배정하면 여기에 나타나요."
+                />
+              }
+              columns={[
+                {
+                  key: 'sme',
+                  header: 'SME',
+                  mobile: 'title',
+                  cell: (r) => <span className="font-medium text-foreground">{r.name}</span>,
+                },
+                {
+                  key: 'org',
+                  header: '소속 / 직급',
+                  cell: (r) => (
+                    <span className="t-caption text-foreground-subtle">
+                      {r.organization} · {r.title}
+                    </span>
+                  ),
+                },
+                { key: 'total', header: '담당', align: 'center', cell: (r) => r.total },
+                {
+                  key: 'submitted',
+                  header: '제출 완료',
+                  align: 'center',
+                  mobile: 'trailing',
+                  cell: (r) => <span className="font-semibold text-success">{r.submitted}</span>,
+                },
+                {
+                  key: 'inProgress',
+                  header: '작성 중',
+                  align: 'center',
+                  cell: (r) => <span className="font-semibold text-warning">{r.inProgress}</span>,
+                },
+                {
+                  key: 'resubmit',
+                  header: '재검토 요청',
+                  align: 'center',
+                  cell: (r) => <span className="font-semibold text-destructive">{r.resubmit}</span>,
+                },
+                {
+                  key: 'notStarted',
+                  header: '미실시',
+                  align: 'center',
+                  cell: (r) => <span className="font-semibold text-foreground-muted">{r.notStarted}</span>,
+                },
+              ]}
+            />
+          )}
         </section>
 
         <section className="rounded-container border border-border bg-card p-5 shadow-1">
