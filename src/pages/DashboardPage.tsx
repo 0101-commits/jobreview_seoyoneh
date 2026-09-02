@@ -8,11 +8,13 @@ import {
   ClipboardCheck,
   MessageSquareText,
   RotateCw,
+  Timer,
   Upload,
   UserX,
 } from 'lucide-react';
 import { fetchCompanies, fetchReviewStatusResult, type Company, type ReviewStatusRow } from '@/lib/jobApi';
 import { fetchDashboardStats, type DashboardStats } from '@/lib/adminApi';
+import { fetchDurationStats, MIN_SAMPLE, type DurationStats } from '@/lib/durationApi';
 import { Button } from '@/components/ui/Button';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { setReviewTablePrefilter, type StatusChip } from '@/pages/ReviewStatusPage';
@@ -81,6 +83,133 @@ function KpiCard({
   );
 }
 
+// ── §11-2 Phase 5 2번 · §12 오픈이슈 1: 직무당 소요 실측 ─────────────
+
+/** "중앙값 12.5분"처럼 소수 자리가 있을 때만 붙인다. */
+const minuteText = (v: number): string => `${v % 1 === 0 ? v : v.toFixed(1)}분`;
+
+/**
+ * 직무당 소요 중앙값 카드. 관리자 전용 값이다.
+ *
+ * §6-1은 "화면에는 예상 소요 약 N분(관리자 설정값)만 표시하고, 실측치는 관리자 화면에서만
+ * 노출한다(SME 압박 방지)"라고 정했다. 대시보드가 관리자 전용 라우트이긴 하지만 그 한 겹에만
+ * 기대지 않는다 — durationApi가 profiles.role을 직접 확인해 관리자가 아니면 stats 자체를
+ * null로 돌려주고, 이 카드는 stats가 없으면 아무것도 그리지 않는다(불러오는 중에도 그리지 않는다).
+ */
+function DurationCard({
+  stats,
+  error,
+}: {
+  stats: DurationStats | null;
+  error: string;
+}) {
+  // stats가 없으면 조회 중이거나 관리자가 아니다. 어느 쪽이든 수치를 그릴 근거가 없다.
+  if (!stats) {
+    if (!error) return null;
+    return (
+      <section className="mt-7 border border-border bg-card p-5 text-sm text-foreground-subtle shadow-sm">
+        소요 실측을 불러오지 못했어요. {error}
+      </section>
+    );
+  }
+
+  const { medianMinutes, sampleSize, lowSample, missingRecordCount, steps, expectedMinutes, expectedSource } = stats;
+  const hasMedian = medianMinutes !== null && !lowSample;
+  const stepRows = steps.filter((s) => s.sampleSize > 0);
+  const stepMax = Math.max(1, ...stepRows.map((s) => s.medianMinutes ?? 0));
+  const diff = hasMedian && expectedMinutes !== null ? Math.round((medianMinutes - expectedMinutes) * 10) / 10 : null;
+
+  return (
+    <section className="mt-7 border border-border bg-card p-5 shadow-sm">
+      <div className="flex items-start gap-2">
+        <Timer size={15} className="mt-0.5 shrink-0 text-foreground-muted" aria-hidden="true" />
+        <div>
+          <h3 className="font-semibold text-foreground">직무당 소요 중앙값(실측)</h3>
+          {/* 이 화면이 무엇의 근거인지 한 줄로 남긴다(§6-1 · R4). */}
+          <p className="mt-1 text-xs text-foreground-subtle">
+            착수보고 11면 「현업 SME 1인당 예상 소요: 직무당 약 ○○분(착수 후 확정)」을 채우는 실측 근거입니다.
+            SME가 검토 화면에 머문 구간의 합이며, 제출을 마친 검토만 셉니다. SME 화면에는 표시되지 않습니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div className="border border-border bg-muted p-4">
+          {hasMedian ? (
+            <>
+              <p className="text-2xl font-semibold text-primary">{minuteText(medianMinutes)}</p>
+              <p className="mt-1 text-xs text-foreground-muted">표본 {sampleSize}건(제출 완료 검토 기준)</p>
+            </>
+          ) : (
+            <>
+              {/* 표본이 적을 때 숫자를 단정하지 않는다 — 그 수가 그대로 계약 문구가 되기 때문이다. */}
+              <p className="text-lg font-semibold text-foreground-muted">표본 부족</p>
+              <p className="mt-1 text-xs text-foreground-muted">
+                기록된 완료 검토 {sampleSize}건. {MIN_SAMPLE}건 이상 모이면 중앙값을 표시합니다.
+              </p>
+            </>
+          )}
+          {missingRecordCount > 0 && (
+            <p className="mt-2 text-[11px] text-foreground-subtle">
+              완료 검토 {missingRecordCount}건은 소요 기록이 없어 분모에서 제외했습니다(창을 닫아 구간이 열린 채 끝난
+              경우).
+            </p>
+          )}
+        </div>
+
+        <div className="border border-dashed border-border p-4">
+          <p className="text-xs font-medium text-foreground">운영 설정 「예상 소요」 반영</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-foreground-muted">
+            {/*
+              세 상태를 각각 다르게 말한다. 특히 조회 실패(FAILED)를 「비어 있습니다」로 적으면,
+              값을 이미 넣어 둔 관리자에게 앱이 "안 넣으셨습니다"라고 되돌려 말하게 된다.
+            */}
+            {expectedSource === 'ALL_COMPANIES'
+              ? '계열사를 선택하면 그 회사의 운영 설정값과 비교됩니다. 예상 소요는 계열사별로 따로 정합니다.'
+              : expectedSource === 'FAILED'
+                ? '운영 설정을 불러오지 못해 이번에는 비교하지 못했습니다. 위 실측값은 그대로 쓰셔도 됩니다. 설정값은 「운영 설정 열기」에서 직접 확인해 주세요.'
+                : expectedMinutes === null
+                  ? '운영 설정의 「예상 소요」가 비어 있습니다. 실측 중앙값이 확정되면 설정에 반영해 주세요 — 가이드 카드 ④의 소요 문장이 이 값에서 나옵니다.'
+                  : diff === null
+                    ? `현재 설정값 ${expectedMinutes}분. 표본이 ${MIN_SAMPLE}건 이상 모이면 실측값과 비교해 드립니다.`
+                    : diff === 0
+                      ? `현재 설정값 ${expectedMinutes}분 — 실측 중앙값과 같습니다. 그대로 두셔도 됩니다.`
+                      : `현재 설정값 ${expectedMinutes}분, 실측 중앙값 ${minuteText(medianMinutes as number)}로 ${minuteText(Math.abs(diff))} ${diff > 0 ? '더 걸립니다' : '덜 걸립니다'}. 실측 중앙값을 운영 설정의 「예상 소요」에 반영해 주세요.`}
+          </p>
+          <Link
+            to="/settings"
+            className="mt-3 inline-flex min-h-11 items-center gap-1 text-[11px] font-medium text-primary"
+          >
+            운영 설정 열기
+            <ArrowRight size={11} aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+
+      {stepRows.length > 0 && (
+        <div className="mt-5">
+          <p className="text-xs font-medium text-foreground">단계별 중앙값</p>
+          <p className="mt-1 text-[11px] text-foreground-subtle">
+            어느 단계가 오래 걸리는지가 부담을 줄일 자리입니다. 단계마다 표본 수가 다릅니다.
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {stepRows.map((s) => (
+              <li key={s.step} className="flex items-center gap-3 text-xs">
+                <span className="w-44 shrink-0 truncate text-foreground-muted">{s.label}</span>
+                <span className="h-2 min-w-[2px] bg-primary" style={{ width: `${((s.medianMinutes ?? 0) / stepMax) * 55}%` }} aria-hidden="true" />
+                <span className="text-foreground">{s.medianMinutes === null ? '–' : minuteText(s.medianMinutes)}</span>
+                <span className="text-foreground-subtle">
+                  (표본 {s.sampleSize}건{s.sampleSize < MIN_SAMPLE ? ' · 표본 부족' : ''})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function Dashboard({
   go,
   companyFilter,
@@ -107,6 +236,10 @@ export function Dashboard({
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState('');
+
+  // §11-2 Phase 5 2번 — 소요 실측. 관리자가 아니면 durationApi가 null을 주고 카드가 그려지지 않는다.
+  const [duration, setDuration] = useState<DurationStats | null>(null);
+  const [durationError, setDurationError] = useState('');
 
   useEffect(() => {
     fetchCompanies().then(setCompanies);
@@ -135,6 +268,9 @@ export function Dashboard({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // 다시 조회하는 동안 이전 범위의 실측치를 남겨 두지 않는다 — 바뀐 계열사의 값으로 읽히기 때문이다.
+    setDuration(null);
+    setDurationError('');
     (async () => {
       const result = await fetchReviewStatusResult(filter === 'all' ? null : filter);
       if (cancelled) return;
@@ -148,6 +284,26 @@ export function Dashboard({
         setLoadedAt(null);
       }
       setLoading(false);
+
+      // 소요 실측은 검토 현황과 같은 범위(계열사 필터)로 세야 하므로 같은 흐름에서 잇는다.
+      // 별도 effect로 두면 필터를 바꾼 직후 한 번은 이전 범위의 검토 목록으로 집계하게 된다.
+      if (!result.ok) {
+        setDuration(null);
+        setDurationError(result.error);
+        return;
+      }
+      const durationResult = await fetchDurationStats(
+        result.data.map((r) => ({ reviewId: r.review_id, status: r.review_status })),
+        filter === 'all' ? null : filter,
+      );
+      if (cancelled) return;
+      if (durationResult.ok) {
+        setDuration(durationResult.data);
+        setDurationError('');
+      } else {
+        setDuration(null);
+        setDurationError(durationResult.error);
+      }
     })();
     return () => {
       cancelled = true;
@@ -369,6 +525,8 @@ export function Dashboard({
           </button>
         ))}
       </div>
+
+      <DurationCard stats={duration} error={durationError} />
 
       <div className="mt-7 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
         <section className="border border-border bg-card p-5 shadow-sm">

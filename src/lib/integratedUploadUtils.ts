@@ -10,8 +10,10 @@ export const SKILL_SHEET_NAME = 'Skill 및 수행요건';
 /*
  * 시트 ③④는 선택 시트다(PLAN §6-3 ⓒ · §11-2 Phase 1 4항).
  * 없으면 기존 2시트 파일과 완전히 동일하게 동작해야 한다 — 이것이 회귀 없음의 기준선이다.
- * 이 Phase의 저장 범위는 조직 마스터까지다. SME 명부는 계정 생성(Edge Function)과 배정이
- * 얽혀 있어 여기서는 검증·미리보기·정규화 결과 다운로드까지만 하고 계정은 만들지 않는다.
+ * 시트 ③은 org_units에, 시트 ④는 이미 등록된 계정의 소속 조직(profiles.org_unit_id)과
+ * 배정직무(review_assignments)에 반영된다(integratedJobApi.saveOrgUnits · linkSmeRoster).
+ * 계정은 여전히 만들지 않는다 — 계정 생성은 SME 계정 관리 화면의 몫이다.
+ * 이 파일이 하는 일은 그 반영에 넘길 값을 검증·정규화하는 데까지다.
  */
 export const ORG_SHEET_NAME = '조직 마스터';
 export const SME_SHEET_NAME = 'SME 명부';
@@ -68,7 +70,11 @@ export interface IntegratedSmeRow {
   조직코드: string;
   직급: string;
   배정직무: string;
-  /** 쉼표로 나눠 정규화·중복 제거한 배정직무 목록. 계정 생성 화면이 그대로 쓸 수 있는 형태다. */
+  /**
+   * 쉼표로 나눠 정규화·중복 제거한 배정직무 목록.
+   * link_sme_roster RPC가 이 배열을 그대로 읽어 review_assignments를 만든다(§2 R6).
+   * 이름을 바꾸면 마이그레이션 20260902010000의 `배정직무목록` 참조도 함께 바꿔야 한다.
+   */
   배정직무목록: string[];
 }
 
@@ -557,7 +563,7 @@ export async function parseAndValidateIntegratedWorkbook(
     });
   }
 
-  // ── 시트 ④ SME 명부(선택) — 검증만, 계정 생성 없음 ────────────────
+  // ── 시트 ④ SME 명부(선택) — 소속 조직·배정직무만 반영, 계정 생성 없음 ────
   const smeRows: IntegratedSmeRow[] = [];
   const smeRowNumbers: number[] = [];
 
@@ -595,7 +601,7 @@ export async function parseAndValidateIntegratedWorkbook(
         조직코드: normalize(raw['조직코드']),
         직급: normalize(raw['직급']),
         배정직무: assignedText,
-        // 여러 개면 쉼표로 구분합니다. 빈 조각과 중복은 여기서 정리해 계정 생성 단계로 그대로 넘길 수 있게 합니다.
+        // 여러 개면 쉼표로 구분합니다. 빈 조각과 중복은 여기서 정리해 배정 반영 단계로 그대로 넘길 수 있게 합니다.
         배정직무목록: [...new Set(assignedText.split(',').map(normalize).filter(Boolean))],
       };
 
@@ -793,8 +799,8 @@ export function downloadIntegratedTemplate(): void {
 
 /**
  * 검증을 통과한 SME 명부의 정규화 결과를 파일로 내려받습니다.
- * 이 Phase는 명부를 저장하지 않습니다 — 계정 생성은 SME 계정 관리 화면의 몫이고,
- * 그 화면에 그대로 옮겨 쓸 수 있도록 배정직무를 정리한 형태를 남기는 것이 이 파일의 용도입니다.
+ * 업로드는 이미 등록된 계정의 소속 조직·배정직무만 반영합니다 — 계정 생성은 SME 계정 관리 화면의
+ * 몫이므로, 그 화면에 그대로 옮겨 쓸 수 있도록 배정직무를 정리한 형태를 남기는 것이 이 파일의 용도입니다.
  */
 export function downloadNormalizedSmeRoster(rows: IntegratedSmeRow[]): void {
   const sheet = XLSX.utils.json_to_sheet(

@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { logAudit } from '@/lib/auditApi';
 import { fetchSurveySettings } from '@/lib/surveyApi';
 import { Button } from '@/components/ui/Button';
-import { guideCards, GUIDE_START_BUTTON } from '@/pages/sme-review/copy';
+import { guideCards, GUIDE_SAVE_NO_DB, GUIDE_START_BUTTON } from '@/pages/sme-review/copy';
 import type { GuidePageProps } from '@/pages/sme-review/wizardTypes';
 
 /*
@@ -144,7 +144,9 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
       return;
     }
     if (!supabase) {
-      setSaveError('데이터베이스에 연결되어 있지 않습니다.');
+      // "연결되어 있지 않습니다"만 남기면 사용자가 할 수 있는 일이 없다 —
+      // 원인(서버 연결 설정)과 다음 행동(관리자 문의)을 함께 말한다. 문구는 copy.ts에 있다.
+      setSaveError(GUIDE_SAVE_NO_DB);
       return;
     }
 
@@ -179,8 +181,9 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
         </div>
 
         {/* 진행 표시. 막대는 장식이라 숨기고, 몇 번째 카드인지는 옆 문구가 읽어 준다.
-            그 문구가 화면에서 위치를 알려 주는 유일한 단서라, 배경 대비가 4.5:1을 넘는
-            foreground-muted로 적는다(foreground-subtle은 약 2.4:1로 WCAG 1.4.3에 못 미친다). */}
+            그 문구가 화면에서 위치를 알려 주는 유일한 단서라 본문급 대비를 쓴다.
+            (Phase 5에서 index.css의 두 보조 텍스트 토큰을 모두 4.5:1 이상으로 올렸으므로 어느 쪽을
+             써도 AA를 만족하지만, 이 문구는 상태 표시라 더 진한 foreground-muted 5.30:1을 유지한다.) */}
         <div className="mb-3 flex items-center gap-3">
           <div className="flex gap-1.5" aria-hidden="true">
             {cards.map((c, i) => (

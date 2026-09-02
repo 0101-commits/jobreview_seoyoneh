@@ -487,8 +487,14 @@ function SidebarBody({
                 <Icon size={17} className="shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <span className="block text-sm">{label}</span>
+                  {/*
+                    짙은 사이드바(#182635)는 이 앱에서 유일하게 토큰 밖 색을 쓰는 영역이다.
+                    비활성 보조설명이 slate-500(#64748b)일 때 3.23:1로 §8 S8의 4.5:1에 못 미쳤고
+                    hover로도 이 span은 밝아지지 않아 계속 미달이었다. slate-400(#94a3b8)이면 5.99:1.
+                    활성(slate-300 #cbd5e1, 10.34:1)이 여전히 더 밝으므로 활성/비활성 관계는 그대로다.
+                  */}
                   <span
-                    className={`mt-0.5 block text-[11px] leading-tight ${isActive ? 'text-slate-300' : 'text-slate-500'}`}
+                    className={`mt-0.5 block text-[11px] leading-tight ${isActive ? 'text-slate-300' : 'text-slate-400'}`}
                   >
                     {sub}
                   </span>

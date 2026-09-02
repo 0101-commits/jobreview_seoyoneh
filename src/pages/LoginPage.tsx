@@ -1,6 +1,8 @@
 // 로그인 화면 — 로그인 전 모든 사용자(ADMIN/SME 공통)가 보는 화면이다.
 import { useEffect, useState } from 'react';
 import { ClipboardCheck } from 'lucide-react';
+// 화면 문구는 copy.ts 한곳에 둔다(문언 단일 원천 — copy.ts 파일 상단 규칙).
+import { LOGIN_PRIVACY_NOTICE } from './sme-review/copy';
 
 // 로그인 보호(§8 S3) — 연속 실패 5회면 60초 동안 입력·제출을 막는다.
 const MAX_FAIL = 5;
@@ -133,7 +135,10 @@ export function Login({
               </button>
             </form>
           </div>
-          <p className="mt-5 text-center text-xs text-slate-400">
+          {/* §8 S6 — 수집·이용 안내 1문장. 로그인 전에 보이도록 카드 바로 아래에 둔다. */}
+          <p className="mt-5 text-center text-xs leading-5 text-foreground-muted">{LOGIN_PRIVACY_NOTICE}</p>
+          {/* 대비 4.5:1(§8 S8). slate-400(#94a3b8)은 이 배경(#f5f6f8)에서 2.37:1이라 미달이었다. */}
+          <p className="mt-3 text-center text-xs text-foreground-muted">
             계정 생성 및 권한 변경은 관리자에게 문의해 주세요.
             <br />
             (hechoi@e-hcg.com)
