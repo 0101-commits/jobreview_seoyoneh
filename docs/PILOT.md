@@ -24,8 +24,12 @@
   `sync_sme_assignments`를 부르고, 그 함수가 **해당 회사의 활성 직무 전체**를 그 SME에게 배정하고
   `reviews`를 `NOT_STARTED`로 만든다
   (`supabase/functions/admin-create-user/index.ts:250-256`, `supabase/APPLY_2026-08-28.sql:483-530`).
-  직무를 골라 배정하는 화면은 없다. 따라서 **§6-3ⓐ의 "직무별 SME 배정 수 1~2명 규칙(R6)"은
-  현재 배정 UI로 통제되지 않는다.** 파일럿에서는 대상 회사의 활성 직무를 2~3개로 줄여 두고 시작하고,
+  **자동 배정 자체는 그대로다.** 다만 사후에 정리하는 화면은 생겼다 —
+  관리자 `/assignments-admin`(SME 배정 관리)에서 직무별 R6 배지를 보고 배정을 추가·해제한다(§2-N').
+  그 화면은 `sync_sme_assignments`를 막지 못하므로 **계정을 만든 뒤에 한 번 돌아야 한다.**
+  3명째 추가도 경고만 하고 막지 않는다(상한이 미확정이라 코드가 먼저 정하지 않았다).
+  따라서 **§6-3ⓐ의 "직무별 SME 배정 수 1~2명 규칙(R6)"은 여전히 코드로 강제되지 않는다.**
+  파일럿에서는 대상 회사의 활성 직무를 2~3개로 줄여 두고 시작하고,
   이 사실은 §12 오픈이슈 3번(배정 예외 처리)에 올린다.
 - **`fte_required`는 기본값이 꺼짐(false)이다.** 켜지 않으면 합계 100% 서버 검증이 통과되어
   파일럿이 "제출 게이트가 없는 상태"를 시험하게 된다. 아래 §1에서 반드시 켠다.
@@ -53,13 +57,23 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 | 4 | `supabase/APPLY_2026-09-01_phase2.sql` | **`survey_settings.fte_required`를 회사 단위로 true**로 올려 §7-2 제출 게이트 ③(FTE 합계 100.00)을 켠다 | 3 이후 **그리고 STEP 3 화면이 배포된 뒤에만.** 화면보다 먼저 켜면 배분 행이 없어 아무도 제출하지 못한다 (OPERATIONS.md §1-5) |
 | 5 | `supabase/APPLY_2026-09-01_phase4.sql` | `survey_settings`에 `reminder_subject`·`reminder_body_md` 두 열 추가(리마인더 템플릿 자리). ALTER TABLE 두 줄뿐 | 3 이후면 앞뒤 어느 쪽이어도 안전 (OPERATIONS.md §1-6) |
 | 6 | `supabase/APPLY_2026-09-02_p5.sql` | `link_sme_roster` 신설 — SME 명부(시트 ④)로 `profiles.org_unit_id`를 연결하고 「배정직무」를 `review_assignments`에 추가한다. `survey_settings.fte_required`의 컬럼 DEFAULT를 true로 올린다(기존 행 값은 안 건드림) | 3 이후면 앞뒤 어느 쪽이어도 안전. **적용하지 않으면 조직축이 계속 비어 진행 매트릭스가 전부 '조직 미지정', Export E2의 조직 칸이 빈칸이다** (OPERATIONS.md §1-7) |
+| 7 | `supabase/APPLY_2026-09-02_followup.sql` | `submit_review`·`request_rereview`·`save_integrated_job_data`를 감사 기록 한 줄씩만 얹어 재정의한다 — 제출·재제출(`REVIEW_SUBMITTED`/`REVIEW_RESUBMITTED`), 재검토 요청(`REVIEW_REREVIEW_REQUESTED`), 직무정보 4시트 업로드(`JOB_DATA_UPLOADED`)가 `audit_logs`에 남기 시작한다. 표·컬럼·정책·시그니처는 그대로 | **반드시 ①·③ 뒤에(가능하면 맨 마지막).** 이 파일은 ①·③이 만든 최신 정의 위에 얹는 것이라 ③을 나중에 실행하면 감사 블록이 **오류 없이 조용히** 사라진다. 화면 배포와는 무관하다 — 적용 전에도 화면은 그대로 돌고 기록만 빠진다 (OPERATIONS.md §1-8) |
+| 8 | `supabase/APPLY_2026-09-02_assignment_guard.sql` | 배정 해제 안전장치를 서버로 내린다 — 제출된 응답이 있는 배정을 `active = false`로 내리는 UPDATE를 42501로 거절하는 트리거 + `submit_review`가 상태 전이 앞에서 배정이 살아 있는지 확인. 이 둘이 없으면 해제된 배정에 매달린 제출이 **어느 화면에도 보이지 않는다** | **반드시 ⑦ 뒤에.** ⑦이 만든 `submit_review` 정의 위에 배정 확인만 얹는 것이라 순서를 뒤집으면 ⑦이 그 확인을 **오류 없이 조용히** 지운다 (OPERATIONS.md §1-8) |
 
 - Phase 3(§11-2)에는 DDL이 없어 `APPLY_*` 파일이 없다 — 저장소 실측 확인함
-  (`supabase/APPLY_*.sql` 6개 = 08-28 / phase0 / phase1 / phase2 / phase4 / 09-02_p5).
+  (`supabase/APPLY_*.sql` 8개 = 08-28 / phase0 / phase1 / phase2 / phase4 / 09-02_p5 / 09-02_followup /
+  09-02_assignment_guard).
+- ⑦⑧은 **이 저장소에서 한 번도 실행해 본 적이 없다**(환경에 `psql`·`docker`가 없어 정적 확인만 했다).
+  구문 오류가 있다면 실행 즉시 드러난다 — ⑦은 확인 (3)이 세 함수 본문에 `log_audit`이 들어갔는지,
+  ⑧은 확인 (1)(2)가 트리거와 배정 확인이 들어갔는지 본다.
 - 각 파일 끝의 `NOTIFY pgrst, 'reload schema';`를 지우지 않는다 — 없으면 `PGRST202`/`PGRST204`가 한동안 계속 난다 (근거: `docs/OPERATIONS.md` §1-1)
-- Edge Function(`admin-create-user`·`send-reminder`) 배포는 `docs/OPERATIONS.md` §1-8을 따른다
+- Edge Function(`admin-create-user`·`send-reminder`) 배포는 `docs/OPERATIONS.md` §1-9를 따른다
 - 체크:
-- [ ] (실시자) ①~⑥을 위 순서대로 적용하고 각 파일의 「적용 후 확인」 쿼리를 돌린다 → 각 쿼리가 파일 주석에 적힌 기대 결과와 일치 (근거: 각 `APPLY_*.sql` 머리주석)
+- [ ] (실시자) ①~⑧을 위 순서대로 적용하고 각 파일의 「적용 후 확인」 쿼리를 돌린다 → 각 쿼리가 파일 주석에 적힌 기대 결과와 일치 (근거: 각 `APPLY_*.sql` 머리주석)
+- [ ] (실시자) ⑧ 적용 후 확인 (1)(2)(4)를 돌린다 → (1) 트리거 `review_assignments_guard_deactivate` **1행**,
+      (2) `has_check`가 **true**이고 `prosecdef`가 **false**, (4) **0행**(적용 이전에 생긴 "보이지 않는 제출"이 없다).
+      (4)가 0행이 아니면 그 목록을 §10-2에 적고 PM과 처리를 정한다 (근거: `supabase/APPLY_2026-09-02_assignment_guard.sql` 「적용 후 확인」)
+- [ ] (실시자) ⑦ 적용 후 확인 (1)(3)을 돌린다 → (1) 세 함수의 `prosecdef`가 **모두 false**(true가 나오면 RLS를 우회하는 함수가 된 것이니 즉시 되돌린다), (3) **3행**(세 함수 본문에 `log_audit`이 들어갔다) (근거: `supabase/APPLY_2026-09-02_followup.sql` 「적용 후 확인」 (1)(3))
 - [ ] (실시자) ② 적용 후 `SELECT must_change_password, count(*) FROM public.profiles GROUP BY 1;`을 돌린다 → **`true` 행이 0**이어야 한다(기존 계정이 잠기지 않음) (근거: `supabase/APPLY_2026-09-01_phase0.sql` 「적용 후 확인」)
 
 ### 1-1. `fte_required` 스위치 — 현재 기본값과 파일럿 절차
@@ -82,6 +96,7 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 - [ ] (관리자) **직무당 예상 소요(분)** 잠정치를 넣는다 → 가이드 카드 ④에 "예상 소요는 직무당 약 N분이며, 입력은 자동 저장됩니다…"가 나타난다. **비워 두면 그 문장이 통째로 빠진다**(앱이 숫자를 지어내지 않는다) (근거: §6-1 카드 ④, `src/pages/sme-review/copy.ts:98-103`, `src/pages/SettingsPage.tsx:344-345`)
 - [ ] (관리자) 직무정보를 업로드한다(`/upload`). 파일럿 대상 회사의 활성 직무를 **2~3개로 제한**한다 → 업로드 성공, `/jobs`에 그 직무들만 보임 (근거: §0의 배정 주의사항, `supabase/APPLY_2026-08-28.sql:483-530`)
 - [ ] (관리자) 업로드 파일에 시트 ③ 「조직 마스터」를 포함한다 → 조직 마스터가 `org_units`에 저장된다. **시트 ④ 「SME 명부」는 검증·미리보기까지만 되고 계정은 만들어지지 않는다** — 계정은 `/users`에서 만든다 (근거: `src/lib/integratedUploadUtils.ts:11-17`, `src/lib/integratedJobApi.ts:81-82`)
+- [ ] (실시자) 위 업로드 직후 SQL `SELECT action, meta, created_at FROM public.audit_logs WHERE action IN ('JOB_DATA_UPLOADED','ORG_UNITS_UPLOADED','SME_ROSTER_LINKED') ORDER BY created_at DESC LIMIT 5;` → **`JOB_DATA_UPLOADED` 1행**(`meta`에 `mode`와 5건수). 시트 ③④를 함께 올렸다면 세 행이 나오는데 중복이 아니라 서로 다른 단계다. **0행이면 ⑦(`APPLY_2026-09-02_followup.sql`)이 적용되지 않았거나 감사 기록이 조용히 빠진 것이다** — 감사 실패는 화면에 뜨지 않으므로 이 쿼리로만 확인된다 (근거: §8 S5, `supabase/APPLY_2026-09-02_followup.sql` 확인 (4))
 
 ---
 
@@ -94,6 +109,7 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 - [ ] (관리자) 같은 이메일로 한 번 더 만들어 본다 → `이미 등록된 이메일이에요. 다른 이메일을 쓰거나 기존 계정을 수정해 주세요.` (근거: `src/components/modals/edgeApi.ts:24`)
 - [ ] (실시자) SQL로 `SELECT email, must_change_password FROM public.profiles WHERE role='sme';`를 확인한다 → 방금 만든 두 계정이 **true** (근거: §8 S2, `supabase/APPLY_2026-09-01_phase0.sql` must_change_password 기본값)
 - [ ] (실시자) SQL로 `SELECT count(*) FROM public.review_assignments WHERE sme_id = '<새 SME id>';`를 센다 → **대상 회사의 활성 직무 수와 같다**(골라 배정되지 않는다는 사실 확인) (근거: `supabase/APPLY_2026-08-28.sql:510-518`)
+- [ ] (관리자) 계정을 만든 직후 `/assignments-admin`(SME 배정 관리)을 열어 배정을 정리한다 → 아래 **N'** 절차. 정리하지 않으면 두 SME가 모든 직무를 배정받은 상태로 파일럿이 시작된다 (근거: §0의 배정 주의사항)
 
 ### B. 첫 로그인 · 비밀번호 강제 변경
 
@@ -187,6 +203,8 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 - [ ] (SME) 합계를 100으로 되돌리고 「최종 제출」 → 모달 `검토를 제출할까요?` / `최종 제출 후에는 관리자가 재검토를 요청하기 전까지 수정할 수 없어요.` (근거: `src/pages/SmeReviewPage.tsx:987-988`)
 - [ ] (SME) 「제출하기」 → 토스트 `검토를 제출했어요. 관리자가 확인한 뒤 결과가 반영됩니다.` (근거: `src/pages/SmeReviewPage.tsx:659`)
 - [ ] (SME) 제출 후 화면을 본다 → 상단에 `이미 제출한 검토라 수정할 수 없어요 (제출 …). 수정이 필요하면 관리자에게 재검토를 요청해 주세요.` 그리고 **모든 입력이 잠긴다**. 단계 이동은 읽기용으로 열려 있다 (근거: `src/pages/SmeReviewPage.tsx:770-778`, `:227-228`, `:571`)
+- [ ] (실시자) 제출 직후 SQL `SELECT action, entity_id, meta, created_at FROM public.audit_logs WHERE action IN ('REVIEW_SUBMITTED','REVIEW_RESUBMITTED') ORDER BY created_at DESC LIMIT 5;` → **`REVIEW_SUBMITTED` 1행**(`meta`에 `status`·`job_id`·`job_name`, SME 성명·이메일은 없다). **0행이면 ⑦이 적용되지 않았거나 감사 기록이 빠진 것이다** — 제출 자체는 성공했으므로 화면에는 아무 표시도 없다 (근거: §8 S5, `supabase/APPLY_2026-09-02_followup.sql` 확인 (4))
+- [ ] (실시자) 건수를 대조한다 — 같은 파일의 확인 (6)을 `<적용 시각>`을 채워 실행한다 → **이력 = 감사**. 감사 쪽이 작으면 그만큼 기록이 조용히 빠진 것이므로 그 사실을 §10-2에 적는다 (근거: `supabase/APPLY_2026-09-02_followup.sql` 확인 (6))
 - [ ] (SME) SME 2명이 **같은 직무**를 각각 제출한다(비교 뷰를 만들기 위해). 두 사람의 FTE를 한 과업에서 **20%p 이상 벌려 둔다** → 아래 H에서 하이라이트를 확인할 준비 (근거: §6-3ⓑ, `src/lib/workshopThresholds.ts:31`)
 
 ### H. 관리자 워크벤치 — 비교 · 반려
@@ -260,6 +278,61 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 - [ ] (실시자) SQL `SELECT simulated, count(*) FROM public.mail_logs GROUP BY 1;` → 시뮬레이션 발송이 기록됨 (근거: §10 P4 DoD ③)
 - [ ] (관리자) `/analytics/fte`를 연다 → 화면 하단에 종료선 문구 `본 화면은 투입 비중 분포의 집계까지 제공하며, 적정 인력의 확정 수치 산정은 후속 별도 과제로 구분됩니다`가 고정 표기 (근거: §6-3ⓒ 16면, `src/pages/FteAnalyticsPage.tsx:522`)
 
+### N'. SME 배정 관리 — R6 점검·정리 (`/assignments-admin`)
+
+이 화면은 §0의 「전 직무 자동 배정」을 **사후에** 정리한다. 자동 배정을 막지는 못한다.
+A(계정 발급) 직후에 한 번, 그리고 SME 계정을 추가할 때마다 다시 돌아야 한다.
+
+- [ ] (관리자) 사이드바 「SME 배정 관리」를 누른다 → `/assignments-admin`이 열리고 상단에 R6 근거
+      (`R6 · 착수보고 7·12면 — "업무 조사는 직무별 최소 인원의 업무전문가(SME, 1~2명)를 대상으로 운영"`)와
+      자동 배정 경고가 고정 표기 (근거: `src/pages/AssignmentAdminPage.tsx`)
+- [ ] (관리자) 요약 줄을 본다 → `직무 N개 · 적정 n · 미배정 n · 과다 n`. A에서 SME 2명만 만들었다면
+      자동 배정으로 직무당 정확히 2명이 되므로 **대상 회사의 직무가 전부 「적정」**이고 「과다」는 0이다.
+      배지 기준은 0명 = 미배정 / 1~2명 = 적정 / 3명 이상 = 과다 (근거: 같은 파일 `r6BadgeOf`)
+- [ ] (관리자) 「R6 위반만 (0명 · 3명 이상)」 필터를 누른다 → 목록이 위반 직무만 남는다.
+      **SME 2명 상태에서는 위반이 없는 것이 정상이다** — `R6(직무별 1~2명)에 어긋나는 직무가 없습니다.`
+      가 뜬다. 「과다」 배지와 아래 해제 절차를 실제로 시험하려면 **먼저** SME 계정을 3명 이상 만들거나
+      (A를 한 번 더) SME 명부로 같은 직무에 배정을 더해 직무당 3명을 만든 뒤 이 절로 돌아온다.
+      해제 절차 자체는 필터를 「전체」로 두고 일반 목록에서도 그대로 수행할 수 있다 (근거: 같은 파일)
+- [ ] (관리자) 직무 한 행을 눌러 펼치고 담당이 아닌 SME의 「배정 해제」를 누른다 →
+      **아직 아무것도 작성하지 않았다면** 확인 모달 없이 해제되고 토스트
+      `… 배정을 해제했습니다. 응답 데이터는 지워지지 않았습니다.` (근거: `src/lib/assignmentApi.ts` `assignmentGuardOf`)
+- [ ] (실시자) SQL `SELECT active FROM public.review_assignments WHERE id = '<해제한 배정 id>';` →
+      **행이 남아 있고 `active = false`**. 삭제가 아니다 (근거: `src/lib/assignmentApi.ts:326-335`)
+- [ ] (SME) 해제당한 SME로 `/assignments`를 새로 고친다 → 그 직무가 목록에서 사라진다.
+      관리자 `/progress`에서도 그 칸이 빠진다 (근거: `src/lib/reviewApi.ts:211`, `src/lib/adminApi.ts:310`)
+- [ ] (관리자) **작성 중인** 검토가 있는 SME를 해제해 본다 → 경고 모달 `배정을 해제할까요?` +
+      `이미 작성을 시작한 검토입니다…`. 「취소」를 누르면 배정이 그대로다 (근거: 같은 파일)
+- [ ] (관리자) **G에서 제출을 마친** SME를 해제해 본다 → 「배정 해제」 버튼이 **비활성**이고 그 옆에
+      잠금 사유(`이미 제출된 응답이 있어 배정을 해제할 수 없습니다…`)가 함께 표시된다.
+      색만이 아니라 문장으로 알린다 (근거: 같은 파일, §8 S8)
+- [ ] (관리자) **반려당한** 검토(H에서 만든 것)의 배정도 해제해 본다 → 상태가 `재검토 요청`으로
+      돌아가 있어도 **여전히 막힌다**(제출 시각이 남아 있으므로). 상태만 보고 판단하지 않는다는 확인이다
+- [ ] (실시자) 서버도 같은 판정을 하는지 본다 — `supabase/APPLY_2026-09-02_assignment_guard.sql`의
+      확인 (3)을 실행한다(제출된 검토의 배정을 `active = false`로 UPDATE → `42501`.
+      `BEGIN … ROLLBACK` 안이라 데이터는 그대로다). 화면을 거치지 않는 해제까지 막힌다는 확인이다
+      (근거: `supabase/migrations/20260902030000_assignment_deactivate_guard.sql`)
+- [ ] (관리자 + SME 2인 동시) **작성 중**인 배정을 관리자가 해제한 직후, 그 SME가 **이미 열어 둔**
+      마법사에서 제출을 누른다 → 제출이 막히고 `이 직무의 배정이 해제되어 제출할 수 없습니다.
+      방금 입력한 내용은 저장됐습니다…`가 뜬다. 관리자 `/progress`에 「제출됨」이 나타나지 않는다.
+      SQL `SELECT count(*) FROM public.reviews r JOIN public.review_assignments a ON a.id = r.assignment_id
+      WHERE r.submitted_at IS NOT NULL AND a.active = false;` → **0** (근거: 같은 파일 `submit_review` ⑤)
+      (근거: `assignmentGuardOf` — 판정 기준이 `status`가 아니라 `submitted_at`)
+- [ ] (관리자) 방금 해제한 SME를 같은 직무에 「배정 추가」로 다시 넣는다 → 되살아난다(새 행이 아니라
+      같은 행의 `active`가 다시 `true`). SQL `SELECT count(*) FROM public.review_assignments
+      WHERE sme_id='<id>' AND job_id='<id>';` → **1행** (근거: `src/lib/assignmentApi.ts` `addAssignment` upsert)
+- [ ] (관리자) 배정이 2명인 직무에서 3명째를 추가해 본다 → 경고 문구
+      `이미 2명이 배정되어 있습니다. 더 추가하면 R6(1~2명)을 넘습니다.`가 뜨지만 **추가는 된다**.
+      상한이 미확정이라 코드가 막지 않는다는 사실 확인 (근거: §12 오픈이슈 3, `docs/OPEN_ISSUES.md` §3)
+- [ ] (실시자) SQL `SELECT action, entity_id, meta FROM public.audit_logs WHERE action IN
+      ('ASSIGNMENT_ADDED','ASSIGNMENT_DEACTIVATED') ORDER BY created_at DESC LIMIT 10;` →
+      추가·해제가 각각 남고 `meta`에 `sme_id`·`job_id`만 있다(이름·이메일 없음) (근거: §8 S5·S6)
+- [ ] (SME) SME 계정으로 로그인해 주소창에 `/assignments-admin`을 직접 친다 → **관리자 화면이 열리지
+      않고** SME 홈(`/assignments`)으로 되돌아간다. 사이드바에도 그 항목이 없다 (근거: `src/App.tsx` isAdmin 분기)
+- [ ] (실시자) 조회를 일부러 실패시킨다(예: 네트워크 차단 후 새로 고침) → 목록이 **「0건」이 아니라**
+      `배정 현황을 불러오지 못했어요…` + 「다시 시도」 버튼으로 표시된다. 「데이터 없음」과 구분된다
+      (근거: `src/lib/assignmentApi.ts` `ApiResult` 분기)
+
 ---
 
 ## 3. 모바일 390px 점검
@@ -292,6 +365,7 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 - [ ] (SME) STEP 2 긴 과업 목록 → 맨 아래 「다음 단계」를 누르면 새 단계의 제목이 화면 위에 보인다(스크롤이 맨 위로 올라간다) (근거: `src/pages/SmeReviewPage.tsx:595-608`)
 - [ ] (관리자) `/progress` 매트릭스, `/workbench/:jobId` 비교 표 → 표만 가로 스크롤되고 페이지는 흔들리지 않는다
 - [ ] (관리자) `/exports` 카드 격자 → 1열로 떨어지고 다운로드 버튼이 눌린다
+- [ ] (관리자) `/assignments-admin` → 직무 행이 세로로 접히고 배지·SME 칩이 줄바꿈된다. 펼친 칸의 「SME 검색」·「배정할 SME」·「배정 추가」가 1열로 떨어지고, 「배정 해제」 버튼이 44px 이상이라 눌린다 (근거: `min-h-11`, `src/pages/AssignmentAdminPage.tsx`)
 
 ---
 
@@ -321,7 +395,7 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 
 **모달 포커스 트랩**
 
-대상 모달: 제출 확인, 단일 100% 확인, 문의 작성, 반려 사유, 계정 추가.
+대상 모달: 제출 확인, 단일 100% 확인, 문의 작성, 반려 사유, 계정 추가, **배정 해제 확인**(`/assignments-admin`).
 
 - [ ] (실시자) 모달이 열리는 순간 → 포커스가 **모달 안 첫 요소**로 들어간다 (근거: `src/components/ui/ModalShell.tsx:59-64`)
 - [ ] (실시자) Tab을 계속 누른다 → 포커스가 **모달 밖으로 새지 않고** 안에서 돈다 (근거: `src/components/ui/ModalShell.tsx:74-94`)
@@ -345,6 +419,11 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 
 - [ ] (관리자) `/progress` 매트릭스, `/workbench/:jobId` 비교 표, `/analytics/fte` 피벗 표를 키보드만으로 **가로로 끝까지 본다** → 스크롤 컨테이너에 Tab으로 포커스가 가서 ←/→ 로 밀 수 있는지 확인. **가지 않는다면 그것이 결함이다**(가로로 넘치는 영역은 키보드로도 스크롤 가능해야 한다 — WCAG 2.1.1). 관측 결과를 그대로 기록
 - [ ] (관리자) 표 안의 링크·버튼(셀 클릭 → 워크벤치 이동)에 Tab으로 도달한다 → 도달하고 Enter로 열린다
+
+**배정 관리 아코디언**
+
+- [ ] (관리자) `/assignments-admin`에서 Tab으로 직무 행에 가서 Enter/Space → 펼쳐지고 다시 누르면 접힌다. 스크린리더가 접힘/펼침을 읽는다(`aria-expanded`·`aria-controls`) (근거: `src/pages/AssignmentAdminPage.tsx`)
+- [ ] (관리자) 제출된 SME의 비활성 「배정 해제」 버튼에 접근한다 → **왜 못 누르는지가 문장으로 읽힌다**(`aria-describedby`로 잠금 사유가 연결돼 있다). 색만으로 알리지 않는다 (근거: 같은 파일, §8 S8)
 
 ---
 
@@ -464,7 +543,7 @@ Phase 5의 토큰 조정에 함께 딸려 오지 않았다. 메뉴 **라벨**은
 |---|---|---|---|---|
 | 1 | 직무당 예상 소요 ○○분 | §6의 대시보드 「직무당 소요 중앙값(실측)」 카드 값과 E5 `전체` 행(**둘 다 적는다 — 표본 모집단이 달라 자동으로 일치하지는 않는다**), 표본 수, 단계별 중앙값, 체감 소요와의 차이 | 확정값을 착수보고·가이드 문구에 반영할지, 반영 시점 | 파일럿 결과 |
 | 2 | 조직 마스터 입수 | 업로드 시트 ③ 「조직 마스터」가 실제 조직도 형식(조직코드·조직명·상위조직코드)으로 들어가는지, `/progress` 행 트리가 제대로 그려지는지. **임시 코드로 개시했을 때 매핑 교체가 얼마나 드는지** | 고객 조직도의 **입수 시점·형식**, 임시 코드로 먼저 개시할지 여부 | 고객 TF |
-| 3 | SME 배정 예외 처리 | **§0에서 확인한 사실 — 배정이 "회사 활성 직무 전부"로 만들어져 직무별 1~2명(R6)을 UI로 통제할 수 없다.** 겸직 SME가 여러 직무를 받았을 때 화면·소요가 어떻게 되는지. SME 1인뿐인 직무가 자동 규칙 ④에 걸리는지(§2-L에서 확인) | 배정 상한·기준의 **문서화**, 겸직 직무 취급 원칙, 위 배정 방식을 유지할지 골라 배정하는 기능을 넣을지 | PM(상무) |
+| 3 | SME 배정 예외 처리 | **§0의 사실 — 배정이 "회사 활성 직무 전부"로 만들어진다.** §2-N'에서 `/assignments-admin`으로 정리했을 때 **직무당 1~2명까지 손으로 줄이는 데 든 조작 수**(계정을 추가할 때마다 반복된다). 겸직 SME가 여러 직무를 받았을 때 화면·소요가 어떻게 되는지. SME 1인뿐인 직무가 자동 규칙 ④에 걸리는지(§2-L) | 배정 **상한**(화면은 3명째를 경고만 하고 막지 않는다)과 겸직 직무 취급 원칙의 문서화. `sync_sme_assignments`의 전 직무 자동 배정을 그대로 둘지, 좁힐지 | PM(상무) |
 | 4 | 메일 발신 도메인 | 시뮬레이션 모드가 `mail_logs(simulated=true)`로 완결되는지(§2-N), 리마인더 템플릿 치환이 맞는지 | **SPF·DKIM 인증 도메인**(HCG/고객), 실발송 전환 시점 | HCG IT |
 | 5 | 워크숍 플래그 임계값 | 초기값(부적합 30% · FTE 차 20%p · 신규 3건)이 파일럿 응답에서 **몇 건을 잡았는지**. 과다/과소 판정 사례 | 임계값 **확정**. 값은 `src/lib/workshopThresholds.ts` 한 곳만 고치면 된다 | PM(상무) |
 | 6 | 데이터 보존·파기 | 수동 스냅샷(§2-K)이 실제로 이관 가능한 형태인지, Export 5종이 이관 범위를 덮는지. **Supabase 리전 값 확인** | 이관 **범위**, 파기 **시점**, Supabase 프로젝트 처리. 과업범위 합의서·회의록에 1문장 반영 | PM(상무)·TF |
@@ -514,26 +593,29 @@ Supabase 대시보드에서 아래를 개시 전·개시 직후·개시 익일 3
 
 ---
 
-## 9. 운영 계정 전환 — 시드 계정 제거
+## 9. 운영 계정 전환 — 관리자 개설
 
 > **정본은 `docs/OPERATIONS.md`다** — §3(운영 계정 전환) · §4(데이터 보존·파기, 리전 확인) ·
 > §5(백업) · §6(메일 발신) · §7(운영 중 점검). 아래는 파일럿 자리에서 바로 밟을 순서만 추린 것이다.
 
-`supabase/seed.sql`이 만드는 계정은 **비밀번호가 README와 저장소에 공개되어 있다**. 반드시 지운다.
+**2026-09-02 실측 정정** — 운영 프로젝트(`yktdlcpovntegiwfnied`)에는 `supabase/seed.sql`이
+실행된 적이 없다. 아래 계정으로 인증하면 `400 invalid_credentials`가 돌아온다.
+즉 **지울 시드 계정이 없고, 만들 관리자가 없다.** 이 절은 "제거"가 아니라 "개설" 절차다.
 
-| 계정 | 비밀번호 | 역할 | 근거 |
+| 계정 | 비밀번호 | 역할 | 상태 |
 |---|---|---|---|
-| `admin@jobreview.local` | `admin1234` | admin | `supabase/seed.sql:20-48` · `docs/OPERATIONS.md` §3-2 |
-| `sme@jobreview.local` | `sme1234` | sme | `supabase/seed.sql:51-79` · `docs/OPERATIONS.md` §3-2 |
+| `admin@jobreview.local` | `admin1234` | admin | **운영에 없음** — 로컬 Supabase 전용(`supabase/seed.sql:20-48`) |
+| `sme@jobreview.local` | `sme1234` | sme | **운영에 없음** — 로컬 Supabase 전용(`supabase/seed.sql:51-79`) |
 
-**순서를 바꾸면 관리자 없이 잠긴다.** 운영 관리자 계정을 먼저 만들고 로그인까지 확인한 뒤에 지운다.
+관리자를 만드는 앱 경로는 전부 호출자가 이미 관리자일 것을 요구한다.
+**활성 관리자가 0명이면 SQL Editor가 유일한 복구 경로다.**
 
-- [ ] (실시자) 운영 관리자 계정을 먼저 만든다 — `/admin-users`(관리자 계정 관리) 또는 Supabase 대시보드 Authentication → Users. `profiles.role`은 **소문자 `admin`** 이어야 한다(CHECK 제약) (근거: `docs/OPERATIONS.md` §3-1·§3-3 1단계, `src/components/AdminUsersPage.tsx`)
+- [ ] (실시자) `supabase/DIAGNOSE_2026-09-02_login.sql`(읽기 전용 7개 질의)로 원인을 확정한다 → 활성 관리자 수, 고아 프로필, 같은 이메일의 id 분기 여부
+- [ ] (실시자) **Phase 0를 먼저 적용한다** → `supabase/APPLY_2026-09-01_phase0.sql`. 순서를 바꾸면 Phase 0의 백필이 새 관리자의 `must_change_password`를 `false`로 내려 임시 비밀번호가 강제 변경 없이 남는다 (근거: `docs/OPERATIONS.md` §3-3 2단계)
+- [ ] (실시자) `supabase/BOOTSTRAP_2026-09-02_admin.sql` 상단 세 줄을 채워 실행한다 → 끝의 확인 질의에서 `auth유저있음 · 이메일확인 · 비번설정 · identity있음`이 모두 참 (근거: `docs/OPERATIONS.md` §3-3 3단계)
 - [ ] (실시자) 새 운영 관리자로 로그인한다 → 첫 로그인 비밀번호 변경을 통과하고 관리자 화면 전부가 열린다 (근거: §8 S2)
-- [ ] (실시자) 시드 계정을 지운다 → `delete from auth.users where email in ('admin@jobreview.local', 'sme@jobreview.local');` (근거: `docs/OPERATIONS.md` §3-3 3단계)
-- [ ] (실시자) 확인한다 → `select * from public.profiles where email like '%@jobreview.local'` 이 **0행**(`on delete cascade`로 profiles도 함께 사라진다) (근거: `docs/OPERATIONS.md` §3-3 4단계)
-- [ ] (실시자) 시드 SME가 남긴 검토·문의가 있으면 함께 사라지는지 미리 확인한다 → 파일럿 기록을 시드 SME로 남기지 않았는지 점검. 남겼다면 **삭제 전에 Export/스냅샷**으로 보존
-- [ ] (실시자) 인수인계 문서에 "운영 DB에서 `supabase/seed.sql`을 다시 실행하지 않는다"를 적는다 → 적힘 (근거: `docs/OPERATIONS.md` §3-3 5단계 — `seed.sql`은 idempotent라 재실행하면 비밀번호를 `admin1234`/`sme1234`로 되돌려 놓는다)
+- [ ] (실시자) 임시 비밀번호를 정리한다 → SQL Editor 질의 기록에 평문으로 남는다. 변경 후 메신저·문서에 남기지 않는다
+- [ ] (실시자) 인수인계 문서에 "운영 DB에서 `supabase/seed.sql`을 실행하지 않는다"를 적는다 → 적힘. 실행하면 비밀번호가 공개된 계정이 운영에 생긴다
 - [ ] (실시자) 파일럿용 SME 계정도 정리한다 → 운영에 그대로 쓸 계정만 남기고 나머지는 비활성 또는 삭제
 - [ ] (실시자) Supabase 대시보드 **Auth → Rate Limits**와 **Auth → Sessions** 만료 정책을 확인한다 → 화면의 5회/60초 잠금은 클라이언트 방어일 뿐이고 서버 한도가 실제 방어선이다 (근거: §8 S3, `docs/OPERATIONS.md` §7-1)
 - [ ] (실시자) `service_role` 키와 `RESEND_API_KEY`가 **저장소·번들에 없고** Supabase 시크릿에만 있는지 확인한다 → `git grep`으로 0건 (근거: §8 S4, §11-1)
