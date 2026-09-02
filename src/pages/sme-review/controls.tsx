@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import type { SuggestionInput } from '@/lib/reviewApi';
+import { newSuggestion, type SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback, Suitability } from '@/types';
 import { NOTE_REQUIRED_HINT, REQUIRED_MARK_SR } from './copy';
 
@@ -151,6 +151,8 @@ export function AutoTextarea({
   'aria-describedby': ariaDescribedBy,
   'aria-invalid': ariaInvalid,
   'aria-required': ariaRequired,
+  // 라벨 <span>이 없는 자리(STEP 3 세부활동 의견처럼 줄 제목이 라벨을 겸하는 곳)에서 쓴다.
+  'aria-label': ariaLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -163,6 +165,7 @@ export function AutoTextarea({
   'aria-describedby'?: string;
   'aria-invalid'?: true;
   'aria-required'?: true;
+  'aria-label'?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -184,6 +187,7 @@ export function AutoTextarea({
       aria-describedby={ariaDescribedBy}
       aria-invalid={ariaInvalid}
       aria-required={ariaRequired}
+      aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
       rows={minRows}
       placeholder={placeholder}
@@ -487,7 +491,7 @@ export function SuggestionEditor({
       )}
       <Button
         variant="secondary"
-        onClick={() => onChange([...items, { name: '', description: '', reason: '' }])}
+        onClick={() => onChange([...items, newSuggestion()])}
         className="w-full border-dashed"
       >
         <Plus size={15} aria-hidden="true" /> 신규 {kind} 제안 추가

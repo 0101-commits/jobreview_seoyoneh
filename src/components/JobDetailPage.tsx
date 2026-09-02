@@ -47,6 +47,11 @@ interface Props {
   onBack: () => void;
   userId: string;
   companyId?: string | null;
+  /**
+   * 이 SME의 검토 카드로 스크롤·강조한다(v2 §6-5).
+   * 검토 현황 화면이 상세 모달을 없애고 이 화면으로 보내면서 "어느 SME를 보러 왔는지"를 넘긴다.
+   */
+  focusSmeId?: string | null;
 }
 
 /** 목록에서 중간 항목을 지워도 뒤 입력칸의 포커스·한글 조합이 엉키지 않도록 행마다 고정 키를 붙인다. */
@@ -95,7 +100,7 @@ const JOB_FIELD_LABEL: Record<string, string> = {
   'req-certifications': '관련 자격증/면허',
 };
 
-export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
+export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: Props) {
   const [detail, setDetail] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -123,6 +128,15 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
 
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [rereviewTarget, setRereviewTarget] = useState<SmeReviewFeedback | null>(null);
+
+  /*
+    구조 편집 잠금(v2 F6 · 결정 D7).
+    검토가 시작된 뒤 과업·Skill을 지우거나 더하면 SME 응답의 참조가 끊긴다 —
+    제출 게이트는 "활성 과업 전부"의 평가를 요구하고, 배분 합계도 활성 과업 기준이다.
+    그래서 응답이 걸린 직무는 구조(추가·삭제·순서)를 잠그고 문구·정의 수정만 남긴다.
+    서버도 같은 조건을 다시 본다(trg_job_tasks_structure_lock) — 화면만의 약속이 아니다.
+  */
+  const structureLocked = feedback.some((f) => f.status !== 'NOT_STARTED');
 
   const backRef = useRef(onBack);
   backRef.current = onBack;
@@ -527,7 +541,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
       </nav>
 
       {/* Top header */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4 rounded-container border border-border bg-card p-6 shadow-sm">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4 rounded-container border border-border bg-card p-6 shadow-1">
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-semibold tracking-tight text-foreground">직무 상세정보</h2>
           <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3">
@@ -607,6 +621,19 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
           {dupError && (
             <p className="mt-3 flex items-center gap-1.5 text-sm text-destructive">
               <AlertTriangle size={14} aria-hidden="true" /> {dupError}
+            </p>
+          )}
+          {/* 구조 편집 잠금 안내(v2 F6) — 무엇이 잠겼고 무엇이 열려 있는지, 언제 풀리는지까지 적는다. */}
+          {editMode && structureLocked && (
+            <p
+              role="status"
+              className="mt-3 flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-3.5 py-2.5 text-sm text-warning"
+            >
+              <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                이 직무는 SME 검토가 시작돼 과업·Skill의 추가·삭제·순서 변경이 잠겨 있어요. 이름·설명·정의는 지금
+                수정할 수 있고, 구조 변경은 검토가 끝난 뒤 재업로드로 해 주세요.
+              </span>
             </p>
           )}
         </div>
@@ -722,8 +749,9 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
                         onUp={() => moveTask(ti, -1)}
                         onDown={() => moveTask(ti, 1)}
                         onDelete={() => deleteTask(ti)}
-                        upDisabled={ti === 0}
-                        downDisabled={ti === editTasks.length - 1}
+                        upDisabled={ti === 0 || structureLocked}
+                        downDisabled={ti === editTasks.length - 1 || structureLocked}
+                        deleteDisabled={structureLocked}
                       />
                     </div>
                     <div className="mt-3 space-y-2 sm:pl-8">
@@ -742,18 +770,25 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
                             onUp={() => moveActivity(ti, ai, -1)}
                             onDown={() => moveActivity(ti, ai, 1)}
                             onDelete={() => deleteActivity(ti, ai)}
-                            upDisabled={ai === 0}
-                            downDisabled={ai === task.activities.length - 1}
+                            upDisabled={ai === 0 || structureLocked}
+                            downDisabled={ai === task.activities.length - 1 || structureLocked}
+                            deleteDisabled={structureLocked}
                           />
                         </div>
                       ))}
-                      <Button variant="ghost" size="sm" onClick={() => addActivity(ti)} className="text-primary">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addActivity(ti)}
+                        disabled={structureLocked}
+                        className="text-primary"
+                      >
                         <Plus size={15} aria-hidden="true" /> 세부활동 추가
                       </Button>
                     </div>
                   </div>
                 ))}
-                <Button variant="secondary" onClick={addTask} className="border-dashed">
+                <Button variant="secondary" onClick={addTask} disabled={structureLocked} className="border-dashed">
                   <Plus size={16} aria-hidden="true" /> 주요과업 추가
                 </Button>
               </div>
@@ -827,13 +862,20 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
                               size="sm"
                               aria-label={`${s.name || '이름 없는'} Skill 삭제`}
                               onClick={() => deleteSkill(s.uid)}
+                              disabled={structureLocked}
                               className="ml-2 text-destructive hover:bg-destructive-muted"
                             >
                               <Trash2 size={15} aria-hidden="true" />
                             </Button>
                           </div>
                         ))}
-                      <Button variant="ghost" size="sm" onClick={() => addSkill(type)} className="text-primary">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addSkill(type)}
+                        disabled={structureLocked}
+                        className="text-primary"
+                      >
                         <Plus size={15} aria-hidden="true" /> Skill 추가
                       </Button>
                     </div>
@@ -915,6 +957,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId }: Props) {
           onFocusField={focusField}
           labelFor={labelFor}
           onRequestRereview={setRereviewTarget}
+          focusSmeId={focusSmeId}
         />
       </div>
 
@@ -991,12 +1034,28 @@ interface PanelProps {
   onRequestRereview: (review: SmeReviewFeedback) => void;
 }
 
-function SmeFeedbackPanel({ data, loading, error, onRetry, onFocusField, labelFor, onRequestRereview }: PanelProps) {
+function SmeFeedbackPanel({
+  data,
+  loading,
+  error,
+  onRetry,
+  onFocusField,
+  labelFor,
+  onRequestRereview,
+  focusSmeId,
+}: PanelProps & { focusSmeId?: string | null }) {
+  // 검토 현황에서 넘어온 경우 그 SME 카드로 스크롤한다. 목록이 도착한 뒤 한 번만 움직인다.
+  useEffect(() => {
+    if (!focusSmeId || data.length === 0) return;
+    const el = document.getElementById(`sme-card-${focusSmeId}`);
+    el?.scrollIntoView({ block: 'center' });
+  }, [focusSmeId, data.length]);
+
   return (
-    <aside className="rounded-container border border-border bg-card p-5 shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
+    <aside className="rounded-container border border-border bg-card p-5 shadow-1 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
       <div className="mb-4 flex items-center gap-2">
         <Users size={16} className="text-primary" aria-hidden="true" />
-        <h3 className="text-base font-bold text-[#182635]">SME 검토 의견</h3>
+        <h3 className="t-headline text-foreground">SME 검토 의견</h3>
         {!loading && !error && data.length > 0 && (
           <span className="rounded-full bg-primary-subtle px-2 py-0.5 text-xs font-medium text-primary">
             {data.length}명
@@ -1033,6 +1092,7 @@ function SmeFeedbackPanel({ data, loading, error, onRetry, onFocusField, labelFo
           {data.map((review) => (
             <ReviewCard
               key={review.review_id}
+              focused={review.sme_id === focusSmeId}
               review={review}
               onFocusField={onFocusField}
               labelFor={labelFor}
@@ -1050,11 +1110,14 @@ function ReviewCard({
   onFocusField,
   labelFor,
   onRequestRereview,
+  focused = false,
 }: {
   review: SmeReviewFeedback;
   onFocusField: (key: string) => void;
   labelFor: (key: string) => { kind: string; name: string };
   onRequestRereview: (review: SmeReviewFeedback) => void;
+  /** 검토 현황에서 이 SME를 보러 온 경우 — 테두리로 표시한다(색만으로 알리지 않게 스크롤도 함께). */
+  focused?: boolean;
 }) {
   // 저장된 값 → 화면 라벨 변환은 reviewApi의 변환기를 그대로 쓴다.
   const items = Object.entries(toFeedbackState(review.feedback))
@@ -1065,7 +1128,10 @@ function ReviewCard({
   const canRerequest = review.status === 'SUBMITTED' || review.status === 'RESUBMITTED';
 
   return (
-    <article className="rounded-element border border-border p-4">
+    <article
+      id={`sme-card-${review.sme_id}`}
+      className={`rounded-element border p-4 ${focused ? 'border-primary bg-primary-subtle' : 'border-border'}`}
+    >
       <header className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="text-sm font-semibold text-foreground">{review.sme_name || '이름 미등록'}</span>
         {review.organization && <span className="text-xs text-foreground-subtle">{review.organization}</span>}
@@ -1227,6 +1293,7 @@ function RowActions({
   onDelete,
   upDisabled,
   downDisabled,
+  deleteDisabled,
 }: {
   label: string;
   onUp: () => void;
@@ -1234,6 +1301,8 @@ function RowActions({
   onDelete: () => void;
   upDisabled: boolean;
   downDisabled: boolean;
+  /** 구조 편집 잠금(v2 F6) — 검토가 시작된 직무는 삭제를 막는다. */
+  deleteDisabled?: boolean;
 }) {
   return (
     <div className="flex items-center gap-1">
@@ -1248,6 +1317,7 @@ function RowActions({
         size="sm"
         aria-label={`${label} 삭제`}
         onClick={onDelete}
+        disabled={deleteDisabled}
         className="ml-2 text-destructive hover:bg-destructive-muted"
       >
         <Trash2 size={15} aria-hidden="true" />
@@ -1258,8 +1328,8 @@ function RowActions({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-6 rounded-container border border-border bg-card p-6 shadow-sm">
-      <h3 className="mb-5 text-base font-bold text-[#182635]">{title}</h3>
+    <section className="mb-6 rounded-container border border-border bg-card p-6 shadow-1">
+      <h3 className="mb-5 t-headline text-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -1283,7 +1353,7 @@ function SkillGroup({
   const chipClass =
     accent === 'teal'
       ? 'bg-primary-subtle text-primary border-primary-border'
-      : 'bg-muted text-[#182635] border-border';
+      : 'bg-fill-alt text-foreground border-border';
   return (
     <div>
       <h4 className="mb-3 text-sm font-semibold text-foreground-muted">{label}</h4>

@@ -34,7 +34,8 @@ import {
   UserCog,
   UserPlus,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { isResetPasswordPath, supabase } from '@/lib/supabase';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { UploadPage } from '@/components/UploadPage';
 import { AdminUsersPage } from '@/components/AdminUsersPage';
 import { Login, type LoginResult } from '@/pages/LoginPage';
@@ -63,31 +64,69 @@ import type { Role, User } from '@/types';
 // ── 라우트 정의 ─────────────────────────────────────────────────────
 // 사이드바 메뉴 = 이 목록. 목록에 없는 화면(직무 상세·직무 검토)은 title에서만 이름을 찾는다.
 type NavItem = { to: string; label: string; sub: string; Icon: typeof LayoutDashboard };
+/**
+ * 사이드바 묶음(v2 §6-5). 13개 평면 메뉴를 준비 → 운영 → 검토 → 산출 → 설정 다섯 그룹으로 나눈다.
+ * 순서가 관리자 흐름(§5-2)과 같다 — 첫 사용에서 무엇부터 해야 하는지가 순서로 읽혀야 한다.
+ */
+type NavGroup = { title: string; items: NavItem[] };
 
-const adminNav: NavItem[] = [
-  { to: '/dashboard', label: '대시보드', sub: '전체 검토 현황을 확인하세요', Icon: LayoutDashboard },
-  { to: '/reviews', label: '검토 현황', sub: 'SME별 검토 진행 상태', Icon: BarChart3 },
-  // §5-2 라우트 표의 문언을 그대로 쓴다(진행 현황 · 검토 워크벤치 · 문의 인박스).
-  { to: '/progress', label: '진행 현황', sub: '조직×직무 매트릭스 · 리마인더', Icon: LayoutGrid },
-  { to: '/workbench', label: '검토 워크벤치', sub: '제출 큐 · SME 비교 · 승인/반려', Icon: ClipboardCheck },
-  { to: '/analytics/fte', label: 'FTE 분포', sub: '직무·조직별 투입 비중 집계', Icon: PieChart },
-  { to: '/inbox', label: '문의 인박스', sub: '문의 답변·상태 관리', Icon: Inbox },
-  { to: '/jobs', label: '직무정보 관리', sub: '등록된 직무정보를 관리하세요', Icon: FileSpreadsheet },
-  { to: '/upload', label: '직무정보 업로드', sub: 'Excel 파일로 일괄 등록', Icon: Upload },
-  { to: '/users', label: 'SME 계정 관리', sub: 'SME 계정을 등록·관리하세요', Icon: Users },
-  // SME 화면의 '/assignments'(내 검토 목록)와 다른 화면이다. 라벨에 'SME'를 붙여 구분한다.
-  { to: '/assignments-admin', label: 'SME 배정 관리', sub: '직무별 SME 1~2명(R6) 점검·조정', Icon: UserPlus },
-  { to: '/admin-users', label: '관리자 계정 관리', sub: '관리자 계정을 등록·관리하세요', Icon: UserCog },
-  { to: '/exports', label: '산출물 내보내기', sub: '계약 산출물 E1~E5 · 스냅샷', Icon: Download },
-  { to: '/settings', label: '운영 설정', sub: '마감일 · 안내문 · 예상 소요 · 문의 담당', Icon: Settings },
+const adminNav: NavGroup[] = [
+  {
+    title: '준비',
+    items: [
+      { to: '/upload', label: '직무정보 업로드', sub: 'Excel 파일로 일괄 등록', Icon: Upload },
+      { to: '/jobs', label: '직무정보 관리', sub: '등록된 직무정보를 관리하세요', Icon: FileSpreadsheet },
+      { to: '/users', label: 'SME 계정 관리', sub: 'SME 계정을 등록·관리하세요', Icon: Users },
+      { to: '/admin-users', label: '관리자 계정 관리', sub: '관리자 계정을 등록·관리하세요', Icon: UserCog },
+      // SME 화면의 '/assignments'(내 검토 목록)와 다른 화면이다. 라벨에 'SME'를 붙여 구분한다.
+      { to: '/assignments-admin', label: 'SME 배정 관리', sub: '직무별 SME 1~2명(R6) 점검·조정', Icon: UserPlus },
+    ],
+  },
+  {
+    title: '운영',
+    items: [
+      { to: '/dashboard', label: '대시보드', sub: '전체 검토 현황을 확인하세요', Icon: LayoutDashboard },
+      // §5-2 라우트 표의 문언을 그대로 쓴다(진행 현황 · 검토 워크벤치 · 문의 인박스).
+      { to: '/progress', label: '진행 현황', sub: '조직×직무 매트릭스 · 리마인더', Icon: LayoutGrid },
+      { to: '/inbox', label: '문의 인박스', sub: '문의 답변·상태 관리', Icon: Inbox },
+    ],
+  },
+  {
+    title: '검토',
+    items: [
+      { to: '/workbench', label: '검토 워크벤치', sub: '제출 큐 · SME 비교 · 승인/반려', Icon: ClipboardCheck },
+      { to: '/reviews', label: '검토 현황', sub: 'SME별 검토 진행 상태', Icon: BarChart3 },
+    ],
+  },
+  {
+    title: '산출',
+    items: [
+      { to: '/analytics/fte', label: 'FTE 분포', sub: '직무·조직별 투입 비중 집계', Icon: PieChart },
+      { to: '/exports', label: '산출물 내보내기', sub: '계약 산출물 E1~E5 · 스냅샷', Icon: Download },
+    ],
+  },
+  {
+    title: '설정',
+    items: [{ to: '/settings', label: '운영 설정', sub: '마감일 · 안내문 · 예상 소요 · 문의 담당', Icon: Settings }],
+  },
 ];
 
-const smeNav: NavItem[] = [
-  { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList },
-  { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3 },
-  { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText },
-  // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
-  { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen },
+const smeNav: NavGroup[] = [
+  {
+    title: '검토',
+    items: [
+      { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList },
+      { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3 },
+    ],
+  },
+  {
+    title: '도움',
+    items: [
+      { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText },
+      // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
+      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen },
+    ],
+  },
 ];
 
 const adminHome = '/dashboard';
@@ -135,10 +174,64 @@ const legacyKeyToPath: Record<string, string> = {
 
 // ── 이탈 가드 ───────────────────────────────────────────────────────
 // SME 검토 화면이 onDirtyChange(true)를 부르면 사이드바 이동·새로고침 전에 확인을 거친다.
-const DirtyContext = React.createContext<{ setDirty: (d: boolean) => void; confirmLeave: () => boolean }>({
+//
+// v2 §6-4: 예전에는 window.confirm으로 물었다. 브라우저 기본 창은 문구·버튼 위계를 정할 수 없고
+// 모바일에서는 맥락이 끊긴다. 대신 앱 안의 ConfirmDialog로 묻는데, 그 확인은 비동기라
+// "true/false를 즉시 돌려주는" 옛 계약(confirmLeave)을 쓸 수 없다.
+// 그래서 계약을 뒤집었다 — 떠나는 동작을 콜백으로 넘기고, 확인이 끝나면 셸이 그 콜백을 실행한다.
+const DirtyContext = React.createContext<{ setDirty: (d: boolean) => void; requestLeave: (run: () => void) => void }>({
   setDirty: () => {},
-  confirmLeave: () => true,
+  requestLeave: (run) => run(),
 });
+
+/*
+ * 유휴 자동 로그아웃(§8 S3 · 결정 D8 = 30분).
+ *
+ * 왜 필요한가: 현장 SME가 공용 PC를 쓰는 것을 전제한다. persistSession이 기본으로 켜져 있어
+ * 브라우저를 닫아도 세션이 남고, 다음 사람이 그 화면을 그대로 이어 볼 수 있었다.
+ *
+ * 왜 이 방식인가: 서버 강제가 아니라 화면의 완충 장치다(진짜 방어선은 Auth의 JWT 만료·refresh
+ * 재사용 감지 설정이며 그 점검표는 OPERATIONS에 있다). 그래서 조작 흔적(키·포인터·스크롤)이
+ * 30분 없으면 로그아웃하고, 1분 전에 한 번 알린다 — 작성 중인 내용이 있으면 미리 저장할 수 있게.
+ */
+const IDLE_LIMIT_MS = 30 * 60 * 1000;
+const IDLE_WARN_MS = 60 * 1000;
+
+function useIdleLogout(active: boolean, onIdle: () => void) {
+  const [warnLeft, setWarnLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      setWarnLeft(null);
+      return;
+    }
+    let last = Date.now();
+    const bump = () => {
+      last = Date.now();
+      setWarnLeft((prev) => (prev === null ? prev : null));
+    };
+    // passive: 스크롤 성능을 건드리지 않는다. capture: 입력이 어느 요소에서 나도 받는다.
+    const events = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'visibilitychange'] as const;
+    for (const type of events) window.addEventListener(type, bump, { passive: true, capture: true });
+
+    const timer = setInterval(() => {
+      const idle = Date.now() - last;
+      if (idle >= IDLE_LIMIT_MS) {
+        onIdle();
+        return;
+      }
+      const left = IDLE_LIMIT_MS - idle;
+      setWarnLeft(left <= IDLE_WARN_MS ? Math.ceil(left / 1000) : null);
+    }, 5000);
+
+    return () => {
+      clearInterval(timer);
+      for (const type of events) window.removeEventListener(type, bump, { capture: true });
+    };
+  }, [active, onIdle]);
+
+  return warnLeft;
+}
 
 // ── 세션 ────────────────────────────────────────────────────────────
 
@@ -186,6 +279,9 @@ function App() {
   const [booting, setBooting] = useState(true);
   const [loginError, setLoginError] = useState('');
   const [companyFilter, setCompanyFilter] = useState<string>('all'); // 관리자 회사 필터
+  // 비밀번호 재설정 흐름(F1). 주소가 진실이고, PASSWORD_RECOVERY 이벤트는 보조 신호다
+  // — supabase-js가 해시(#type=recovery)를 먼저 지워도 경로는 남기 때문이다.
+  const [recovery, setRecovery] = useState(isResetPasswordPath);
 
   // 부팅과 로그인이 같은 경로를 쓰도록, 프로필 조회는 여기 한 곳에서만 한다.
   useEffect(() => {
@@ -227,6 +323,9 @@ function App() {
 
     // 토큰 만료·다른 탭 로그아웃을 반영한다. 콜백 안에서 곧바로 supabase를 부르면 잠길 수 있어 한 틱 미룬다.
     const { data: sub } = auth.onAuthStateChange((event, session) => {
+      // 재설정 메일 링크로 들어온 세션. 주소가 /reset-password가 아니어도(메일 클라이언트가 주소를
+      // 바꾸는 경우) 이 이벤트로 재설정 화면을 띄운다.
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
       if (event === 'INITIAL_SESSION') return; // getSession이 이미 처리했다.
       setTimeout(() => {
         void apply(session?.user?.id);
@@ -261,12 +360,40 @@ function App() {
     setUser(null);
   }, []);
 
+  // 유휴 30분 로그아웃(§8 S3 · D8). 로그인 상태에서만 돈다.
+  const idleLeft = useIdleLogout(Boolean(user), logout);
+
+  // 재설정을 마치거나 포기했을 때 — 주소에서 /reset-password를 지워 새로고침해도 다시 열리지 않게 한다.
+  const exitRecovery = useCallback(() => {
+    window.history.replaceState(null, '', import.meta.env.BASE_URL);
+    setRecovery(false);
+  }, []);
+
   if (booting)
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-sm text-foreground-subtle">
         불러오는 중…
       </div>
     );
+
+  // 재설정 게이트(F1) — 로그인 게이트보다 앞이다. 링크가 만료돼 세션이 없으면
+  // ChangePasswordPage가 "링크가 만료되었어요"를 보여 주고 로그인 화면으로 되돌린다.
+  if (recovery)
+    return (
+      <ChangePasswordPage
+        mode="recovery"
+        user={user}
+        onChanged={() => {
+          setUser((prev) => (prev ? { ...prev, must_change_password: false } : prev));
+          exitRecovery();
+        }}
+        onLogout={async () => {
+          await logout();
+          exitRecovery();
+        }}
+      />
+    );
+
   if (!user) return <Login onLogin={login} error={loginError} />;
 
   // 강제 게이트 — 라우터를 아예 띄우지 않는다. 라우트 가드를 두면 직접 URL 입력으로 한 번은 화면이 그려지므로,
@@ -287,6 +414,18 @@ function App() {
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
+      {/* 유휴 경고 — 남은 시간을 초 단위로 알린다. 아무 키·클릭이면 사라진다. */}
+      {idleLeft !== null && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-3"
+        >
+          <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 t-label text-warning shadow-2">
+            {idleLeft}초 후 자동 로그아웃돼요. 계속하시려면 화면을 클릭해 주세요.
+          </p>
+        </div>
+      )}
       {needsGuide ? (
         <GuidePage
           user={user}
@@ -316,14 +455,21 @@ function Shell({
   const [dirty, setDirty] = useState(false);
   const { pathname } = useLocation();
   const isAdmin = user.role === 'admin';
-  const nav = isAdmin ? adminNav : smeNav;
+  const navGroups = isAdmin ? adminNav : smeNav;
   const home = isAdmin ? adminHome : smeHome;
   const closeDrawer = useCallback(() => setMobileOpen(false), []);
 
-  const confirmLeave = useCallback(
-    () =>
-      !dirty ||
-      window.confirm('저장하지 않은 검토 내용이 있어요. 이 화면을 떠나면 작성 중인 내용이 사라집니다. 이동할까요?'),
+  /** 확인을 기다리는 이탈 동작. null이면 확인창이 닫힌 상태다. */
+  const [pendingLeave, setPendingLeave] = useState<{ run: () => void } | null>(null);
+
+  const requestLeave = useCallback(
+    (run: () => void) => {
+      if (!dirty) {
+        run();
+        return;
+      }
+      setPendingLeave({ run });
+    },
     [dirty],
   );
 
@@ -334,18 +480,35 @@ function Shell({
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [dirty]);
 
-  const guard = React.useMemo(() => ({ setDirty, confirmLeave }), [confirmLeave]);
+  const guard = React.useMemo(() => ({ setDirty, requestLeave }), [requestLeave]);
 
   return (
     <DirtyContext.Provider value={guard}>
       <div className="min-h-screen bg-background text-foreground">
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-[#182635] text-white lg:block">
-          <SidebarBody items={nav} onNavigate={closeDrawer} onLogout={onLogout} />
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
+          <SidebarBody groups={navGroups} onNavigate={closeDrawer} onLogout={onLogout} />
         </aside>
 
         <MobileDrawer open={mobileOpen} onClose={closeDrawer}>
-          <SidebarBody items={nav} onNavigate={closeDrawer} onLogout={onLogout} />
+          <SidebarBody groups={navGroups} onNavigate={closeDrawer} onLogout={onLogout} />
         </MobileDrawer>
+
+        {/* 이탈 확인 — 사이드바 이동·뒤로가기 버튼이 모두 이 한 창을 쓴다. */}
+        {pendingLeave && (
+          <ConfirmDialog
+            title="작성 중인 내용이 사라져요"
+            body="저장하지 않은 검토 내용이 있어요. 이 화면을 떠나면 작성 중인 내용이 사라집니다."
+            confirmLabel="이동하기"
+            cancelLabel="여기 머무르기"
+            tone="negative"
+            onConfirm={() => {
+              const run = pendingLeave.run;
+              setPendingLeave(null);
+              run();
+            }}
+            onCancel={() => setPendingLeave(null)}
+          />
+        )}
 
         <div className="lg:pl-64">
           <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
@@ -386,7 +549,9 @@ function Shell({
                   />
                   <Route
                     path="/reviews"
-                    element={<ReviewTable companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                    element={
+                      <ReviewsRoute companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
                   />
                   <Route
                     path="/progress"
@@ -401,9 +566,22 @@ function Shell({
                     path="/inbox"
                     element={<InquiryInboxPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
                   />
-                  <Route path="/jobs" element={<JobsRoute userId={user.id} />} />
-                  <Route path="/jobs/:jobId" element={<JobsRoute userId={user.id} />} />
-                  <Route path="/upload" element={<UploadPage />} />
+                  <Route
+                    path="/jobs"
+                    element={
+                      <JobsRoute userId={user.id} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
+                  />
+                  <Route
+                    path="/jobs/:jobId"
+                    element={
+                      <JobsRoute userId={user.id} companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />
+                    }
+                  />
+                  <Route
+                    path="/upload"
+                    element={<UploadPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
+                  />
                   <Route
                     path="/users"
                     element={<UsersPage companyFilter={companyFilter} setCompanyFilter={setCompanyFilter} />}
@@ -454,42 +632,53 @@ function Shell({
 }
 
 function SidebarBody({
-  items,
+  groups,
   onNavigate,
   onLogout,
 }: {
-  items: NavItem[];
+  groups: NavGroup[];
   onNavigate: () => void;
   onLogout: () => void;
 }) {
-  const { confirmLeave } = React.useContext(DirtyContext);
+  const { requestLeave } = React.useContext(DirtyContext);
+  const navigate = useNavigate();
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/10 px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2e9b9a]">
+      <div className="flex h-20 shrink-0 items-center gap-3 border-b border-inverse-label/10 px-6">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand">
           <ClipboardCheck size={19} aria-hidden="true" />
         </div>
         <div>
           <p className="text-[15px] font-semibold tracking-tight">Job Review Architecture</p>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Workforce platform</p>
+          <p className="t-caption uppercase tracking-[0.18em] text-inverse-label-muted">Workforce platform</p>
         </div>
       </div>
       {/* 짧은 뷰포트·확대에서도 메뉴가 잘리지 않도록 nav만 스크롤한다. */}
-      <nav aria-label="주요 메뉴" className="flex-1 space-y-1 overflow-y-auto px-3 py-6">
-        {items.map(({ to, label, sub, Icon }) => (
-          <NavLink
-            key={to}
+      <nav aria-label="주요 메뉴" className="flex-1 space-y-5 overflow-y-auto px-3 py-6">
+        {groups.map((group) => (
+          <div key={group.title}>
+            {/* 그룹 제목은 조작이 아니라 이름표다 — 누를 수 없고, 낭독기에는 목록의 이름으로 읽힌다. */}
+            <p className="px-3 pb-1.5 t-caption font-semibold uppercase tracking-wider text-inverse-label-muted">
+              {group.title}
+            </p>
+            <div role="group" aria-label={group.title} className="space-y-1">
+              {group.items.map(({ to, label, sub, Icon }) => (
+              <NavLink
+                key={to}
             to={to}
             onClick={(e) => {
-              if (!confirmLeave()) {
-                e.preventDefault();
-                return;
-              }
-              onNavigate();
+              // 확인이 비동기라 기본 이동을 먼저 막고, 확인이 끝난 뒤 직접 이동한다.
+              e.preventDefault();
+              requestLeave(() => {
+                navigate(to);
+                onNavigate();
+              });
             }}
             className={({ isActive }) =>
               `flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-3 text-left text-sm transition ${
-                isActive ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                isActive
+                  ? 'bg-inverse-label/10 text-inverse-label'
+                  : 'text-inverse-label-muted hover:bg-inverse-label/5 hover:text-inverse-label'
               }`
             }
           >
@@ -499,28 +688,35 @@ function SidebarBody({
                 <div className="min-w-0 flex-1">
                   <span className="block text-sm">{label}</span>
                   {/*
-                    짙은 사이드바(#182635)는 이 앱에서 유일하게 토큰 밖 색을 쓰는 영역이다.
-                    비활성 보조설명이 slate-500(#64748b)일 때 3.23:1로 §8 S8의 4.5:1에 못 미쳤고
-                    hover로도 이 span은 밝아지지 않아 계속 미달이었다. slate-400(#94a3b8)이면 5.99:1.
-                    활성(slate-300 #cbd5e1, 10.34:1)이 여전히 더 밝으므로 활성/비활성 관계는 그대로다.
+                    반전 표면(--inverse-bg #182635)의 보조설명. 대비는 이 토큰 쌍으로 고정된다:
+                    --inverse-label-muted(#94a3b8)가 #182635 위 5.99:1로 §8 S8의 4.5:1을 넘는다.
+                    활성은 --inverse-label(흰색)을 90%로 써 더 밝다 — 활성/비활성 관계는 그대로다.
+                    (v2 §6-2: hex 14곳을 이 토큰들로 걷어냈다.)
                   */}
                   <span
-                    className={`mt-0.5 block text-[11px] leading-tight ${isActive ? 'text-slate-300' : 'text-slate-400'}`}
+                    className={`mt-0.5 block t-caption leading-tight ${
+                      isActive ? 'text-inverse-label/90' : 'text-inverse-label-muted'
+                    }`}
                   >
                     {sub}
                   </span>
                 </div>
-                {isActive && <ChevronRight size={15} className="ml-auto shrink-0 text-[#73d0c5]" aria-hidden="true" />}
+                {isActive && (
+                  <ChevronRight size={15} className="ml-auto shrink-0 text-inverse-accent" aria-hidden="true" />
+                )}
               </>
             )}
           </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
-      <div className="shrink-0 border-t border-white/10 p-3">
+      <div className="shrink-0 border-t border-inverse-label/10 p-3">
         <button
           type="button"
           onClick={onLogout}
-          className="flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+          className="flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-2 t-label text-inverse-label-muted hover:bg-inverse-label/5 hover:text-inverse-label"
         >
           <LogOut size={16} aria-hidden="true" /> 로그아웃
         </button>
@@ -551,7 +747,7 @@ function MobileDrawer({ open, onClose, children }: { open: boolean; onClose: () 
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose(); // ::backdrop 클릭은 dialog로 전달된다.
       }}
-      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-[#182635] p-0 text-white backdrop:bg-slate-900/50 lg:hidden"
+      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label backdrop:bg-dimmer/50 lg:hidden"
     >
       {children}
     </dialog>
@@ -573,6 +769,27 @@ function DashboardRoute({
       go={(key: string) => navigate(legacyKeyToPath[key] ?? adminHome)}
       companyFilter={companyFilter}
       setCompanyFilter={setCompanyFilter}
+    />
+  );
+}
+
+/**
+ * 검토 현황(/reviews). 행을 열면 직무 상세의 SME 피드백 패널로 보낸다(v2 §6-5) —
+ * 예전에는 이 화면이 자기 상세 모달을 따로 갖고 있어 "직무 항목 의견만 보이는" 반쪽 화면이 됐다.
+ */
+function ReviewsRoute({
+  companyFilter,
+  setCompanyFilter,
+}: {
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
+}) {
+  const navigate = useNavigate();
+  return (
+    <ReviewTable
+      companyFilter={companyFilter}
+      setCompanyFilter={setCompanyFilter}
+      onOpenReview={(jobId, smeId) => navigate(`/jobs/${jobId}?sme=${smeId}`)}
     />
   );
 }
@@ -603,14 +820,27 @@ function CompareRoute() {
   return <JobComparePage jobId={jobId} onBack={() => navigate('/workbench')} />;
 }
 
-function JobsRoute({ userId }: { userId: string }) {
+function JobsRoute({
+  userId,
+  companyFilter,
+  setCompanyFilter,
+}: {
+  userId: string;
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
+}) {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  // 검토 현황에서 「보기」로 넘어오면 ?sme=<id>가 붙는다 — 그 SME 카드로 스크롤한다(v2 §6-5).
+  const [params] = useSearchParams();
   return (
     <JobsPage
       userId={userId}
       selectedJobId={jobId ?? null}
       onSelectJob={(next) => navigate(next ? `/jobs/${next}` : '/jobs')}
+      companyFilter={companyFilter}
+      setCompanyFilter={setCompanyFilter}
+      focusSmeId={params.get('sme')}
     />
   );
 }
@@ -636,7 +866,7 @@ function ReviewRoute({ user }: { user: User }) {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { setDirty, confirmLeave } = React.useContext(DirtyContext);
+  const { setDirty, requestLeave } = React.useContext(DirtyContext);
 
   // 검토 화면을 벗어나면 가드를 반드시 푼다(제출 후 남아 있으면 다른 화면에서도 확인창이 뜬다).
   useEffect(() => () => setDirty(false), [setDirty]);
@@ -667,14 +897,10 @@ function ReviewRoute({ user }: { user: User }) {
         setParams({ step: String(next) });
       }}
       onDirtyChange={setDirty}
-      onBack={() => {
-        if (confirmLeave()) navigate(smeHome);
-      }}
+      onBack={() => requestLeave(() => navigate(smeHome))}
       // 문의 답변 배너(§6-3 ⓒ) → '내 문의'. onBack과 같은 이탈 가드를 태운다 —
       // 검토 화면을 떠나는 이동이라 작성 중인 입력이 있으면 먼저 확인을 거쳐야 한다.
-      onOpenInquiries={() => {
-        if (confirmLeave()) navigate('/inquiries');
-      }}
+      onOpenInquiries={() => requestLeave(() => navigate('/inquiries'))}
     />
   );
 }

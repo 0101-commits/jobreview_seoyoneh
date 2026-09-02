@@ -1,7 +1,5 @@
 import { supabase } from './supabase';
-import { logAudit } from './auditApi';
 import {
-  FIXED_COMPANY_NAME,
   type IntegratedJobRow,
   type IntegratedOrgRow,
   type IntegratedSkillRow,
@@ -28,21 +26,6 @@ interface RpcSaveResult {
   activity_count?: number;
   skill_count?: number;
   requirement_count?: number;
-}
-
-export async function fetchFixedCompanyId(): Promise<string> {
-  if (!supabase) throw new Error('데이터베이스 연결이 없습니다.');
-  const { data: company, error: companyError } = await supabase
-    .from('companies')
-    .select('id')
-    .eq('name', FIXED_COMPANY_NAME)
-    .maybeSingle();
-
-  if (companyError) throw new Error(companyError.message);
-  if (!company?.id) {
-    throw new Error(`회사 정보 ‘${FIXED_COMPANY_NAME}’를 찾을 수 없습니다. companies 테이블을 확인해 주세요.`);
-  }
-  return company.id;
 }
 
 /**
@@ -93,41 +76,20 @@ export async function saveOrgUnits(params: { companyId: string; rows: Integrated
   const rows = params.rows.filter((row) => row.조직코드 && row.조직명);
   if (rows.length === 0) return 0;
 
-  const { data, error } = await supabase
-    .from('org_units')
-    .upsert(
-      rows.map((row) => ({
-        company_id: params.companyId,
-        code: row.조직코드,
-        name: row.조직명,
-        active: true,
-      })),
-      { onConflict: 'company_id,code' },
-    )
-    .select('id, code');
+  /*
+    v2 S5: 2패스 upsert와 감사 기록을 서버 RPC(save_org_units)로 옮겼다.
+     · 두 패스가 한 트랜잭션이 된다 — 1패스만 성공해 상위조직이 비어 있는 트리가 남지 않는다.
+     · 감사 기록을 서버가 남긴다 — 화면이 호출을 빠뜨릴 수도, 건수를 임의로 적을 수도 없다.
+    인자명은 마이그레이션의 save_org_units(p_company_id, p_rows)와 정확히 같아야 합니다.
+  */
+  const { data, error } = await supabase.rpc('save_org_units', {
+    p_company_id: params.companyId,
+    p_rows: rows,
+  });
   if (error) throw new Error(`조직 마스터를 저장하지 못했습니다. ${error.message}`);
 
-  const idByCode = new Map(
-    (data || []).map((row) => {
-      const record = row as Record<string, unknown>;
-      return [String(record.code), String(record.id)];
-    }),
-  );
-
-  // 파일을 조직 트리의 기준으로 삼습니다. 상위조직코드가 비어 있으면 parent_id도 비워 최상위로 되돌립니다.
-  const { error: parentError } = await supabase.from('org_units').upsert(
-    rows.map((row) => ({
-      company_id: params.companyId,
-      code: row.조직코드,
-      name: row.조직명,
-      parent_id: row.상위조직코드 ? (idByCode.get(row.상위조직코드) ?? null) : null,
-    })),
-    { onConflict: 'company_id,code' },
-  );
-  if (parentError) throw new Error(`상위조직을 연결하지 못했습니다. ${parentError.message}`);
-
-  await logAudit('ORG_UNITS_UPLOADED', 'org_units', params.companyId, { count: rows.length });
-  return rows.length;
+  const raw = (data || {}) as Record<string, unknown>;
+  return Number(raw.count ?? rows.length);
 }
 
 /** SME 명부(시트 ④) 반영 결과. 못 찾은 값은 버리지 않고 그대로 화면에 나열합니다. */
@@ -184,8 +146,9 @@ export async function linkSmeRoster(params: {
   const rows = params.rows.filter((row) => row.이메일);
   if (rows.length === 0) return EMPTY_ROSTER_RESULT;
 
-  // 인자명은 마이그레이션의 link_sme_roster(p_company_id, p_rows)와 정확히 같아야 합니다.
-  const { data, error } = await supabase.rpc('link_sme_roster', {
+  // v2 S5: 감사 기록을 서버에서 남기는 래퍼를 부른다(link_sme_roster_audited).
+  // 인자·반환 모양은 link_sme_roster와 같다.
+  const { data, error } = await supabase.rpc('link_sme_roster_audited', {
     p_company_id: params.companyId,
     p_rows: rows,
   });
@@ -202,17 +165,7 @@ export async function linkSmeRoster(params: {
     reviewCreatedCount: Number(raw.reviewCreatedCount ?? 0),
   };
 
-  // §8 S5. 조직 연결과 배정 생성은 한 번의 명부 반영이므로 한 건으로 남깁니다.
-  // 이메일·직무명 원문은 남기지 않고 건수만 남깁니다(감사 로그에 명부를 통째로 복사하지 않습니다).
-  await logAudit('SME_ROSTER_LINKED', 'profiles', params.companyId, {
-    rowCount: rows.length,
-    linked: result.linkedCount,
-    changed: result.changedCount,
-    unmatched: result.unmatchedEmails.length,
-    missingOrgCodes: result.missingOrgCodes.length,
-    assignmentsCreated: result.assignmentCreatedCount,
-    unknownJobs: result.unknownJobNames.length,
-  });
+  // 감사 기록은 서버(link_sme_roster_audited)가 남긴다 — v2 S5.
 
   return result;
 }

@@ -35,6 +35,7 @@ import { CELL_STATUS_LABELS, type CellStatus } from '@/lib/adminApi';
 import { r6Of } from '@/pages/ProgressMatrixPage';
 import { fetchCompaniesResult } from '@/lib/jobApi';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
@@ -252,8 +253,6 @@ export function AssignmentAdminPage({
     runDeactivate(job, sme);
   };
 
-  const ready = !loading && !error && board !== null;
-
   return (
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
@@ -315,28 +314,17 @@ export function AssignmentAdminPage({
 
       <Toast toast={toast} onDismiss={dismiss} />
 
-      <div className="border border-border bg-card shadow-sm">
+      <div className="rounded-container border border-border bg-card shadow-1">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="배정 인원 필터">
-            {[
-              { on: false, label: '전체', count: counts.total },
-              { on: true, label: 'R6 위반만 (0명 · 3명 이상)', count: counts.none + counts.over },
-            ].map((f) => (
-              <button
-                key={f.label}
-                type="button"
-                aria-pressed={onlyViolation === f.on}
-                onClick={() => setOnlyViolation(f.on)}
-                className={`min-h-11 rounded-element border px-3 text-xs font-medium transition sm:min-h-control-sm ${
-                  onlyViolation === f.on
-                    ? 'border-primary bg-primary-subtle text-primary'
-                    : 'border-border bg-card text-foreground-muted hover:border-primary hover:text-primary'
-                }`}
-              >
-                {f.label} {ready ? f.count : ''}
-              </button>
-            ))}
-          </div>
+          <FilterChips
+            label="배정 인원 필터"
+            value={onlyViolation ? 'violation' : 'all'}
+            onChange={(next) => setOnlyViolation(next === 'violation')}
+            options={[
+              { value: 'all', label: '전체', count: counts.total },
+              { value: 'violation', label: 'R6 위반만 (0명 · 3명 이상)', count: counts.none + counts.over },
+            ]}
+          />
           <p className="text-xs text-foreground-subtle">직무를 누르면 SME를 추가하거나 해제할 수 있습니다.</p>
         </div>
 
@@ -423,7 +411,7 @@ export function AssignmentAdminPage({
                             return (
                               <li
                                 key={sme.assignmentId}
-                                className="flex flex-col gap-3 border border-border bg-card p-3 sm:flex-row sm:items-start sm:justify-between"
+                                className="flex flex-col gap-3 rounded-container border border-border bg-card p-3 sm:flex-row sm:items-start sm:justify-between"
                               >
                                 <div className="min-w-0">
                                   <p className="text-sm text-foreground">

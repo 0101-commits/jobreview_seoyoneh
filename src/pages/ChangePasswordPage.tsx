@@ -1,5 +1,7 @@
-// 비밀번호 변경 강제 화면 — profiles.must_change_password가 true인 동안 이 화면만 보인다(§8 S2 · §10 P0 DoD ②).
-// 현재 비밀번호는 묻지 않는다. Supabase Auth 세션이 이미 본인임을 증명했고,
+// 비밀번호 변경 화면 — 두 흐름이 같은 화면을 쓴다.
+//  · mode 'first-login': profiles.must_change_password가 true인 동안 이 화면만 보인다(§8 S2 · §10 P0 DoD ②).
+//  · mode 'recovery': 재설정 메일 링크(/reset-password)로 들어온 경우(v2 F1).
+// 어느 쪽도 현재 비밀번호는 묻지 않는다. Supabase Auth 세션이 이미 본인임을 증명했고,
 // 초기 비밀번호를 다시 입력하게 하면 관리자가 발급한 값을 한 번 더 타이핑시키는 것뿐이다.
 import { useRef, useState } from 'react';
 import { ClipboardCheck, LogOut } from 'lucide-react';
@@ -17,11 +19,15 @@ export function ChangePasswordPage({
   user,
   onChanged,
   onLogout,
+  mode = 'first-login',
 }: {
-  user: User;
+  /** 재설정 링크가 만료돼 세션이 없는 경우 null. 그때는 안내만 보여 준다. */
+  user: User | null;
   onChanged: () => void;
   onLogout: () => void;
+  mode?: 'first-login' | 'recovery';
 }) {
+  const recovery = mode === 'recovery';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -74,7 +80,7 @@ export function ChangePasswordPage({
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ must_change_password: false })
-        .eq('id', user.id);
+        .eq('id', user!.id);
       if (profileError) {
         // 여기까지 왔으면 비밀번호는 이미 바뀌었다. 실패를 뭉뚱그리면 사용자가 옛 비밀번호로 다시 로그인하려 든다.
         showToast({
@@ -84,30 +90,52 @@ export function ChangePasswordPage({
         return;
       }
 
-      await logAudit('PASSWORD_CHANGED', 'profiles', user.id, { reason: 'FIRST_LOGIN' });
+      await logAudit(recovery ? 'PASSWORD_RESET' : 'PASSWORD_CHANGED', 'profiles', user!.id, {
+        reason: recovery ? 'RESET_LINK' : 'FIRST_LOGIN',
+      });
       onChanged();
     } finally {
       setSaving(false);
     }
   }
 
+  // 재설정 링크의 유효기간이 지났거나 링크 없이 이 주소를 연 경우 — 세션이 없어 비밀번호를 바꿀 수 없다.
+  if (recovery && !user)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">
+        <div className="w-full max-w-[440px]">
+          <Brand />
+          <div className="rounded-container border border-border bg-card p-7 shadow-1 sm:p-9">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">링크가 만료되었어요</h1>
+            <p className="mt-2 text-sm leading-6 text-foreground-muted">
+              비밀번호 재설정 링크는 일정 시간이 지나면 쓸 수 없어요. 로그인 화면에서 다시 요청해 주세요.
+            </p>
+            <Button size="lg" className="mt-6 w-full" onClick={onLogout}>
+              로그인 화면으로
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">
       <div className="w-full max-w-[440px]">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2e9b9a] text-white">
-            <ClipboardCheck size={21} aria-hidden="true" />
-          </div>
-          <span className="font-semibold text-foreground">Job Review Architecture</span>
-        </div>
+        <Brand />
 
-        <div className="rounded-container border border-border bg-card p-7 shadow-sm sm:p-9">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">비밀번호 변경</h1>
+        <div className="rounded-container border border-border bg-card p-7 shadow-1 sm:p-9">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {recovery ? '새 비밀번호 설정' : '비밀번호 변경'}
+          </h1>
           <p className="mt-2 text-sm text-foreground-muted">
-            처음 로그인하셨습니다. 계속하기 전에 비밀번호를 변경해 주세요.
+            {recovery
+              ? '재설정 링크로 들어오셨습니다. 새 비밀번호를 정해 주세요.'
+              : '처음 로그인하셨습니다. 계속하기 전에 비밀번호를 변경해 주세요.'}
           </p>
           <p className="mt-4 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning">
-            관리자가 발급한 초기 비밀번호는 더 이상 사용할 수 없습니다.
+            {recovery
+              ? '새 비밀번호를 정하면 이전 비밀번호는 더 이상 사용할 수 없습니다.'
+              : '관리자가 발급한 초기 비밀번호는 더 이상 사용할 수 없습니다.'}
           </p>
 
           <Toast toast={toast} onDismiss={dismiss} className="mt-5" />
@@ -137,7 +165,7 @@ export function ChangePasswordPage({
               required
             />
             <Button type="submit" size="lg" loading={saving} className="w-full">
-              비밀번호 변경하고 시작하기
+              {recovery ? '새 비밀번호로 시작하기' : '비밀번호 변경하고 시작하기'}
             </Button>
           </form>
         </div>
@@ -149,6 +177,17 @@ export function ChangePasswordPage({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="mb-8 flex items-center gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-white">
+        <ClipboardCheck size={21} aria-hidden="true" />
+      </div>
+      <span className="font-semibold text-foreground">Job Review Architecture</span>
     </div>
   );
 }

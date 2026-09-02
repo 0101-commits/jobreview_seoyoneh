@@ -222,7 +222,7 @@ const round1 = (v: number): number => Math.round(v * 10) / 10;
 const byKorean = (a: string, b: string) => a.localeCompare(b, 'ko');
 
 /** 짝수 개면 가운데 두 값의 평균. 홀수 개면 가운데 값. 빈 배열이면 null(0 이 아니다). */
-function median(values: number[]): number | null {
+export function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
@@ -468,7 +468,7 @@ async function loadFteFacts(
  *
  * 쿼리 1회(검토 id 청크당).
  */
-const SESSION_CAP_MINUTES = 60;
+export const SESSION_CAP_MINUTES = 60;
 
 async function loadDurations(reviewIds: string[]): Promise<Map<string, number>> {
   const rows = await fetchByIds('검토 소요 조회', reviewIds, (ids) =>
@@ -962,11 +962,11 @@ export async function collectE3(companyId: string | null): Promise<ApiResult<Col
     const tasks = await loadTasks(jobIds);
     const activeTaskIds = tasks.filter((t) => t.active).map((t) => t.id);
 
-    const [activities, skills, requirements, suggestions] = await Promise.all([
+    const [activities, skills, requirements, suggestions, activityNotes] = await Promise.all([
       fetchByIds('세부활동 조회', activeTaskIds, (ids) =>
         db()
           .from('task_activities')
-          .select('job_task_id, activity_name, sort_order')
+          .select('id, job_task_id, activity_name, sort_order')
           .in('job_task_id', ids)
           .eq('active', true)
           .order('sort_order'),
@@ -983,6 +983,10 @@ export async function collectE3(companyId: string | null): Promise<ApiResult<Col
         db().from('job_requirements').select('job_id, education, major, certifications').in('job_id', ids),
       ),
       loadTaskSuggestions(approvedReviewIds),
+      // 세부활동 의견(결정 D2). 승인된 검토의 것만 싣는다 — E3의 다른 열과 같은 모집단이다.
+      fetchByIds('세부활동 의견 조회', approvedReviewIds, (ids) =>
+        db().from('activity_feedback').select('activity_id, comment, delete_requested').in('review_id', ids),
+      ),
     ]);
 
     const suggestionNameById = new Map(suggestions.map((s) => [str(s.id), str(s.name)]));
@@ -1027,12 +1031,30 @@ export async function collectE3(companyId: string | null): Promise<ApiResult<Col
     for (const row of descriptionRows) row['직무정의'] = definitionById.get(String(row['직무 ID'])) ?? '';
 
     // ── 시트 2: task_activity ──
-    const activitiesByTask = new Map<string, string[]>();
+    const activitiesByTask = new Map<string, { id: string; name: string }[]>();
     for (const a of activities) {
       const taskId = str(a.job_task_id);
+      const entry = { id: str(a.id), name: str(a.activity_name) };
       const list = activitiesByTask.get(taskId);
-      if (list) list.push(str(a.activity_name));
-      else activitiesByTask.set(taskId, [str(a.activity_name)]);
+      if (list) list.push(entry);
+      else activitiesByTask.set(taskId, [entry]);
+    }
+
+    /*
+      세부활동 의견(결정 D2). 여러 SME가 같은 줄에 의견을 남길 수 있으므로 문장을 이어 붙이고,
+      삭제 제안은 앞에 표시를 붙인다. 배분 값은 건드리지 않는다 — 배분 단위는 여전히 과업이다.
+    */
+    const notesByActivity = new Map<string, string[]>();
+    for (const n of activityNotes) {
+      const id = str(n.activity_id);
+      const text = str(n.comment).trim();
+      const parts: string[] = [];
+      if (n.delete_requested === true) parts.push('[삭제 제안]');
+      if (text) parts.push(text);
+      if (parts.length === 0) continue;
+      const list = notesByActivity.get(id) ?? [];
+      list.push(parts.join(' '));
+      notesByActivity.set(id, list);
     }
 
     const tasksByJob = new Map<string, TaskRow[]>();
@@ -1067,17 +1089,18 @@ export async function collectE3(companyId: string | null): Promise<ApiResult<Col
     for (const job of jobs) {
       for (const task of tasksByJob.get(job.id) ?? []) {
         const cells = fteCell(job.id, `task:${task.id}`);
-        const activityNames = activitiesByTask.get(task.id) ?? [];
+        const activityList = activitiesByTask.get(task.id) ?? [];
         // 세부활동이 여러 개면 과업 단위 비중이 같은 값으로 반복된다 — 합산하지 말 것(계약 시트 주석).
-        const names = activityNames.length ? activityNames : [''];
-        for (const activityName of names) {
+        const list = activityList.length ? activityList : [{ id: '', name: '' }];
+        for (const activity of list) {
           taskRows.push({
             '직무 ID': job.id,
             직군: job.group_name,
             직렬: job.series_name,
             직무: job.name,
             주요과업: task.name,
-            세부활동: activityName,
+            세부활동: activity.name,
+            '세부활동 의견': (notesByActivity.get(activity.id) ?? []).join(' / '),
             '과업 구분': TARGET_LABELS.EXISTING,
             ...cells,
           });
@@ -1091,6 +1114,7 @@ export async function collectE3(companyId: string | null): Promise<ApiResult<Col
           직무: job.name,
           주요과업: name,
           세부활동: '', // 신규 제안에는 아직 세부활동이 없다
+          '세부활동 의견': '',
           '과업 구분': TARGET_LABELS.SUGGESTED,
           ...fteCell(job.id, key),
         });

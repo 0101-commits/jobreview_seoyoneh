@@ -36,6 +36,7 @@ import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { Button } from '@/components/ui/Button';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import type { User } from '@/types';
 
 // ── 상수 ────────────────────────────────────────────────────────────
@@ -81,6 +82,8 @@ export function ExportsPage({
   /** 수동 스냅샷(§8 S7). Export 5종과 달리 계열사 필터를 받지 않는다 — 자세한 근거는 snapshotApi.ts 상단. */
   const [snapshot, setSnapshot] = useState<CardState>({ kind: 'IDLE' });
   const { toast, showToast, dismiss } = useToast();
+  // 되돌릴 수 없는 조작 확인(v2 §6-4) — dialog를 아래에서 반드시 그린다.
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     fetchCompanies().then(setCompanies);
@@ -144,10 +147,11 @@ export function ExportsPage({
       const { sheets, totalRows: rows } = result.data;
       if (
         rows > EXPORT_ROW_WARNING &&
-        !window.confirm(
-          `${id} ${definition.name} — 총 ${rows.toLocaleString('ko-KR')}행입니다. ` +
-            '파일을 만드는 동안 화면이 잠시 멈출 수 있어요. 계속할까요?',
-        )
+        !(await confirm({
+          title: '파일을 만드는 데 시간이 걸려요',
+          body: `${id} ${definition.name} — 총 ${rows.toLocaleString('ko-KR')}행입니다. 파일을 만드는 동안 화면이 잠시 멈출 수 있어요.`,
+          confirmLabel: '계속',
+        }))
       ) {
         setState(id, { kind: 'IDLE' });
         return;
@@ -222,9 +226,15 @@ export function ExportsPage({
 
   const runSnapshot = async () => {
     if (snapshot.kind === 'RUNNING') return;
-    if (!window.confirm(`${PERSONAL_DATA_WARNING}
-
-계속 내려받을까요?`)) return;
+    if (
+      !(await confirm({
+        title: '개인정보가 포함된 파일이에요',
+        body: PERSONAL_DATA_WARNING,
+        confirmLabel: '내려받기',
+        tone: 'negative',
+      }))
+    )
+      return;
     setSnapshot({ kind: 'RUNNING', format: 'JSON' });
     const at = new Date();
     // 감사 기록(SNAPSHOT_EXPORTED)은 downloadSnapshot 안에서 남긴다 — 파일을 실제로 만든 쪽에서만 남긴다.
@@ -265,6 +275,7 @@ export function ExportsPage({
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} className="mb-5" />
+      {dialog}
 
       <div className="grid gap-4 xl:grid-cols-2">
         {EXPORT_DEFINITIONS.map((definition) => {
@@ -273,7 +284,7 @@ export function ExportsPage({
           return (
             <section
               key={definition.id}
-              className="flex flex-col border border-border bg-card p-4 shadow-sm"
+              className="flex flex-col rounded-container border border-border bg-card p-4 shadow-1"
               aria-labelledby={`export-${definition.id}-title`}
             >
               <div className="mb-2 flex items-start gap-2">
@@ -424,7 +435,7 @@ export function ExportsPage({
         수동 스냅샷(§8 S7 · §11-2 Phase 4 4번). E1~E5와 목적이 달라 카드 격자 밖에 따로 둔다 —
         이건 계약 산출물이 아니라 복원용 백업이고, 계열사로 자르지 않는다(자르면 참조가 끊긴다).
       */}
-      <section className="mt-6 border border-border bg-card p-4 shadow-sm" aria-labelledby="snapshot-title">
+      <section className="mt-6 rounded-container border border-border bg-card p-4 shadow-1" aria-labelledby="snapshot-title">
         <div className="mb-2 flex items-start gap-2">
           <DatabaseBackup size={18} className="mt-0.5 shrink-0 text-foreground-muted" aria-hidden="true" />
           <h3 id="snapshot-title" className="text-base font-semibold text-foreground">

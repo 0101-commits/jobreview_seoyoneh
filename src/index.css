@@ -79,6 +79,38 @@
   --destructive-border: 254 205 211; /* #fecdd3 */
   --destructive-foreground: 255 255 255;
 
+  /*
+    v2 확장(기획안 §6-2) — montage semantic 토큰 층을 앱 역할 토큰으로 옮긴 것.
+    label.disable / primary.heavy / fill.* / interaction.disable / material.dimmer /
+    inverse.* / elevation.shadow / accent(차트) 자리를 채운다.
+  */
+  --foreground-disabled: 148 163 184; /* #94a3b8 — 비활성 텍스트 전용(본문 대비 규칙 밖) */
+  --primary-heavy: 24 82 81;          /* #185251 pressed */
+
+  /* fill — 표 헤더·칩 배경·hover가 각자 muted/card를 쓰던 것을 정리 */
+  --fill-strong: 241 245 249;  /* #f1f5f9 hover */
+  --fill-alt: 236 240 245;     /* #ecf0f5 표 헤더·칩 */
+
+  --interaction-disabled: 226 232 240; /* #e2e8f0 비활성 컨트롤 배경 */
+  --dimmer: 15 23 42;                  /* #0f172a — 모달 배경막(투명도는 사용처에서) */
+
+  /* 반전 표면(사이드바·로그인 좌측) — 이전에는 hex 14곳으로 흩어져 있었다 */
+  --inverse-bg: 24 38 53;          /* #182635 */
+  --inverse-label: 255 255 255;
+  --inverse-label-muted: 148 163 184; /* #94a3b8 — #182635 위 5.99:1 */
+  --inverse-accent: 115 208 197;   /* #73d0c5 */
+  --brand: 46 155 154;             /* #2e9b9a 로고 타일 */
+
+  /* 그림자 2단(montage elevation 3단 중 앱이 쓰는 2단만) */
+  --shadow-1: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-2: 0 10px 24px -12px rgb(15 23 42 / 0.25);
+
+  /* 차트 팔레트 — 상태색(success/warning)은 상태에만 쓴다(montage "semantic ≠ chart") */
+  --chart-1: 36 125 124;   /* #247d7c */
+  --chart-2: 115 208 197;  /* #73d0c5 */
+  --chart-3: 148 163 184;  /* #94a3b8 */
+  --chart-4: 203 213 225;  /* #cbd5e1 */
+
   /* 반경 */
   --radius-inner: 4px;
   --radius-element: 6px;   /* 현행 rounded-md 121곳과 같은 값 */
@@ -89,6 +121,58 @@
   --control-sm: 32px;
   --control-md: 40px;
   --control-lg: 48px;
+}
+
+/*
+  다크 값(기획안 D8). 토글 UI는 아직 없고, .dark 클래스가 붙으면 곧바로 작동하도록 쌍만 정의한다.
+  반전 표면(--inverse-*)은 두 모드에서 같다 — 사이드바는 원래 어두운 면이다.
+*/
+.dark {
+  --background: 15 23 35;
+  --card: 24 38 53;
+  --muted: 30 45 62;
+  --border: 45 62 82;
+  --border-input: 118 134 156;
+
+  --foreground: 226 232 240;
+  --foreground-muted: 176 188 204;
+  --foreground-subtle: 155 168 186;
+  --foreground-disabled: 100 116 139;
+
+  --primary: 115 208 197;
+  --primary-hover: 143 219 210;
+  --primary-heavy: 168 230 222;
+  --primary-subtle: 22 61 61;
+  --primary-border: 36 95 93;
+  --primary-foreground: 10 26 26;
+
+  --success: 52 211 153;
+  --success-muted: 6 46 36;
+  --success-border: 6 78 59;
+  --success-foreground: 10 26 26;
+
+  --warning: 251 191 36;
+  --warning-muted: 55 40 10;
+  --warning-border: 120 78 20;
+  --warning-foreground: 26 20 6;
+
+  --destructive: 251 113 133;
+  --destructive-muted: 61 20 30;
+  --destructive-border: 120 40 55;
+  --destructive-foreground: 26 6 10;
+
+  --fill-strong: 36 52 70;
+  --fill-alt: 30 45 62;
+  --interaction-disabled: 45 62 82;
+  --dimmer: 2 6 12;
+
+  --shadow-1: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-2: 0 10px 24px -12px rgb(0 0 0 / 0.7);
+
+  --chart-1: 115 208 197;
+  --chart-2: 36 125 124;
+  --chart-3: 148 163 184;
+  --chart-4: 71 85 105;
 }
 
 @layer base {
@@ -112,6 +196,20 @@
 }
 
 @layer components {
+  /*
+    타이포 스케일(기획안 §6-3) — montage 17단계 중 이 앱이 쓰는 8단계.
+    자간은 montage 값(title3 −0.023em … caption1 +0.0252em)을 그대로 옮긴다.
+    크기·행간을 화면마다 정하지 않게 하려고 클래스로 고정한다.
+  */
+  .t-title    { font-size: 24px; line-height: 32px; letter-spacing: -0.023em; font-weight: 600; }
+  .t-heading  { font-size: 20px; line-height: 28px; letter-spacing: -0.012em; font-weight: 600; }
+  .t-headline { font-size: 18px; line-height: 26px; letter-spacing: -0.002em; font-weight: 600; }
+  .t-body     { font-size: 16px; line-height: 26px; letter-spacing: 0.0057em; }
+  .t-body-2   { font-size: 15px; line-height: 22px; letter-spacing: 0.0091em; }
+  .t-label    { font-size: 14px; line-height: 20px; letter-spacing: 0.0145em; }
+  .t-label-2  { font-size: 13px; line-height: 18px; letter-spacing: 0.0194em; }
+  .t-caption  { font-size: 12px; line-height: 16px; letter-spacing: 0.0252em; }
+
   .label { @apply mb-2 block text-xs font-medium text-foreground-muted; }
   /* 좁은 화면에서는 손가락이 닿는 높이(44px)를 보장한다 — sm 이상에서는 표 밀도를 위해 그대로 둔다. */
   .input { @apply w-full min-h-control-lg rounded-element border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; border-color: rgb(var(--border-input)); }

@@ -17,6 +17,7 @@ import { fetchDashboardStats, type DashboardStats } from '@/lib/adminApi';
 import { fetchDurationStats, MIN_SAMPLE, type DurationStats } from '@/lib/durationApi';
 import { Button } from '@/components/ui/Button';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { FallbackView } from '@/components/ui/FallbackView';
 import { setReviewTablePrefilter, type StatusChip } from '@/pages/ReviewStatusPage';
 
 const timeFormat: Intl.DateTimeFormatOptions = { dateStyle: 'long', timeStyle: 'short' };
@@ -59,7 +60,7 @@ function KpiCard({
   return (
     <Link
       to={to}
-      className="flex min-h-11 flex-col border border-border bg-card p-4 shadow-sm transition hover:border-primary"
+      className="flex min-h-11 flex-col rounded-container border border-border bg-card p-4 shadow-1 transition hover:border-primary"
     >
       <p className="flex items-center gap-1.5 text-xs text-foreground-muted">
         <Icon size={13} className="shrink-0" aria-hidden="true" />
@@ -107,7 +108,7 @@ function DurationCard({
   if (!stats) {
     if (!error) return null;
     return (
-      <section className="mt-7 border border-border bg-card p-5 text-sm text-foreground-subtle shadow-sm">
+      <section className="mt-7 rounded-container border border-border bg-card p-5 text-sm text-foreground-subtle shadow-1">
         소요 실측을 불러오지 못했어요. {error}
       </section>
     );
@@ -120,7 +121,7 @@ function DurationCard({
   const diff = hasMedian && expectedMinutes !== null ? Math.round((medianMinutes - expectedMinutes) * 10) / 10 : null;
 
   return (
-    <section className="mt-7 border border-border bg-card p-5 shadow-sm">
+    <section className="mt-7 rounded-container border border-border bg-card p-5 shadow-1">
       <div className="flex items-start gap-2">
         <Timer size={15} className="mt-0.5 shrink-0 text-foreground-muted" aria-hidden="true" />
         <div>
@@ -319,15 +320,8 @@ export function Dashboard({
     [filter, go],
   );
 
-  const total = reviewRows.length;
+  // 검토 목록은 이제 「SME별 검토 현황」 표에만 쓴다(v2 §6-5 — 지표는 fetchDashboardStats 하나가 원천).
   const smeNames = [...new Set(reviewRows.map((r) => r.sme_name))];
-  const cnt = (s: string) => reviewRows.filter((r) => r.review_status === s).length;
-  const notStarted = cnt('NOT_STARTED');
-  const inProgress = cnt('IN_PROGRESS');
-  const submitted = cnt('SUBMITTED') + cnt('RESUBMITTED');
-  const resubmit = cnt('REVIEW_REQUESTED');
-  const completionRate = total ? Math.round((submitted / total) * 1000) / 10 : 0;
-  const pct = (n: number) => (total ? Math.round((n / total) * 1000) / 10 : 0);
 
   const smeRows = smeNames.map((name) => {
     const items = reviewRows.filter((r) => r.sme_name === name);
@@ -343,52 +337,40 @@ export function Dashboard({
     };
   });
 
-  // 로딩·오류일 때는 값을 0으로 그리지 않는다(진짜 0건과 구분되지 않기 때문).
-  const ready = !loading && !error;
-  const cards: { label: string; value: string | number; sub: string; tone: string; status: StatusChip }[] = [
-    { label: '전체 SME 수', value: smeNames.length, sub: '등록 계정 기준', tone: 'text-foreground', status: 'ALL' },
-    {
-      label: '미실시',
-      value: notStarted,
-      sub: `전체의 ${pct(notStarted)}%`,
-      tone: 'text-foreground-muted',
-      status: 'NOT_STARTED',
-    },
-    {
-      label: '작성 중',
-      value: inProgress,
-      sub: `전체의 ${pct(inProgress)}%`,
-      tone: 'text-warning',
-      status: 'IN_PROGRESS',
-    },
+  /*
+    v2 §6-5 — KPI 단일화.
+    예전에는 같은 화면이 같은 사실을 두 번, 서로 다른 모집단으로 말했다(U2):
+      · 상단 KPI 4장은 fetchDashboardStats(배정 기준)
+      · 그 아래 카드 6장과 도넛은 get_review_status(검토 기준)
+    그래서 "미시작 SME 수"와 "미실시", "응답률"과 "검토 완료율"이 서로 어긋나 보였다.
+    이제 카드 6장을 없애고 그 수치를 도넛 범례로 흡수하며, 모집단은 fetchDashboardStats 하나다.
+    「SME별 검토 현황」 표는 남긴다(사람 단위로 보는 유일한 자리 — 그쪽은 검토 목록이 원천이다).
+  */
+  const statusCounts = stats?.statusCounts;
+  const distTotal = stats?.assignedCount ?? 0;
+  const distPct = (n: number) => (distTotal ? Math.round((n / distTotal) * 1000) / 10 : 0);
+  const distRate = distTotal ? Math.round(((stats?.submittedCount ?? 0) / distTotal) * 100) : 0;
+
+  /*
+    상태 분포. 색은 상태 토큰을 쓴다 — 이 차트의 계열이 곧 상태이므로 상태색이 의미를 그대로 옮긴다
+    (montage의 "semantic ≠ chart"는 임의 계열에 상태색을 빌려 쓰지 말라는 규약이다).
+    범례 항목을 누르면 그 상태로 걸러진 검토 현황으로 간다 — 없앤 카드 6장이 하던 일이다.
+  */
+  const dist: { label: string; n: number; color: string; status: StatusChip }[] = [
     {
       label: '제출 완료',
-      value: submitted,
-      sub: `전체의 ${pct(submitted)}%`,
-      tone: 'text-success',
+      n: (statusCounts?.SUBMITTED ?? 0) + (statusCounts?.RESUBMITTED ?? 0),
+      color: 'rgb(var(--success))',
       status: 'SUBMITTED',
     },
+    { label: '작성 중', n: statusCounts?.IN_PROGRESS ?? 0, color: 'rgb(var(--warning))', status: 'IN_PROGRESS' },
     {
       label: '재검토 요청',
-      value: resubmit,
-      sub: `전체의 ${pct(resubmit)}%`,
-      tone: 'text-destructive',
+      n: statusCounts?.REVIEW_REQUESTED ?? 0,
+      color: 'rgb(var(--destructive))',
       status: 'REVIEW_REQUESTED',
     },
-    {
-      label: '검토 완료율',
-      value: `${completionRate}%`,
-      sub: `${submitted} / ${total}건`,
-      tone: 'text-primary',
-      status: 'ALL',
-    },
-  ];
-
-  const dist: { label: string; n: number; color: string; status: StatusChip }[] = [
-    { label: '제출 완료', n: submitted, color: 'rgb(var(--success))', status: 'SUBMITTED' },
-    { label: '작성 중', n: inProgress, color: 'rgb(var(--warning))', status: 'IN_PROGRESS' },
-    { label: '재검토 요청', n: resubmit, color: 'rgb(var(--destructive))', status: 'REVIEW_REQUESTED' },
-    { label: '미실시', n: notStarted, color: 'rgb(var(--foreground-subtle))', status: 'NOT_STARTED' },
+    { label: '미실시', n: statusCounts?.NOT_STARTED ?? 0, color: 'rgb(var(--foreground-subtle))', status: 'NOT_STARTED' },
   ];
 
   // total 0 가드가 없으면 conic-gradient에 NaNdeg가 들어가 도넛이 통째로 깨진다.
@@ -396,11 +378,13 @@ export function Dashboard({
   const conic = dist
     .map(({ n, color }) => {
       const start = acc;
-      acc += total ? (n / total) * 360 : 0;
+      acc += distTotal ? (n / distTotal) * 360 : 0;
       return `${color} ${start}deg ${acc}deg`;
     })
     .join(', ');
-  const donutLabel = `검토 상태 분포. 전체 ${total}건. ${dist.map((d) => `${d.label} ${d.n}건 ${pct(d.n)}%`).join(', ')}.`;
+  const donutLabel = `검토 상태 분포. 배정 ${distTotal}건. ${dist
+    .map((d) => `${d.label} ${d.n}건 ${distPct(d.n)}%`)
+    .join(', ')}.`;
 
   // ── §6-3 ⓐ 상단 4지표: 응답률(제출/배정) · 마감 D-day · 미시작 SME 수 · 미답 문의 수 ──
   const statsState: 'ready' | 'loading' | 'error' = statsLoading ? 'loading' : statsError ? 'error' : 'ready';
@@ -506,30 +490,10 @@ export function Dashboard({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {cards.map(({ label, value, sub, tone, status }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => openReviews(status)}
-            disabled={!ready}
-            className="border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary disabled:cursor-default disabled:hover:border-border"
-          >
-            <p className="text-xs text-foreground-muted">{label}</p>
-            <p className={`mt-3 text-2xl font-semibold ${ready ? tone : 'text-foreground-subtle'}`}>
-              {ready ? value : '–'}
-            </p>
-            <p className="mt-1 text-[11px] text-foreground-subtle">
-              {loading ? '불러오는 중…' : error ? '조회 실패' : sub}
-            </p>
-          </button>
-        ))}
-      </div>
-
       <DurationCard stats={duration} error={durationError} />
 
       <div className="mt-7 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-        <section className="border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-container border border-border bg-card p-5 shadow-1">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold text-foreground">SME별 검토 현황</h3>
@@ -627,16 +591,16 @@ export function Dashboard({
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-container border border-border bg-card p-5 shadow-1">
           <h3 className="font-semibold text-foreground">검토 상태 분포</h3>
-          <p className="mt-1 text-xs text-foreground-subtle">
-            {loading
+          <p className="mt-1 t-caption text-foreground-subtle">
+            {statsState === 'loading'
               ? '불러오는 중…'
-              : error
+              : statsState === 'error'
                 ? '조회에 실패해 분포를 계산할 수 없어요.'
-                : `전체 ${total}건 기준 · 검토 완료율 ${completionRate}%`}
+                : `배정 ${distTotal}건 기준 · SME ${stats?.smeCount ?? 0}명 · 응답률 ${distRate}%`}
           </p>
-          {ready && total > 0 ? (
+          {statsState === 'ready' && distTotal > 0 ? (
             <div className="mt-7 flex flex-col items-center gap-7 sm:flex-row">
               <div
                 role="img"
@@ -646,8 +610,8 @@ export function Dashboard({
               >
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-card text-center">
                   <span className="text-xl font-semibold text-foreground">
-                    {completionRate}
-                    <small className="text-xs">%</small>
+                    {distRate}
+                    <small className="t-caption">%</small>
                   </span>
                 </div>
               </div>
@@ -669,7 +633,7 @@ export function Dashboard({
                       </span>
                       <span className="flex items-baseline gap-1.5">
                         <b className="text-foreground">{n}건</b>
-                        <span className="text-foreground-subtle">({pct(n)}%)</span>
+                        <span className="text-foreground-subtle">({distPct(n)}%)</span>
                       </span>
                     </button>
                   </li>
@@ -677,13 +641,18 @@ export function Dashboard({
               </ul>
             </div>
           ) : (
-            <p className="mt-7 border border-dashed border-border p-6 text-center text-xs text-foreground-subtle">
-              {loading
-                ? '검토 현황을 불러오는 중이에요.'
-                : error
-                  ? '데이터를 불러오면 분포가 표시돼요.'
-                  : '아직 검토 대상이 없어 분포를 그릴 수 없어요. 직무정보를 업로드하고 SME에게 배정해 주세요.'}
-            </p>
+            <FallbackView
+              compact
+              kind={statsState === 'error' ? 'error' : 'empty'}
+              className="mt-7 rounded-element border border-dashed border-border"
+              description={
+                statsState === 'loading'
+                  ? '검토 현황을 불러오는 중이에요.'
+                  : statsState === 'error'
+                    ? '지표를 불러오면 분포가 표시돼요.'
+                    : '아직 배정된 검토가 없어 분포를 그릴 수 없어요. 직무정보를 업로드하고 SME에게 배정해 주세요.'
+              }
+            />
           )}
         </section>
       </div>

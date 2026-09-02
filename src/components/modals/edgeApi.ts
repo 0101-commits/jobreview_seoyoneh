@@ -82,15 +82,9 @@ function planAccountAudit(
         entityId: str(body.profileId),
         meta: {},
       };
-    // 고아 프로필에 로그인 계정을 다시 붙이는 조작 — 계정 생성과 같은 무게로 남긴다.
-    case 'recreate-auth':
-      return {
-        action: 'ACCOUNT_AUTH_RECREATED',
-        entityId: str(data.authId) ?? str(body.profileId),
-        meta: {},
-      };
-    // 조회(companies-list·check-auth)와 이름·소속 수정(update·update-sme), 회사 마스터 편집은
-    // S5의 기록 대상이 아니다. 대상을 넓히면 감사 로그가 조회 기록에 묻힌다.
+    // 조회(check-auth)와 이름·소속 수정(update·update-sme)은 S5의 기록 대상이 아니다.
+    // 대상을 넓히면 감사 로그가 조회 기록에 묻힌다.
+    // (recreate-auth 모드는 v2 F3으로 제거했다 — profile.id ≠ auth.uid 계정을 만들었다.)
     default:
       return null;
   }

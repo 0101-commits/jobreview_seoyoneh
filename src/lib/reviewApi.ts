@@ -92,9 +92,50 @@ export interface SkillFeedbackInput {
 }
 
 export interface SuggestionInput {
+  /**
+   * 화면이 만드는 안정 키(v2 F5). 서버의 new_task_suggestions.client_key와 짝이다.
+   * 이름이 아니라 이 값으로 제안을 맞추므로, 이름을 고쳐도 STEP 3의 배분이 그대로 따라온다.
+   * 새 제안은 newSuggestion()으로 만든다 — 여기서 키를 빠뜨리면 저장 때 서버가 새 키를 만들어
+   * 붙이고, 그 사이의 배분은 갈 곳을 잃는다.
+   */
+  client_key: string;
   name: string;
   description: string;
   reason: string;
+}
+
+/** 세부활동 줄 의견(결정 D2). 적합성은 받지 않는다 — 평가·배분 단위는 과업이다. */
+export interface ActivityFeedbackInput {
+  activity_id: string;
+  comment: string;
+  delete_requested: boolean;
+}
+
+/**
+ * 투입 비중 한 줄. 신규 제안은 DB id 대신 client_key로 가리킨다 —
+ * 서버(save_review_draft)가 같은 트랜잭션 안에서 id로 푼다(v2 F5).
+ */
+export interface FteAllocationPayload {
+  target_type: 'EXISTING' | 'SUGGESTED';
+  task_id: string | null;
+  client_key: string | null;
+  pct: number;
+}
+
+/** 새 제안 한 줄. client_key는 여기서만 만든다. */
+export function newSuggestion(): SuggestionInput {
+  return { client_key: newClientKey(), name: '', description: '', reason: '' };
+}
+
+/** crypto.randomUUID가 없는 옛 브라우저(비 HTTPS 컨텍스트 포함)를 위한 폴백. */
+export function newClientKey(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    const v = ch === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 /**
@@ -108,6 +149,12 @@ export interface ReviewDraftPayload {
   skills: SkillFeedbackInput[];
   newTasks: SuggestionInput[];
   newSkills: SuggestionInput[];
+  activities: ActivityFeedbackInput[];
+  /**
+   * 투입 비중. null이면 "이 저장은 배분과 무관하다"는 뜻이고 서버가 배분을 건드리지 않는다.
+   * 배열이면 그것이 전체 상태다 — 서버가 한 트랜잭션에서 지우고 다시 넣는다(v2 F5).
+   */
+  fte: FteAllocationPayload[] | null;
 }
 
 export const EMPTY_DRAFT_PAYLOAD: ReviewDraftPayload = {
@@ -116,6 +163,8 @@ export const EMPTY_DRAFT_PAYLOAD: ReviewDraftPayload = {
   skills: [],
   newTasks: [],
   newSkills: [],
+  activities: [],
+  fte: null,
 };
 
 // ── 조회 결과 타입 ──────────────────────────────────────────────────
@@ -164,6 +213,11 @@ export interface MyAssignment {
   status: ReviewStatus;
   last_saved_at: string | null;
   submitted_at: string | null;
+  /**
+   * 마지막으로 본 마법사 단계(1~5). 기기 간 이어하기의 근거다(v2 §6-5).
+   * 예전에는 localStorage에만 있어 다른 기기에서는 언제나 STEP 1이었다.
+   */
+  last_step: number | null;
 }
 
 /** 화면 복원용 저장 내용 전체. */
@@ -173,6 +227,7 @@ export interface ReviewFeedbackData {
   skills: SkillFeedbackInput[];
   newTasks: SuggestionInput[];
   newSkills: SuggestionInput[];
+  activities: ActivityFeedbackInput[];
 }
 
 // ── 내부 헬퍼 ───────────────────────────────────────────────────────
@@ -214,7 +269,7 @@ export async function fetchMyAssignments(smeId: string): Promise<MyAssignment[]>
       id,
       job_id,
       jobs!inner(id, name, job_groups!inner(name), job_series!inner(name)),
-      reviews(id, status, last_saved_at, submitted_at)
+      reviews(id, status, last_saved_at, submitted_at, last_step)
     `,
     )
     .eq('sme_id', smeId)
@@ -240,9 +295,23 @@ export async function fetchMyAssignments(smeId: string): Promise<MyAssignment[]>
         status: (review ? (review.status as ReviewStatus) : 'NOT_STARTED') || 'NOT_STARTED',
         last_saved_at: review ? str(review.last_saved_at) || null : null,
         submitted_at: review ? str(review.submitted_at) || null : null,
+        // 컬럼이 없는 DB(Phase D 마이그레이션 미적용)에서는 undefined로 와 null이 된다 — 이어하기만 꺼진다.
+        last_step: review && review.last_step != null ? Number(review.last_step) : null,
       };
     })
     .sort((a, b) => a.job_name.localeCompare(b.job_name, 'ko'));
+}
+
+/**
+ * 마지막으로 본 단계를 서버에 남긴다(v2 §6-5).
+ *
+ * 부수 기록이라 실패를 던지지 않는다 — 이어하기 표시가 한 번 못 따라가는 것보다 단계 이동이
+ * 막히는 편이 나쁘다. 마이그레이션 전 DB에서는 컬럼이 없어 실패하는데, 그때도 조용히 넘긴다
+ * (콘솔에는 남긴다).
+ */
+export async function saveLastStep(reviewId: string, step: number): Promise<void> {
+  const { error } = await client().from('reviews').update({ last_step: step }).eq('id', reviewId);
+  if (error) console.warn(`[reviewApi] 이어하기 단계를 저장하지 못했습니다(${step}): ${error.message}`);
 }
 
 /** 배정에 붙은 검토 세션을 가져온다. 없으면 NOT_STARTED로 만든다. */
@@ -313,7 +382,7 @@ function toReviewState(row: Row): ReviewState {
 
 export async function fetchReviewFeedback(reviewId: string): Promise<ReviewFeedbackData> {
   const db = client();
-  const [job, tasks, skills, newTasks, newSkills] = await Promise.all([
+  const [job, tasks, skills, newTasks, newSkills, activities] = await Promise.all([
     db.from('job_feedback').select('section, suitability, comment, suggestion').eq('review_id', reviewId),
     db
       .from('task_feedback')
@@ -323,17 +392,29 @@ export async function fetchReviewFeedback(reviewId: string): Promise<ReviewFeedb
       .from('skill_feedback')
       .select('skill_id, suitability, comment, suggestion, delete_requested')
       .eq('review_id', reviewId),
-    db.from('new_task_suggestions').select('name, description, reason').eq('review_id', reviewId).order('created_at'),
+    db
+      .from('new_task_suggestions')
+      .select('client_key, name, description, reason')
+      .eq('review_id', reviewId)
+      .order('created_at'),
     db.from('new_skill_suggestions').select('name, description, reason').eq('review_id', reviewId).order('created_at'),
+    db.from('activity_feedback').select('activity_id, comment, delete_requested').eq('review_id', reviewId),
   ]);
 
-  const firstError = [job, tasks, skills, newTasks, newSkills].find((r) => r.error)?.error;
+  const firstError = [job, tasks, skills, newTasks, newSkills, activities].find((r) => r.error)?.error;
   if (firstError) fail('저장된 검토 내용을 불러오지', firstError.message);
 
+  // client_key가 비어 있는 행은 Phase B 이전에 저장된 제안이다(마이그레이션 DEFAULT가 채우므로
+  // 실제로는 거의 없다). 그때만 화면에서 키를 만들어 붙인다 — 다음 저장에서 서버가 이름으로 맞춰 준다.
   const toSuggestion = (rows: unknown[] | null): SuggestionInput[] =>
     (rows || []).map((raw) => {
       const r = raw as Row;
-      return { name: str(r.name), description: str(r.description), reason: str(r.reason) };
+      return {
+        client_key: str(r.client_key) || newClientKey(),
+        name: str(r.name),
+        description: str(r.description),
+        reason: str(r.reason),
+      };
     });
 
   return {
@@ -368,6 +449,14 @@ export async function fetchReviewFeedback(reviewId: string): Promise<ReviewFeedb
     }),
     newTasks: toSuggestion(newTasks.data),
     newSkills: toSuggestion(newSkills.data),
+    activities: (activities.data || []).map((raw) => {
+      const r = raw as Row;
+      return {
+        activity_id: str(r.activity_id),
+        comment: str(r.comment),
+        delete_requested: r.delete_requested === true,
+      };
+    }),
   };
 }
 
@@ -381,6 +470,9 @@ function rpcArgs(reviewId: string, payload: ReviewDraftPayload) {
     p_skills: payload.skills,
     p_new_tasks: payload.newTasks,
     p_new_skills: payload.newSkills,
+    p_activities: payload.activities,
+    // 배분은 초안 저장과 같은 트랜잭션에서 처리된다(v2 F5). null이면 서버가 배분을 건드리지 않는다.
+    p_fte: payload.fte,
   };
 }
 
@@ -448,7 +540,12 @@ const isEmpty = (f: UiFeedback) => !f.suitability && !f.comment.trim() && !f.sug
  */
 export function buildDraftPayload(
   feedback: Record<string, UiFeedback>,
-  suggestions: { newTasks?: SuggestionInput[]; newSkills?: SuggestionInput[] } = {},
+  suggestions: {
+    newTasks?: SuggestionInput[];
+    newSkills?: SuggestionInput[];
+    /** 투입 비중 전체 상태. 넘기지 않으면 null이 되고 서버는 배분을 건드리지 않는다(v2 F5). */
+    fte?: FteAllocationPayload[] | null;
+  } = {},
 ): ReviewDraftPayload {
   const payload: ReviewDraftPayload = {
     job: [],
@@ -456,6 +553,8 @@ export function buildDraftPayload(
     skills: [],
     newTasks: (suggestions.newTasks || []).filter((s) => s.name.trim()),
     newSkills: (suggestions.newSkills || []).filter((s) => s.name.trim()),
+    activities: [],
+    fte: suggestions.fte ?? null,
   };
 
   for (const [key, raw] of Object.entries(feedback)) {
@@ -491,6 +590,13 @@ export function buildDraftPayload(
         suggestion: f.suggestion,
         delete_requested: f.remove === true,
       });
+    } else if (key.startsWith('act-')) {
+      // 세부활동(D2)은 의견·삭제 제안만 받는다. 적합성 칸이 없으므로 여기서도 보내지 않는다.
+      payload.activities.push({
+        activity_id: key.slice('act-'.length),
+        comment: f.comment,
+        delete_requested: f.remove === true,
+      });
     }
   }
 
@@ -518,6 +624,14 @@ export function toFeedbackState(data: ReviewFeedbackData): Record<string, UiFeed
       suitability: toSuitabilityLabel(f.suitability),
       comment: f.comment,
       suggestion: f.suggestion,
+      remove: f.delete_requested,
+    };
+  }
+  for (const f of data.activities) {
+    state[`act-${f.activity_id}`] = {
+      suitability: '',
+      comment: f.comment,
+      suggestion: '',
       remove: f.delete_requested,
     };
   }
@@ -552,10 +666,22 @@ export interface SmeReviewFeedback {
   feedback: ReviewFeedbackData;
 }
 
-const emptyFeedback = (): ReviewFeedbackData => ({ job: [], tasks: [], skills: [], newTasks: [], newSkills: [] });
+const emptyFeedback = (): ReviewFeedbackData => ({
+  job: [],
+  tasks: [],
+  skills: [],
+  newTasks: [],
+  newSkills: [],
+  activities: [],
+});
 
 const hasContent = (f: ReviewFeedbackData) =>
-  f.job.length > 0 || f.tasks.length > 0 || f.skills.length > 0 || f.newTasks.length > 0 || f.newSkills.length > 0;
+  f.job.length > 0 ||
+  f.tasks.length > 0 ||
+  f.skills.length > 0 ||
+  f.newTasks.length > 0 ||
+  f.newSkills.length > 0 ||
+  f.activities.length > 0;
 
 const SUBMITTED_STATUSES: ReviewStatus[] = ['SUBMITTED', 'RESUBMITTED', 'REVIEW_REQUESTED'];
 
@@ -599,7 +725,7 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
   if (reviews.length === 0) return [];
   const ids = reviews.map((r) => r.review_id);
 
-  const [job, tasks, skills, newTasks, newSkills] = await Promise.all([
+  const [job, tasks, skills, newTasks, newSkills, activities] = await Promise.all([
     db.from('job_feedback').select('review_id, section, suitability, comment, suggestion').in('review_id', ids),
     db
       .from('task_feedback')
@@ -611,7 +737,7 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
       .in('review_id', ids),
     db
       .from('new_task_suggestions')
-      .select('review_id, name, description, reason')
+      .select('review_id, client_key, name, description, reason')
       .in('review_id', ids)
       .order('created_at'),
     db
@@ -619,9 +745,11 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
       .select('review_id, name, description, reason')
       .in('review_id', ids)
       .order('created_at'),
+    // 세부활동 의견(결정 D2) — 관리자 비교 뷰·직무 상세가 함께 읽는다.
+    db.from('activity_feedback').select('review_id, activity_id, comment, delete_requested').in('review_id', ids),
   ]);
 
-  const firstError = [job, tasks, skills, newTasks, newSkills].find((r) => r.error)?.error;
+  const firstError = [job, tasks, skills, newTasks, newSkills, activities].find((r) => r.error)?.error;
   if (firstError) fail('SME 검토 내용을 불러오지', firstError.message);
 
   const byId = new Map(reviews.map((r) => [r.review_id, r]));
@@ -661,11 +789,29 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
   }
   for (const raw of newTasks.data || []) {
     const r = raw as Row;
-    bucket(raw)?.newTasks.push({ name: str(r.name), description: str(r.description), reason: str(r.reason) });
+    bucket(raw)?.newTasks.push({
+      client_key: str(r.client_key) || newClientKey(),
+      name: str(r.name),
+      description: str(r.description),
+      reason: str(r.reason),
+    });
   }
   for (const raw of newSkills.data || []) {
     const r = raw as Row;
-    bucket(raw)?.newSkills.push({ name: str(r.name), description: str(r.description), reason: str(r.reason) });
+    bucket(raw)?.newSkills.push({
+      client_key: str(r.client_key) || newClientKey(),
+      name: str(r.name),
+      description: str(r.description),
+      reason: str(r.reason),
+    });
+  }
+  for (const raw of activities.data || []) {
+    const r = raw as Row;
+    bucket(raw)?.activities.push({
+      activity_id: str(r.activity_id),
+      comment: str(r.comment),
+      delete_requested: r.delete_requested === true,
+    });
   }
 
   // 아직 아무것도 쓰지 않은 배정은 관리자 화면에서 잡음이라 감춘다.
@@ -678,18 +824,9 @@ export async function fetchJobReviewFeedback(jobId: string): Promise<SmeReviewFe
     );
 }
 
-/**
- * 재검토 요청(반려). reviews.status를 REVIEW_REQUESTED로 바꾸고 review_history에 사유를 남긴다.
- * 두 쓰기가 한 트랜잭션이어야 감사 기록이 어긋나지 않으므로 RPC 한 번으로 처리한다.
- * (supabase/migrations/20260828020000_add_request_rereview_rpc.sql)
- *
- * ⚠ 새 화면에서는 쓰지 말 것 — 반려는 adminApi.decideReview(reviewId, 'REJECTED', 사유)를 쓴다.
- * 이 RPC는 사유를 review_history에만 남기고 reviews.rejected_reason을 쓰지 않아, SME 화면의
- * 재검토 배너가 사유 없이 뜬다(§10 P3 DoD ①). 지금은 호출부가 없다.
+/*
+ * (삭제) requestRereview — v2 F8. 호출부 0이었고, 사유를 reviews.rejected_reason에 쓰지 않아
+ * SME 화면의 재검토 배너가 사유 없이 떴다. 반려는 adminApi.decideReview(reviewId, 'REJECTED', 사유)다.
+ * 서버의 request_rereview 실행 권한도 함께 회수한다(APPLY_2026-09-02_phaseA.sql).
  */
-export async function requestRereview(reviewId: string, note: string): Promise<ReviewState> {
-  const { data, error } = await client().rpc('request_rereview', { p_review_id: reviewId, p_note: note });
-  if (error) fail('재검토를 요청하지', error.message);
-  const row = Array.isArray(data) ? data[0] : data;
-  return toState(row, '재검토를 요청하지');
-}
+

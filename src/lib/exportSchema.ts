@@ -357,6 +357,13 @@ const E3_TASK_ACTIVITY: ExportSheet = {
     { name: '직무', note: 'jobs.name.', source: 'REUSED' },
     { name: '주요과업', note: 'job_tasks.name. 신규 제안이 반영된 과업은 new_task_suggestions.name.', source: 'REUSED' },
     { name: '세부활동', note: 'task_activities.activity_name. 없으면 빈칸.', source: 'REUSED' },
+    {
+      name: '세부활동 의견',
+      note:
+        'activity_feedback — 승인된 검토에서 SME가 그 줄에 남긴 의견. 삭제 제안은 앞에 [삭제 제안]을 붙이고, ' +
+        '여러 SME의 의견은 " / "로 잇는다. 배분 단위는 바뀌지 않는다(v2 결정 D2).',
+      source: 'COINED',
+    },
     { name: '과업 구분', note: '기존 / 신규 제안.', source: 'PLAN' },
     { name: 'FTE 비중(%)', note: '§9 E3 "FTE 비중 열 포함". 승인 기준 SME 평균 비중. 승인 응답이 없으면 빈칸.', source: 'PLAN' },
     { name: '응답 수', note: '비중의 분모(n). 0건이면 빈칸.', source: 'PLAN' },

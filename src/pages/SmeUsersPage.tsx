@@ -191,7 +191,7 @@ export function UsersPage({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-1 w-56 rounded-element border border-border bg-card py-1 shadow-lg"
+                className="absolute right-0 z-20 mt-1 w-56 rounded-element border border-border bg-card py-1 shadow-2"
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
                     setMenuOpen(false);
@@ -234,7 +234,7 @@ export function UsersPage({
         등록할 때 사용합니다.
       </div>
 
-      <div className="rounded-container border border-border bg-card shadow-sm">
+      <div className="rounded-container border border-border bg-card shadow-1">
         <div className="border-b border-border p-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-3 text-foreground-subtle" size={16} aria-hidden="true" />
@@ -379,8 +379,9 @@ export function UsersPage({
         <SmeSingleCreateModal
           companies={companies}
           onClose={() => setShowSingleCreate(false)}
-          onSuccess={() => {
-            setShowSingleCreate(false);
+          onSuccess={(opts) => {
+            // keepOpen: 모달이 임시 비밀번호를 보여 주는 동안 목록만 새로고침한다(v2 S2).
+            if (!opts?.keepOpen) setShowSingleCreate(false);
             showToast({ type: 'success', msg: 'SME 계정을 추가했어요.' });
             fetchSmes();
           }}

@@ -4,6 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
+    <!--
+      Content-Security-Policy (§8 S5 · v2 Phase E).
+      GitHub Pages는 응답 헤더를 세울 수 없어 meta로 건다. meta CSP의 한계는 알고 쓴다 —
+      frame-ancestors·report-uri는 무시되고, 이 태그 앞에서 실행된 스크립트는 막지 못한다.
+      그래도 XSS가 외부 스크립트를 끌어오거나 임의 도메인으로 데이터를 보내는 경로는 닫힌다.
+
+      허용 범위를 왜 이렇게 잡았나:
+       · script-src 'self' — 번들만 실행한다. Vite 빌드는 인라인 스크립트를 만들지 않는다.
+       · style-src 'self' 'unsafe-inline' — Tailwind 유틸은 파일로 나오지만, 화면이 style
+         속성(진행률 폭·도넛 conic-gradient)을 계산해 넣는다. 그건 인라인 스타일로 취급된다.
+       · connect-src — Supabase REST·Auth·Realtime(wss)·Edge Function이 모두 그 도메인이다.
+         값은 빌드 시점에 VITE_SUPABASE_URL로 치환된다(vite.config.ts의 transformIndexHtml).
+       · img-src data: — 아이콘·엑셀 미리보기가 data URL을 쓴다. blob:은 파일 저장 경로다.
+       · font-src 'self' — Pretendard는 번들에 포함된다(외부 폰트 CDN 없음).
+       · object-src 'none' · base-uri 'self' — 플러그인·base 태그 주입을 막는다.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' %VITE_SUPABASE_ORIGIN% wss://%VITE_SUPABASE_HOST%; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <title>직무정보 검토 시스템 | Job Review Architecture</title>
   </head>
   <body>

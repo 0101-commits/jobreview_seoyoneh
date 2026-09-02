@@ -354,7 +354,6 @@ export interface SmeUploadRow {
   사번: string;
   이름: string;
   이메일: string;
-  비밀번호: string;
 }
 
 export interface SmeValidationResult {
@@ -365,7 +364,12 @@ export interface SmeValidationResult {
   validRows: SmeUploadRow[];
 }
 
-const SME_COLS = ['회사', '조직', '직급', '사번', '이름', '이메일', '비밀번호'];
+/*
+ * 양식에서 '비밀번호' 열을 뺐다(v2 S2 / 결정 D1 ⓑ).
+ * 수십 명의 초기 비밀번호가 담긴 xlsx가 관리자 PC·메일에 남는 구조를 없애려는 것이다.
+ * 비밀번호는 서버(Edge Function)가 만들어 등록 결과에 1회만 표시한다.
+ */
+const SME_COLS = ['회사', '조직', '직급', '사번', '이름', '이메일'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateSmeRows(
@@ -399,7 +403,6 @@ export function validateSmeRows(
       사번: normalize(raw['사번']),
       이름: normalize(raw['이름']),
       이메일: normalize(raw['이메일']).toLowerCase(),
-      비밀번호: String(raw['비밀번호'] ?? '').trim(),
     };
 
     let hasError = false;
@@ -418,10 +421,6 @@ export function validateSmeRows(
     else if (seenEmails.has(row.이메일)) { errorList.push({ row: rowNum, message: `Excel 내 중복 이메일입니다. (${row.이메일})` }); hasError = true; }
     else { seenEmails.add(row.이메일); }
 
-    if (!row.비밀번호) { errorList.push({ row: rowNum, message: '비밀번호가 입력되지 않았습니다.' }); hasError = true; }
-    else if (row.비밀번호.length < 8 || !/[a-zA-Z]/.test(row.비밀번호) || !/[0-9]/.test(row.비밀번호)) {
-      errorList.push({ row: rowNum, message: '비밀번호는 8자 이상이며 영문과 숫자를 포함해야 합니다.' }); hasError = true;
-    }
 
     if (row.사번 && row.회사) {
       const empKey = `${row.회사}|${row.사번}`;
@@ -438,11 +437,11 @@ export function validateSmeRows(
 
 export function downloadSmeTemplate() {
   const data: SmeUploadRow[] = [
-    { 회사: '서연이화', 조직: '생산기술팀', 직급: '대리', 사번: '2024001', 이름: '김서연', 이메일: 'seoyeon@example.com', 비밀번호: 'Test1234' },
-    { 회사: '서연탑메탈', 조직: '품질팀', 직급: '과장', 사번: '2024002', 이름: '이탑', 이메일: 'topmetal@example.com', 비밀번호: 'Test5678' },
+    { 회사: '서연이화', 조직: '생산기술팀', 직급: '대리', 사번: '2024001', 이름: '김서연', 이메일: 'seoyeon@example.com' },
+    { 회사: '서연탑메탈', 조직: '품질팀', 직급: '과장', 사번: '2024002', 이름: '이탑', 이메일: 'topmetal@example.com' },
   ];
   const ws = XLSX.utils.json_to_sheet(data, { header: SME_COLS });
-  ws['!cols'] = [{ wch: 14 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 24 }, { wch: 14 }];
+  ws['!cols'] = [{ wch: 14 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 24 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'SME 계정');
   XLSX.writeFile(wb, 'SME계정_업로드_양식.xlsx');

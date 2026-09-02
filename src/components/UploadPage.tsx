@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -24,6 +25,9 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import { fetchCompanies, type Company } from '@/lib/jobApi';
+import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { ProgressTracker } from '@/components/ui/ProgressTracker';
 import { Button } from './ui/Button';
 import { ModalShell } from './ui/ModalShell';
 import { Toast, useToast } from './ui/Toast';
@@ -40,7 +44,6 @@ import {
 import {
   fetchCurrentJobCount,
   fetchExistingJobNames,
-  fetchFixedCompanyId,
   linkSmeRoster,
   saveIntegratedJobData,
   saveOrgUnits,
@@ -77,7 +80,15 @@ function listPreview(items: string[]): string {
   return items.length > NAME_LIST_LIMIT ? `${head} 외 ${items.length - NAME_LIST_LIMIT}건` : head;
 }
 
-export function UploadPage() {
+export function UploadPage({
+  companyFilter,
+  setCompanyFilter,
+}: {
+  /** 공통 회사 필터(App 보유). 업로드는 대상이 하나여야 하므로 'all'이면 저장 버튼을 막는다(v2 F4). */
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
+}) {
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<PageState>('idle');
   const [validation, setValidation] = useState<IntegratedValidationResult | null>(null);
@@ -92,6 +103,14 @@ export function UploadPage() {
   const [currentJobCount, setCurrentJobCount] = useState<number | null | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast, showToast, dismiss } = useToast();
+
+  // 회사명 하드코딩('서연이화')을 걷어낸 자리(v2 F4). 대상 회사는 관리자가 고른다.
+  const companyId = companyFilter === 'all' ? null : companyFilter;
+  const companyName = companies.find((c) => c.id === companyId)?.name ?? '';
+
+  useEffect(() => {
+    fetchCompanies().then(setCompanies);
+  }, []);
 
   const resetFile = useCallback(() => {
     setFile(null);
@@ -118,7 +137,7 @@ export function UploadPage() {
     try {
       // 두 번째 인자는 SME 명부 Sheet가 있을 때만 호출됩니다. 기존 2시트 파일은 조회를 타지 않습니다.
       const checked = await parseAndValidateIntegratedWorkbook(selectedFile, async () =>
-        fetchExistingJobNames(await fetchFixedCompanyId()),
+        companyId ? fetchExistingJobNames(companyId) : [],
       );
       setValidation(checked);
     } catch (error) {
@@ -130,7 +149,7 @@ export function UploadPage() {
     } finally {
       setState('validated');
     }
-  }, []);
+  }, [companyId]);
 
   const runUpload = useCallback(async () => {
     if (!validation?.valid || state === 'saving') return;
@@ -143,8 +162,13 @@ export function UploadPage() {
     setOrgSavedCount(0);
     setRosterResult(null);
 
+    if (!companyId) {
+      setSaveError('업로드할 회사를 먼저 선택해 주세요. 「전체 회사」로는 저장할 수 없어요.');
+      setState('validated');
+      return;
+    }
+
     try {
-      const companyId = await fetchFixedCompanyId();
       setSavePhase(1);
       const result = await saveIntegratedJobData({
         jobRows: validation.jobRows,
@@ -196,7 +220,7 @@ export function UploadPage() {
       );
       setState('validated');
     }
-  }, [mode, state, validation]);
+  }, [companyId, mode, state, validation]);
 
   const handleUploadClick = useCallback(async () => {
     if (!validation?.valid || state === 'saving') return;
@@ -207,15 +231,15 @@ export function UploadPage() {
     // 전체 교체는 되돌릴 수 없으므로 현재 등록 건수를 보여 주고 한 번 더 확인받습니다.
     setCurrentJobCount(undefined);
     setConfirmOpen(true);
-    try {
-      const companyId = await fetchFixedCompanyId();
-      setCurrentJobCount(await fetchCurrentJobCount(companyId));
-    } catch {
+    if (!companyId) {
       setCurrentJobCount(null);
+      return;
     }
-  }, [mode, runUpload, state, validation]);
+    setCurrentJobCount(await fetchCurrentJobCount(companyId));
+  }, [companyId, mode, runUpload, state, validation]);
 
-  const canUpload = Boolean(validation?.valid) && (state === 'validated' || state === 'done');
+  const canUpload =
+    Boolean(validation?.valid) && Boolean(companyId) && (state === 'validated' || state === 'done');
 
   const savePhases = useMemo(
     () => [
@@ -242,7 +266,7 @@ export function UploadPage() {
         </p>
       </div>
 
-      <div className="mb-6 rounded-container border border-border bg-card p-5 shadow-sm">
+      <div className="mb-6 rounded-container border border-border bg-card p-5 shadow-1">
         <StepIndicator current={currentStep} complete={state === 'done'} />
       </div>
 
@@ -288,7 +312,7 @@ export function UploadPage() {
 
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <section className="space-y-5">
-          <div className="rounded-container border border-border bg-card p-6 shadow-sm">
+          <div className="rounded-container border border-border bg-card p-6 shadow-1">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold text-foreground">통합 Excel 파일 업로드</h3>
@@ -360,8 +384,28 @@ export function UploadPage() {
           )}
         </section>
 
-        <aside className="h-fit rounded-container border border-border bg-card p-5 shadow-sm">
-          <h3 className="font-semibold text-foreground">업로드 방식</h3>
+        <aside className="h-fit rounded-container border border-border bg-card p-5 shadow-1">
+          {/* 대상 회사 — 저장 대상이 무엇인지가 업로드 방식보다 먼저 정해져야 한다(v2 F4). */}
+          <h3 className="font-semibold text-foreground">대상 회사</h3>
+          <div className="mt-3">
+            <CompanyFilterDropdown
+              companies={companies}
+              value={companyFilter}
+              onChange={setCompanyFilter}
+              label="대상 회사"
+              className="w-full"
+            />
+            {companyId ? (
+              <p className="mt-2 text-xs text-foreground-muted">
+                이 파일의 직무·과업·Skill이 <span className="font-medium text-foreground">{companyName}</span> 에
+                저장됩니다.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-warning">업로드할 회사를 선택해 주세요. 「전체 회사」로는 저장할 수 없어요.</p>
+            )}
+          </div>
+
+          <h3 className="mt-6 font-semibold text-foreground">업로드 방식</h3>
           <div className="mt-4 space-y-3">
             <ModeOption
               checked={mode === 'append'}
@@ -466,51 +510,18 @@ function RosterSummary({ result }: { result: SmeRosterLinkResult }) {
 // ── 진행 단계 ───────────────────────────────────────────────────────
 
 function StepIndicator({ current, complete }: { current: number; complete: boolean }) {
+  // v2 §6-4: 단계 표시는 공용 ProgressTracker 하나를 쓴다(마법사와 같은 부품).
+  // 여기서는 표시 전용이라 onSelect를 주지 않는다 — 업로드 단계는 눌러서 건너뛸 수 없다.
   return (
-    <ol className="flex flex-col gap-3 sm:flex-row sm:items-center" aria-label="업로드 진행 단계">
-      {STEPS.map((step, index) => {
-        const number = index + 1;
-        const isDone = complete || number < current;
-        const isActive = !complete && number === current;
-        const Icon = step.icon;
-        return (
-          <li key={step.label} className="flex flex-1 items-center gap-3" aria-current={isActive ? 'step' : undefined}>
-            <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
-                isDone
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : isActive
-                    ? 'border-primary bg-primary-subtle text-primary'
-                    : 'border-border bg-muted text-foreground-subtle'
-              }`}
-            >
-              {isDone ? <Check size={16} aria-hidden="true" /> : number}
-            </span>
-            <span className="min-w-0">
-              <span
-                className={`flex items-center gap-1.5 text-sm ${
-                  isActive
-                    ? 'font-semibold text-primary'
-                    : isDone
-                      ? 'font-medium text-foreground'
-                      : 'text-foreground-subtle'
-                }`}
-              >
-                <Icon size={14} aria-hidden="true" />
-                {step.label}
-                <span className="sr-only">{isDone ? ' (완료)' : isActive ? ' (진행 중)' : ' (대기)'}</span>
-              </span>
-            </span>
-            {index < STEPS.length - 1 && (
-              <span
-                aria-hidden="true"
-                className={`hidden h-px flex-1 sm:block ${isDone ? 'bg-primary' : 'bg-border'}`}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <ProgressTracker
+      label="업로드 진행 단계"
+      current={complete ? STEPS.length + 1 : current}
+      items={STEPS.map((step, index) => ({
+        step: index + 1,
+        label: step.label,
+        complete: complete || index + 1 < current,
+      }))}
+    />
   );
 }
 
@@ -752,7 +763,7 @@ function ValidationPanel({
   onCopied: (toast: { type: 'success' | 'error'; msg: string }) => void;
 }) {
   return (
-    <div className="rounded-container border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-container border border-border bg-card p-6 shadow-1">
       <h3 className="font-semibold text-foreground">데이터 검증 결과</h3>
 
       <div className="mt-4 space-y-3">
@@ -1075,7 +1086,7 @@ function PreviewPanel({ validation }: { validation: IntegratedValidationResult }
   if (validation.jobRows.length === 0 && validation.skillRows.length === 0) return null;
 
   return (
-    <div className="rounded-container border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-container border border-border bg-card p-6 shadow-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 font-semibold text-foreground">
           <Table2 size={16} className="text-primary" aria-hidden="true" /> 파일 내용 미리보기

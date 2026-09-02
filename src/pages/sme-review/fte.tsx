@@ -1,29 +1,29 @@
 /*
- * STEP 3 — 투입 비중(FTE) 배분 화면 (§6-2 "STEP 3 상세" · 그림 6-A).
+ * STEP 3 — 투입 비중(FTE) 배분 화면 (§6-2 "STEP 3 상세" · 그림 6-A · v2 §5-3).
  *
- * 이 개편에서 전례가 없는 유일한 화면이라(§4 "두 레포 모두 부재"), 기획안 명세를 그대로 옮긴다.
- * 대상 목록·입력 방식·합계 게이지·품질 가드 ⓐⓑⓒ·겸직 표기 다섯 덩어리가 그 명세다.
+ * 대상 목록·입력 방식·합계 게이지·품질 가드 ⓐⓑⓒ·겸직 표기가 원래 명세이고,
+ * v2에서 「이 과업 다시 보기」가 더해졌다 — STEP 2로 돌아가지 않고 이 자리에서
+ * 적합성·의견·수정 제안·삭제 제안·세부활동 의견을 고칠 수 있다(옵션 C).
  *
  * 상태를 여기서 들지 않는다. 대상(targets)과 값(rows)은 셸(SmeReviewPage)이 들고 내려 준다.
- *  - 대상: STEP 2의 삭제 제안·신규 제안이 바뀌는 즉시 다시 계산돼야 한다(§10 P2 DoD ①).
- *    그래서 이 파일은 사본을 만들지 않고 props에서 파생만 한다. 셸이 대상을 만들 때 쓰라고
- *    buildFteTargets를 함께 내보낸다 — 같은 규칙이 두 벌로 갈라지지 않게 하려는 것이다.
+ *  - 대상: STEP 2의 삭제 제안·신규 제안이 바뀌는 즉시 다시 계산된다(§10 P2 DoD ①).
+ *    셸이 대상을 만들 때 쓰라고 buildFteTargets를 함께 내보낸다 — 규칙이 두 벌로 갈라지지 않게.
  *  - 값: 바꾸면 setRows로 셸에 올리고 onDirty()를 부른다. 저장은 셸의 자동 저장(2.5초)이 한다.
- *    여기서 따로 저장하면 상단 저장 칩과 실제 저장 시점이 어긋난다.
+ *  - 펼침 안의 편집은 STEP 2와 같은 상태를 고친다(update / setNewTasks). 저장 경로도 같다.
  *
- * 신규 제안 과업의 저장 — 임시저장 전에는 DB의 suggestion_id가 아직 없다. 그래서 화면은
- * newTasks 배열의 인덱스(FteTarget.suggestionIndex)로만 식별하고, 저장은 셸이
- *   ① saveReviewDraft로 신규 제안을 먼저 저장해 suggestion_id를 얻고
- *   ② 그 id로 rows의 'sug-{index}'를 치환해 surveyApi.saveFteAllocations를 부른다
- * 순서로 처리한다. id를 얻기 전에는 SUGGESTED 행을 보내지 않는다(참조할 행이 없어 어차피 들어가지 않는다).
+ * 신규 제안 배분의 연결고리는 client_key다(v2 F5). 화면 키가 `sug-{client_key}`이고
+ * 서버(save_review_draft p_fte)가 같은 트랜잭션에서 그 키로 제안 행을 찾는다 —
+ * 이름으로 되짚거나 배열 인덱스를 보정하는 코드는 모두 사라졌다.
  */
 import { type KeyboardEvent, useCallback, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Info, Minus, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, Minus, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import type { JobDetail } from '@/lib/jobApi';
-import type { SuggestionInput } from '@/lib/reviewApi';
+import { newSuggestion, type SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback } from '@/types';
+import { AutoTextarea, FeedbackNotes, SuitabilityControl } from './controls';
 import {
   FTE_DONE_LINE,
   FTE_EQUAL_SPLIT_BUTTON,
@@ -36,21 +36,31 @@ import {
   FTE_STEP_PCT,
   FTE_SUGGESTED_BADGE,
   FTE_TOTAL_LABEL,
+  ACTIVITY_NOTE_HINT,
+  ACTIVITY_REMOVE_LABEL,
+  ACTIVITY_SECTION_LABEL,
+  FTE_ADD_TASK_BUTTON,
+  FTE_REOPEN_BUTTON,
+  FTE_REOPEN_CLOSE_BUTTON,
+  FTE_REOPEN_NOTE,
+  FTE_RESTORE_BUTTON,
   GATE_STEP2_NEW_TASK_NAME,
   NEXT_STEP_BUTTON,
   PREV_STEP_BUTTON,
   STEP_TITLES,
-  fteExcludedLine,
+  activityCommentLabel,
+  fteExcludedRestoreLine,
   fteGaugeValueText,
   fteInputLabel,
   fteOverLine,
   fteRemainingLine,
   fteStepDownLabel,
   fteStepUpLabel,
+  fteSuggestedNameChip,
   fteTooManySmallNote,
   fteZeroPctNote,
 } from './copy';
-import type { FteRow, FteStepProps, FteTarget, StepNo } from './wizardTypes';
+import type { FteExcluded, FteRow, FteStepProps, FteTarget, StepNo } from './wizardTypes';
 
 // ── 계산 (화면 밖에서도 쓴다: 셸의 단계 게이트, STEP 5 제출 요약) ───
 
@@ -95,60 +105,61 @@ function equalSplit(count: number): number[] {
 }
 
 /**
- * STEP 2 결과 → 배분 대상(§6-2 "대상 목록"). 셸이 STEP 2 상태에서 이 함수로 targets를 만든다.
- * 유지 Task + 이름이 있는 신규 제안 Task만 남기고, 삭제 제안한 Task는 목록에서 빼고 건수만 돌려준다.
- * 이름이 빈 신규 제안은 애초에 저장되지 않는 항목이라(reviewApi.buildDraftPayload) 대상에서 뺀다.
+ * STEP 2 결과 → 배분 대상(§6-2 "대상 목록" · v2 §5-3). 셸이 STEP 2 상태에서 이 함수로 targets를 만든다.
+ *
+ * 유지 과업 + 이름이 있는 신규 제안만 대상이고, 삭제 제안한 과업은 excluded로 따로 돌려준다
+ * (STEP 3에서 되살릴 수 있어야 이름이 필요하다).
+ * 이름이 빈 신규 제안은 저장되지 않는 항목이라(reviewApi.buildDraftPayload) 대상에서 뺀다.
+ *
+ * 같은 이름의 제안 두 줄도 각각 대상이 된다 — 키가 client_key이고 서버도 같은 키로 맞추므로,
+ * 이름 중복이 더 이상 한 줄로 합쳐지지 않는다(v2 F5).
  */
 export function buildFteTargets(
   tasks: JobDetail['tasks'],
   feedback: Record<string, Feedback>,
   newTasks: SuggestionInput[],
-): { targets: FteTarget[]; excludedCount: number } {
+): { targets: FteTarget[]; excluded: FteExcluded[] } {
   const targets: FteTarget[] = [];
-  let excludedCount = 0;
+  const excluded: FteExcluded[] = [];
 
   for (const task of tasks) {
-    if (feedback[`task-${task.id}`]?.remove) {
-      excludedCount += 1;
+    const f = feedback[`task-${task.id}`];
+    if (f?.remove) {
+      excluded.push({ taskId: task.id, name: task.name });
       continue;
     }
     targets.push({
       key: `task-${task.id}`,
       targetType: 'EXISTING',
       taskId: task.id,
-      suggestionIndex: null,
+      clientKey: null,
       name: task.name,
       description: task.description,
       isNew: false,
+      suitability: f?.suitability || '',
+      suggestedName: (f?.suggestion || '').trim(),
+      activities: (task.task_activities || []).map((a) => ({ id: a.id, name: a.activity_name })),
     });
   }
 
-  // 키가 배열 인덱스라, 중간 제안을 지우면 뒤 제안의 키가 한 칸 당겨진다(제안 편집기가 filter로
-  // 지운다 — controls.tsx SuggestionEditor). 그래서 셸(SmeReviewPage)의 targets 동기화 effect는
-  // SUGGESTED 대상의 값을 키보다 이름으로 먼저 찾는다. 그러지 않으면 밀려온 제안이 방금 지운
-  // 제안의 비중을 그대로 물려받는다.
-  //
-  // 같은 이름의 제안은 한 줄만 대상으로 잡는다. 서버 save_review_draft가 신규 제안을 이름 기준
-  // (DISTINCT ON)으로 저장해 같은 이름 두 줄이 DB에서는 한 행이 되기 때문이다. 두 줄을 그대로
-  // 대상에 넣으면 저장 때 같은 suggestion_id로 두 번 insert 하게 되고, 부분 unique 인덱스
-  // (idx_fte_review_suggestion)에 걸려 자동 저장이 매번 실패한다.
-  const seenNames = new Set<string>();
-  newTasks.forEach((item, index) => {
+  for (const item of newTasks) {
     const name = item.name.trim();
-    if (!name || seenNames.has(name)) return;
-    seenNames.add(name);
+    if (!name) continue;
     targets.push({
-      key: `sug-${index}`,
+      key: `sug-${item.client_key}`,
       targetType: 'SUGGESTED',
       taskId: null,
-      suggestionIndex: index,
+      clientKey: item.client_key,
       name,
       description: item.description,
       isNew: true,
+      suitability: '',
+      suggestedName: '',
+      activities: [],
     });
-  });
+  }
 
-  return { targets, excludedCount };
+  return { targets, excluded };
 }
 
 // ── 합계 게이지 ─────────────────────────────────────────────────────
@@ -290,12 +301,24 @@ export function FteStep({
   targets,
   rows,
   setRows,
-  excludedCount,
+  excluded,
+  feedback,
+  update,
   newTasks,
+  setNewTasks,
   onDirty,
   goToStep,
   showNav = true,
 }: FteStepProps & { showNav?: boolean }) {
+  /** 「다시 보기」로 펼친 행. 기본은 전부 접힘이다(모바일 390px에서 행 밀도를 지키기 위해). */
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+  const toggleOpen = (key: string) =>
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   // 사본을 만들지 않는다. 대상이 바뀌면(STEP 2 편집) 이 파생값이 같은 렌더에서 함께 바뀐다.
   const pcts = useMemo(() => ftePctMap(targets, rows), [targets, rows]);
   const total = useMemo(() => {
@@ -306,6 +329,17 @@ export function FteStep({
 
   /** 가드 ⓐ에서 "다시 배분할게요"를 누르면 돌아갈 직전 값. null이면 모달이 닫힌 상태다. */
   const [revertTo, setRevertTo] = useState<FteRow[] | null>(null);
+  // 균등 배분 덮어쓰기 확인(v2 §6-4 — window.confirm 대체).
+  const { confirm, dialog } = useConfirm();
+
+  /*
+    삭제 제안으로 대상에서 빠진 행의 이전 비중. 셸이 rows에 그대로 남겨 두므로(주차) 되살리면
+    같은 값이 돌아온다 — 자동 재배분은 하지 않는다(응답자의 판단을 기계가 대신하면 E2가 왜곡된다).
+  */
+  const parkedPct = useMemo(() => {
+    const keys = new Set(excluded.map((ex) => `task-${ex.taskId}`));
+    return rows.filter((r) => keys.has(r.key)).reduce((sum, r) => sum + normalizePct(r.pct), 0);
+  }, [excluded, rows]);
 
   const unnamedCount = useMemo(() => newTasks.filter((t) => !t.name.trim()).length, [newTasks]);
   const zeroCount = useMemo(() => targets.filter((t) => (pcts.get(t.key) ?? 0) === 0).length, [targets, pcts]);
@@ -372,10 +406,19 @@ export function FteStep({
 
   const bump = (key: string, delta: number) => setPct(key, (pcts.get(key) ?? 0) + delta);
 
-  const onEqualSplit = () => {
+  const onEqualSplit = async () => {
     if (readOnly || targets.length === 0) return;
     // 덮어쓰기 확인 — 문구는 기획안에 없어 새로 씀. 이미 배분한 값이 말없이 사라지지 않게 한 번 묻는다.
-    if (total > 0 && !window.confirm('이미 입력한 비중을 지우고 균등하게 다시 배분할까요?')) return;
+    if (
+      total > 0 &&
+      !(await confirm({
+        title: '균등하게 다시 배분할까요?',
+        body: '이미 입력한 비중이 지워지고 과업 수에 맞춰 고르게 나눠집니다.',
+        confirmLabel: '다시 배분',
+        tone: 'negative',
+      }))
+    )
+      return;
     const parts = equalSplit(targets.length);
     setRows(targets.map((t, i) => ({ key: t.key, pct: parts[i] })));
     onDirty();
@@ -429,16 +472,23 @@ export function FteStep({
             <ul className="space-y-3">
               {targets.map((t) => {
                 const pct = pcts.get(t.key) ?? 0;
+                const open = openKeys.has(t.key);
                 return (
                   <li key={t.key} className="rounded-element border border-border bg-card p-3 sm:p-4">
                     <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
                       <p className="min-w-0 flex-1 font-medium text-foreground">{t.name}</p>
+                      {/* STEP 2 판정을 배분 행에서도 읽을 수 있게 한다(v2 §5-3 "행 머리에 STEP 2 결과"). */}
+                      {t.suitability && <SuitabilityChip value={t.suitability} />}
                       {t.isNew && (
                         <span className="shrink-0 rounded-inner bg-primary-subtle px-2 py-0.5 text-[11px] font-semibold text-primary">
                           {FTE_SUGGESTED_BADGE}
                         </span>
                       )}
                     </div>
+                    {/* 수정 제안명 — 관리자 비교 뷰와 같은 문언으로 붙인다. */}
+                    {t.suggestedName && (
+                      <p className="mt-1 text-xs font-medium text-primary">{fteSuggestedNameChip(t.suggestedName)}</p>
+                    )}
                     {t.description && <p className="mt-1 text-xs leading-5 text-foreground-muted">{t.description}</p>}
 
                     {/* 좁은 폭·큰 글꼴에서는 줄을 바꿔 넘치지 않게 한다(막대가 flex-1이라 스스로 다음 줄을 채운다). */}
@@ -500,16 +550,75 @@ export function FteStep({
                       >
                         <span className="block h-full rounded-inner bg-primary" style={{ width: `${pct}%` }} />
                       </span>
+                      {/* 「다시 보기」 — STEP 2로 왕복하지 않고 이 자리에서 고친다(v2 옵션 C). */}
+                      <button
+                        type="button"
+                        onClick={() => toggleOpen(t.key)}
+                        aria-expanded={open}
+                        className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-element px-2 text-xs font-medium text-primary transition hover:bg-primary-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      >
+                        {open ? FTE_REOPEN_CLOSE_BUTTON : FTE_REOPEN_BUTTON}
+                        {open ? (
+                          <ChevronUp size={14} aria-hidden="true" />
+                        ) : (
+                          <ChevronDown size={14} aria-hidden="true" />
+                        )}
+                      </button>
                     </div>
+
+                    {open && (
+                      <TargetEditor
+                        target={t}
+                        readOnly={readOnly}
+                        feedback={feedback}
+                        update={update}
+                        newTasks={newTasks}
+                        setNewTasks={setNewTasks}
+                        onDirty={onDirty}
+                      />
+                    )}
                   </li>
                 );
               })}
             </ul>
           )}
 
-          {/* 그림 6-A 목록 아래 줄 — 삭제 제안 제외 안내 · 균등 배분으로 시작 */}
+          {/* 목록 하단 — 과업 추가 제안(v2 §5-3) */}
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setNewTasks([...newTasks, newSuggestion()]);
+                onDirty();
+              }}
+              disabled={readOnly}
+              className="w-full border-dashed"
+            >
+              <Plus size={15} aria-hidden="true" /> {FTE_ADD_TASK_BUTTON}
+            </Button>
+          </div>
+
+          {/* 삭제 제안 제외 안내 · 되살리기 · 균등 배분으로 시작 */}
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-            {excludedCount > 0 && <span className="text-xs text-foreground-muted">{fteExcludedLine(excludedCount)}</span>}
+            {excluded.length > 0 && (
+              <span className="text-xs text-foreground-muted">
+                {fteExcludedRestoreLine(excluded.length, parkedPct)}
+                {excluded.map((ex) => (
+                  <button
+                    key={ex.taskId}
+                    type="button"
+                    onClick={() => {
+                      // STEP 2의 삭제 제안 체크를 그대로 해제한다 — 같은 상태, 같은 저장이다.
+                      update(`task-${ex.taskId}`, { remove: false });
+                    }}
+                    disabled={readOnly}
+                    className="ml-2 font-medium text-primary underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {ex.name} {FTE_RESTORE_BUTTON}
+                  </button>
+                ))}
+              </span>
+            )}
             <Button variant="secondary" size="sm" onClick={onEqualSplit} disabled={readOnly || targets.length === 0}>
               {FTE_EQUAL_SPLIT_BUTTON}
             </Button>
@@ -554,6 +663,8 @@ export function FteStep({
 
       <TotalGauge layout="bar" total={total} showNav={showNav} goToStep={goToStep} />
 
+      {dialog}
+
       {revertTo && (
         <ModalShell
           title={FTE_SINGLE_100_MODAL.title}
@@ -579,6 +690,171 @@ export function FteStep({
         </ModalShell>
       )}
     </section>
+  );
+}
+
+// ── 행 머리 판정 칩 / 「다시 보기」 펼침 ─────────────────────────────
+
+/** STEP 2 판정을 배분 행 머리에 작게 다시 보여 준다. 색만으로 알리지 않도록 문구를 그대로 쓴다. */
+function SuitabilityChip({ value }: { value: string }) {
+  const tone =
+    value === '적합'
+      ? 'bg-success-muted text-success'
+      : value === '부적합'
+        ? 'bg-destructive-muted text-destructive'
+        : 'bg-warning-muted text-warning';
+  return <span className={`shrink-0 rounded-inner px-2 py-0.5 t-caption font-semibold ${tone}`}>{value}</span>;
+}
+
+/**
+ * 「다시 보기」 펼침(v2 §5-3). STEP 2의 편집 표면을 그대로 이 자리에 놓는다.
+ *  · 기존 과업: 적합성·의견·수정 제안·삭제 제안 — feedback[`task-{id}`] 한 상태를 고친다.
+ *  · 신규 제안: 이름·설명·이유 — newTasks의 그 줄(client_key로 찾는다)을 고친다.
+ *  · 세부활동(결정 D2): 줄마다 의견·삭제 제안 — feedback[`act-{id}`]로 저장된다.
+ * 새 상태를 만들지 않는 것이 핵심이다. 게이트·진행률·자동 저장은 그대로 셸의 것을 쓴다.
+ */
+function TargetEditor({
+  target,
+  readOnly,
+  feedback,
+  update,
+  newTasks,
+  setNewTasks,
+  onDirty,
+}: {
+  target: FteTarget;
+  readOnly: boolean;
+  feedback: Record<string, Feedback>;
+  update: (key: string, value: Partial<Feedback>) => void;
+  newTasks: SuggestionInput[];
+  setNewTasks: (items: SuggestionInput[]) => void;
+  onDirty: () => void;
+}) {
+  const emptyFeedback: Feedback = { suitability: '', comment: '', suggestion: '' };
+
+  if (target.targetType === 'SUGGESTED') {
+    const index = newTasks.findIndex((t) => t.client_key === target.clientKey);
+    if (index < 0) return null;
+    const item = newTasks[index];
+    const patch = (v: Partial<SuggestionInput>) => {
+      setNewTasks(newTasks.map((t, i) => (i === index ? { ...t, ...v } : t)));
+      onDirty();
+    };
+    return (
+      <div className="mt-3 rounded-element border border-dashed border-primary-border bg-primary-subtle p-3 sm:p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="t-caption font-semibold text-primary">신규 주요과업 제안</span>
+          <button
+            type="button"
+            aria-label={`신규 주요과업 제안 ${item.name || index + 1} 삭제`}
+            disabled={readOnly}
+            onClick={() => {
+              setNewTasks(newTasks.filter((_, i) => i !== index));
+              onDirty();
+            }}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-element text-foreground-subtle transition hover:bg-destructive-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          <label>
+            <span className="label">과업명</span>
+            <input
+              className="input"
+              value={item.name}
+              disabled={readOnly}
+              onChange={(e) => patch({ name: e.target.value })}
+              placeholder="추가할 과업명을 입력해 주세요."
+            />
+          </label>
+          <label>
+            <span className="label">설명</span>
+            <AutoTextarea
+              value={item.description}
+              onChange={(v) => patch({ description: v })}
+              placeholder="어떤 일인지 적어 주세요."
+            />
+          </label>
+          <label>
+            <span className="label">추가가 필요한 이유</span>
+            <AutoTextarea
+              value={item.reason}
+              onChange={(v) => patch({ reason: v })}
+              placeholder="왜 필요한지 적어 주세요."
+            />
+          </label>
+        </div>
+        <p className="mt-3 t-caption text-primary">{FTE_REOPEN_NOTE}</p>
+      </div>
+    );
+  }
+
+  const key = `task-${target.taskId}`;
+  const f = feedback[key] || emptyFeedback;
+  return (
+    <div className="mt-3 rounded-element border border-border bg-muted p-3 sm:p-4">
+      <div className="grid gap-4 lg:grid-cols-[260px_1fr_1fr]">
+        <div>
+          <span className="label">적합성 평가</span>
+          <SuitabilityControl
+            value={f.suitability}
+            onChange={(v) => update(key, { suitability: v })}
+            label={`${target.name} 적합성 평가`}
+          />
+          <label className="mt-3 flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
+            <input
+              type="checkbox"
+              checked={!!f.remove}
+              disabled={readOnly}
+              onChange={(e) => update(key, { remove: e.target.checked })}
+              className="h-4 w-4 accent-[rgb(var(--destructive))]"
+            />
+            이 과업은 삭제가 필요해요
+          </label>
+        </div>
+        <FeedbackNotes feedback={f} onChange={(v) => update(key, v)} suggestionLabel="수정 제안" />
+      </div>
+
+      {/* 세부활동 — 배분 단위가 아니라 의견 단위다(결정 D2 · 계약 E3 과업 단위 유지). */}
+      {target.activities.length > 0 && (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="t-label-2 font-semibold text-foreground">{ACTIVITY_SECTION_LABEL}</p>
+          <p className="mt-1 t-caption text-foreground-muted">{ACTIVITY_NOTE_HINT}</p>
+          <ul className="mt-3 space-y-3">
+            {target.activities.map((act) => {
+              const actKey = `act-${act.id}`;
+              const af = feedback[actKey] || emptyFeedback;
+              return (
+                <li key={act.id} className="rounded-element bg-card p-3">
+                  <p className="t-label-2 font-medium text-foreground">{act.name}</p>
+                  <div className="mt-2">
+                    <AutoTextarea
+                      value={af.comment}
+                      onChange={(v) => update(actKey, { comment: v })}
+                      placeholder="고칠 점이 있으면 적어 주세요."
+                      aria-label={activityCommentLabel(act.name)}
+                    />
+                  </div>
+                  <label className="mt-2 flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
+                    <input
+                      type="checkbox"
+                      checked={!!af.remove}
+                      disabled={readOnly}
+                      onChange={(e) => update(actKey, { remove: e.target.checked })}
+                      className="h-4 w-4 accent-[rgb(var(--destructive))]"
+                    />
+                    {ACTIVITY_REMOVE_LABEL}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <p className="mt-3 t-caption text-foreground-muted">{FTE_REOPEN_NOTE}</p>
+    </div>
   );
 }
 

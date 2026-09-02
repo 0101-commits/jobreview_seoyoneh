@@ -8,7 +8,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, RotateCw, Users } from 'lucide-
 import {
   decideReview,
   fetchJobComparison,
-  fetchWorkshopFlags,
+  fetchWorkshopFlag,
   type FteRow,
   type JobComparison,
   type ReviewDecision,
@@ -16,8 +16,9 @@ import {
 } from '@/lib/adminApi';
 import { SIGNAL_LABELS, WORKSHOP_REASONS, WORKSHOP_THRESHOLDS } from '@/lib/workshopThresholds';
 import { workshopDecisionOf } from '@/lib/workshopRules';
-import { fetchAllJobsResult, mapReviewStatus, type JobListItem } from '@/lib/jobApi';
+import { fetchJobHeader, mapReviewStatus, type JobListItem } from '@/lib/jobApi';
 import { toSuitabilityLabel, type SmeReviewFeedback, type Suitability, type SuitabilityLabel } from '@/lib/reviewApi';
+import { fteSuggestedNameChip } from '@/pages/sme-review/copy';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -145,12 +146,11 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
     (async () => {
       // 세 조회는 서로를 기다릴 이유가 없다. 하나가 실패해도 나머지는 그대로 보여 준다
       // (adminApi가 예외 대신 ApiResult를 주는 이유가 이것이다).
-      // ponytail: 직무명 한 줄·플래그 한 줄 때문에 목록을 통째로 받는다(각 쿼리 1회).
-      // adminApi에 단건 조회(fetchJobHeader·fetchWorkshopFlag)가 생기면 그것으로 바꾼다 — 화면 계약은 그대로다.
-      const [cmp, jobs, flags] = await Promise.all([
+      // v2 D3: 직무명 한 줄·플래그 한 줄을 단건으로 읽는다(예전에는 전 직무·전 플래그를 받아 하나를 골랐다).
+      const [cmp, jobResult, flagResult] = await Promise.all([
         fetchJobComparison(jobId),
-        fetchAllJobsResult(null),
-        fetchWorkshopFlags(null),
+        fetchJobHeader(jobId),
+        fetchWorkshopFlag(jobId),
       ]);
       if (cancelled) return;
       if (cmp.ok) {
@@ -164,20 +164,20 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
         setComparison(null);
         setError(cmp.error);
       }
-      if (jobs.ok) {
-        setJob(jobs.data.find((j) => j.id === jobId) ?? null);
+      if (jobResult.ok) {
+        setJob(jobResult.data);
         setJobError('');
       } else {
         setJob(null);
-        setJobError(jobs.error);
+        setJobError(jobResult.error);
       }
       // 저장된 결정이 없는 것(null)과 못 불러온 것을 구분한다 — 후자면 패널 대신 오류를 띄운다.
-      if (flags.ok) {
-        setFlag(flags.data.find((f) => f.jobId === jobId) ?? null);
+      if (flagResult.ok) {
+        setFlag(flagResult.data);
         setFlagError('');
       } else {
         setFlag(null);
-        setFlagError(flags.error);
+        setFlagError(flagResult.error);
       }
       setLoading(false);
     })();
@@ -280,14 +280,14 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
         </div>
       )}
 
-      {loading && <p className="border border-border bg-card p-8 text-center text-sm text-foreground-subtle">불러오는 중…</p>}
+      {loading && <p className="rounded-container border border-border bg-card p-8 text-center text-sm text-foreground-subtle">불러오는 중…</p>}
 
       {!loading && !error && comparison && (
         <div className="space-y-5">
           {/* 자동 규칙에 걸린 사유·기준·측정값은 아래 워크숍 패널이 규칙 ①~④로 풀어서 보여 준다.
               여기서 같은 말을 다시 적지 않는다(사유 문구의 출처는 workshopThresholds 한 곳이다). */}
           {comparison.smeCount === 0 ? (
-            <p className="border border-border bg-card p-8 text-center text-sm text-foreground-subtle">
+            <p className="rounded-container border border-border bg-card p-8 text-center text-sm text-foreground-subtle">
               아직 제출된 검토가 없습니다. SME가 제출하면 응답을 나란히 비교할 수 있어요.
             </p>
           ) : crossCheckImpossible ? (
@@ -365,7 +365,7 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
 
 function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFeedback[] }) {
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead
         title="적합성 판정 불일치"
         note={
@@ -440,8 +440,24 @@ function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFe
 function FteSection({ comparison, smes }: { comparison: JobComparison; smes: SmeReviewFeedback[] }) {
   const rows = comparison.fteRows;
 
+  /*
+    과업 수정 제안명(v2 §5-3). SME 화면의 STEP 3 행 머리와 같은 문언을 여기에도 붙인다 —
+    "어느 과업의 배분인지"가 양쪽에서 같은 말로 읽혀야 워크숍에서 헷갈리지 않는다.
+    같은 과업에 SME마다 다른 제안명을 냈으면 모두 나열한다(그것 자체가 이견 정보다).
+  */
+  const suggestedNames = new Map<string, string[]>();
+  for (const sme of smes) {
+    for (const t of sme.feedback.tasks) {
+      const name = t.suggestion.trim();
+      if (!name) continue;
+      const list = suggestedNames.get(`task:${t.task_id}`) ?? [];
+      if (!list.includes(name)) list.push(name);
+      suggestedNames.set(`task:${t.task_id}`, list);
+    }
+  }
+
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead
         title="과업별 투입 비중(FTE)"
         note={
@@ -494,6 +510,11 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
                         {row.targetType === 'SUGGESTED' && (
                           <span className="text-[11px] text-foreground-subtle">신규 제안</span>
                         )}
+                        {(suggestedNames.get(row.key) ?? []).map((name) => (
+                          <span key={name} className="block t-caption font-medium text-primary">
+                            {fteSuggestedNameChip(name)}
+                          </span>
+                        ))}
                         {flagged && <ReasonChip text={reason} tone="warning" />}
                       </th>
                       {smes.map((sme) => (
@@ -531,6 +552,11 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
                           {row.targetType === 'SUGGESTED' && (
                             <span className="text-[11px] text-foreground-subtle">신규 제안</span>
                           )}
+                          {(suggestedNames.get(row.key) ?? []).map((name) => (
+                            <span key={name} className="block t-caption font-medium text-primary">
+                              {fteSuggestedNameChip(name)}
+                            </span>
+                          ))}
                           {reason && <ReasonChip text={reason} tone="warning" />}
                         </span>
                         <PctCell
@@ -576,7 +602,7 @@ function SuggestionSection({ smes }: { smes: SmeReviewFeedback[] }) {
   const any = smes.some((s) => s.feedback.newTasks.length > 0);
   if (!any) return null;
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead title="신규 제안 과업" note="제안한 SME가 적은 과업일수록 워크숍에서 확인할 값이 큽니다." />
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         {smes.map((sme) => (
@@ -624,7 +650,7 @@ function DecisionSection({
   onReject: (sme: SmeReviewFeedback) => void;
 }) {
   return (
-    <section className="border border-border bg-card shadow-sm">
+    <section className="rounded-container border border-border bg-card shadow-1">
       <SectionHead
         title="승인 · 반려"
         note="SME 한 명의 검토 1건씩 판정합니다. 반려하면 그 SME 화면에 사유가 배너로 뜨고 해당 검토만 다시 열립니다."

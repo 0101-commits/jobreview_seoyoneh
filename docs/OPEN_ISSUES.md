@@ -432,3 +432,59 @@ select action, entity, entity_id, actor_id, created_at
 관리자 화면 문구에 기획안 절 번호(`§6-1`, `§12 오픈이슈 1`, `§10 P5` 등)가 그대로 노출돼 있었다. 착수보고·계약 산출물 번호(11면, E2·E5)는 관리자에게 뜻이 통하므로 남기고, 이 저장소 안에서만 통하는 좌표만 걷어냈다 — `src/pages/SettingsPage.tsx`(페이지 부제, 마감일·예상 소요·가이드·FTE 게이트 안내), `src/pages/DashboardPage.tsx`(소요 카드 3곳).
 
 이 과정에서 **문구 하나가 이미 사실과 달라져 있던 것**도 고쳤다: 운영 설정의 "대시보드 지표로 올리는 일은 §10 P5에서 정합니다"는 이번 Phase에서 대시보드 카드를 실제로 만들었으므로 틀린 문장이 됐다. 지금은 대시보드 카드와 Export E5 두 곳에서 볼 수 있다고 적었다.
+
+
+---
+
+## v2.0 개편(2026-09-02) — Phase A~E 구현 기록
+
+기획안: **아티팩트 dcab2660**(전수 감사 + 개편 기획안 v2.0). 브랜치 `revamp2`.
+아래는 "무엇을 했는가"와 "무엇이 남았는가"만 적는다. 근거·선택지 비교는 기획안에 있다.
+
+### 적용해야 하는 SQL (순서대로)
+
+| 순서 | 파일 | 무엇 | 화면 배포와의 관계 |
+| --- | --- | --- | --- |
+| 1 | `supabase/APPLY_2026-09-02_v2_phaseA.sql` | profiles GRANT 축소(S1) · `request_rereview` REVOKE(F8) | 먼저 적용해도 무해 |
+| 2 | `supabase/APPLY_2026-09-02_v2_phaseB.sql` | `client_key` · `save_review_draft(p_fte, p_activities)` · `submit_review` · `activity_feedback` · 구조 편집 잠금 트리거 | **함께 적용해야 한다**(함수 시그니처가 바뀐다 — 옛 화면은 6인자 호출을 찾지 못한다) |
+| 3 | `supabase/APPLY_2026-09-02_v2_phaseD.sql` | `reviews.last_step` | 미적용이어도 화면은 동작(이어하기만 꺼짐) |
+| 4 | `supabase/APPLY_2026-09-02_v2_phaseE.sql` | `save_org_units` · `link_sme_roster_audited` | **함께 적용해야 한다**(업로드 시트 ③④ 경로가 이 함수를 부른다) |
+
+2·4를 적용하지 않은 채 새 화면을 배포하면 각각 SME 저장·제출과 조직/명부 업로드가 PGRST202로 실패한다.
+
+### Phase별 요약
+
+- **A 복구** — 비밀번호 재설정 경로 신설(`/reset-password` + 로그인 「비밀번호를 잊으셨나요」 + 관리자 메일 redirectTo 통일),
+  Edge Function `listUsers()` 50건 상한 제거(이메일 조회는 전 페이지 순회, 존재 확인은 `getUserById`),
+  로그인 계정 재생성 기능 제거(profile.id ≠ auth.uid 계정을 만들었다), 회사명 하드코딩 제거(업로드에 대상 회사 선택),
+  SME 발급을 서버 생성 임시 비밀번호 1회 표시로 전환(양식에서 비밀번호 열 삭제), 로그인 화면 개인 이메일 제거,
+  죽은 코드 삭제(`saveStep1Data`·`saveStep2Data`·`requestRereview`·회사 마스터 CRUD 모드).
+- **B FTE 연동 v2** — `new_task_suggestions.client_key`로 화면·DB를 잇고, FTE 배분을 `save_review_draft(p_fte)`
+  한 트랜잭션으로 합쳤다(delete만 성공한 중간 상태가 사라졌다). STEP 3에 판정 칩·「→ 제안명」·「다시 보기」 펼침·
+  과업 추가·삭제 제안 되살리기. 세부활동 의견(`activity_feedback`)과 E3 「세부활동 의견」 열.
+  진행 중 검토가 있는 직무의 구조 편집 잠금(트리거 3개 + 화면 비활성).
+- **C 디자인 시스템** — 토큰 12종 + 다크 값 쌍, 타이포 8클래스, 공용 부품 12종(`src/components/ui/`).
+  지표: hex 19→0 · Tailwind 원색 43→0 · `window.confirm` 9→0 · 상태 배지 3벌→1 · 단계 표시 2벌→1 ·
+  필터 칩 5벌→1 · 반경 없는 카드 23→0 · 그림자 2단 고정.
+- **D 화면·IA** — 사이드바 5그룹, 대시보드 KPI 모집단 단일화(카드 6장 → 도넛 범례), SME 홈(D-day·단계 진행·
+  이어하기 = `reviews.last_step`), 검토 현황 상세 모달 제거 → `/jobs/:jobId?sme=`로 통합, 문의 담당 표기,
+  비교 뷰 단건 조회.
+- **E 품질** — `lib/paging.ts` 공용 페이징(관리자 조회 4곳 적용 — 1,000행 절단으로 "미배정"이 되던 자리),
+  소요 실측 집계 상수·중앙값을 `exportApi`에서 공유(두 벌 제거), 유휴 30분 자동 로그아웃(1분 전 경고),
+  meta CSP(빌드 시 Supabase 도메인 치환), 감사 기록 서버 이관.
+
+### 아직 남은 것 (이번에 하지 않은 것)
+
+1. **PILOT.md 251항목 실측** — 운영 계정이 없어 로그인 이후 경로를 이 저장소에서 실행하지 못했다.
+   Phase A~E의 DoD 중 "실제로 해 본다"에 해당하는 항목은 전부 미검증이다(재설정 메일 1회, 계정 60개
+   시드에서 check-auth, 두 회사 업로드, 42501 확인, 30명 동시 저장).
+2. **대형 파일 분해(D5)** — `exportApi` 1,494줄 · `adminApi` 1,351줄 · `JobDetailPage` 1,308줄 ·
+   `SmeReviewPage` 1,234줄 · `UploadPage` 1,206줄. 이번에는 손대지 않았다(회귀 위험이 이득보다 컸다).
+   react-refresh 경고 20건도 같은 이유로 남았다.
+3. **Playwright 스모크(D6)** — vitest는 도입했고(`npm test`, `buildFteTargets` 6케이스) 브라우저 스모크는
+   의존성 추가가 커서 남겼다.
+4. **표 모바일 스택** — 공용 `DataTable`(+`ListCell`)은 만들었고, 기존 표 8곳의 교체는 남았다.
+   지금은 비교 뷰만 카드 스택이다.
+5. **`SectionMessage`·`FallbackView`·`Skeleton` 전면 적용** — 부품은 만들었고 SME 홈·대시보드 도넛 등
+   일부만 적용했다. 나머지 화면의 인라인 alert/빈 상태/「불러오는 중…」은 그대로다.
+6. **결정 D6(배정 상한 강제)·D5(신규 제안 승격)** — 기획안 9절의 결정 사항이라 구현하지 않았다.

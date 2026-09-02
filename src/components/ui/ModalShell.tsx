@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 export type ModalSize = 'sm' | 'md' | 'lg';
@@ -48,10 +48,16 @@ export function ModalShell({
   const titleId = useId();
   const descId = useId();
 
+  // 저장하지 않은 입력이 있는데 닫으려 할 때 뜨는 확인. window.confirm을 앱 안의 창으로 바꿨습니다(v2 §6-4).
+  const [askClose, setAskClose] = useState(false);
+
   // 닫기 요청 하나로 ESC·배경 클릭·X 버튼을 모두 처리합니다(가드가 한 곳에만 있게).
   const requestClose = useCallback(() => {
     if (closeDisabled) return;
-    if (dirty && !window.confirm('저장하지 않은 변경 내용이 있어요. 창을 닫으면 입력한 내용이 사라집니다. 닫을까요?')) return;
+    if (dirty) {
+      setAskClose(true);
+      return;
+    }
     onClose();
   }, [closeDisabled, dirty, onClose]);
 
@@ -95,7 +101,7 @@ export function ModalShell({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-dimmer/40 p-4"
       onMouseDown={e => { if (e.target === e.currentTarget) requestClose(); }}
     >
       <div
@@ -104,7 +110,7 @@ export function ModalShell({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
-        className={`flex max-h-[calc(100dvh-2rem)] w-full ${sizes[size]} flex-col rounded-container bg-card shadow-xl`}
+        className={`flex max-h-[calc(100dvh-2rem)] w-full ${sizes[size]} flex-col rounded-container bg-card shadow-2`}
       >
         <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
           <div className="flex items-start gap-2">
@@ -133,6 +139,51 @@ export function ModalShell({
           <div className="flex flex-wrap justify-end gap-2 border-t border-border px-6 py-4">{footer}</div>
         )}
       </div>
+
+      {/*
+        닫기 확인. ConfirmDialog를 쓰지 않고 여기에 직접 그립니다 —
+        ConfirmDialog가 ModalShell 위에 서 있어 서로 가져오면 순환 참조가 됩니다.
+        모양·문구 규칙(제목 + 본문 + 조치 2개, 파괴적 조치는 destructive)은 같습니다.
+      */}
+      {askClose && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby={`${titleId}-close-ask`}
+          className="absolute inset-0 z-10 flex items-center justify-center bg-dimmer/40 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setAskClose(false);
+          }}
+        >
+          <div className="w-full max-w-sm rounded-container bg-card p-6 shadow-2">
+            <h4 id={`${titleId}-close-ask`} className="t-headline text-foreground">
+              작성 중인 내용이 사라져요
+            </h4>
+            <p className="mt-2 t-label leading-6 text-foreground-muted">
+              저장하지 않은 변경 내용이 있어요. 창을 닫으면 입력한 내용이 사라집니다.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAskClose(false)}
+                className="min-h-11 rounded-element border border-border bg-card px-4 t-label font-medium text-foreground-muted transition hover:border-primary hover:text-primary sm:min-h-control-md"
+              >
+                계속 작성
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAskClose(false);
+                  onClose();
+                }}
+                className="min-h-11 rounded-element border border-destructive-border bg-destructive-muted px-4 t-label font-medium text-destructive transition hover:bg-destructive hover:text-destructive-foreground sm:min-h-control-md"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

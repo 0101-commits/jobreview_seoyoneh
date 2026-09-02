@@ -109,7 +109,7 @@ export function HistoryPage({ user }: { user: User }) {
             </p>
           )}
           {rows.map((r) => (
-            <div className="rounded-container border border-border bg-card p-5 shadow-sm" key={r.review_id || r.job_id}>
+            <div className="rounded-container border border-border bg-card p-5 shadow-1" key={r.review_id || r.job_id}>
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">

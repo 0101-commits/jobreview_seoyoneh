@@ -7,8 +7,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Inbox, MessageSquareText, RotateCw } from 'lucide-react';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { Button } from '@/components/ui/Button';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { AutoTextarea } from '@/pages/sme-review/controls';
 import { STEP_TITLES } from '@/pages/sme-review/copy';
 import { fetchCompaniesResult, type Company } from '@/lib/jobApi';
@@ -38,24 +41,24 @@ const OVERDUE_WARNING_DAYS = 3;
 
 // ── 상태 표기 ───────────────────────────────────────────────────────
 //
-// shared/StatusBadge.tsx는 쓸 수 없다. 그쪽은 검토 상태(미시작·작성 중·제출 완료…)에 타입이 묶여
-// 있어 문의 상태 세 값이 들어가지 않는다. MyInquiriesPage의 배지도 그 파일 안 지역 컴포넌트라
-// 가져올 수 없어, 같은 모양(rounded·11px·아이콘 병기)만 맞춘다. 라벨은 계약에서 읽는다.
-const STATUS_VIEW: Record<InquiryStatus, { className: string; Icon: typeof Clock }> = {
-  OPEN: { className: 'bg-amber-50 text-amber-700', Icon: Clock },
-  ANSWERED: { className: 'bg-emerald-50 text-emerald-700', Icon: MessageSquareText },
-  CLOSED: { className: 'bg-slate-100 text-slate-600', Icon: CheckCircle2 },
+// v2 §6-4: 색·크기는 ui/StatusBadge(domain='inquiry')가 정하고, 이 파일은 아이콘과 라벨 사전만 고른다.
+// 예전에는 검토 상태 배지에 타입이 묶여 있어 문의 상태를 넣지 못하고 마크업을 두 벌 더 만들었다.
+const STATUS_VIEW: Record<InquiryStatus, { Icon: typeof Clock }> = {
+  OPEN: { Icon: Clock },
+  ANSWERED: { Icon: MessageSquareText },
+  CLOSED: { Icon: CheckCircle2 },
 };
 
 function InquiryStatusBadge({ status }: { status: InquiryStatus }) {
-  const { className, Icon } = STATUS_VIEW[status];
+  const { Icon } = STATUS_VIEW[status];
+  // 라벨 사전은 계약(INQUIRY_STATUS_LABELS)에서 읽고, 색은 ui/StatusBadge 한 곳에서 정한다(v2 §6-4).
   return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium ${className}`}
-    >
-      <Icon size={12} aria-hidden="true" />
-      {INQUIRY_STATUS_LABELS[status]}
-    </span>
+    <StatusBadge
+      status={INQUIRY_STATUS_LABELS[status]}
+      domain="inquiry"
+      size="sm"
+      icon={<Icon size={12} aria-hidden="true" />}
+    />
   );
 }
 
@@ -66,7 +69,7 @@ function WaitingDaysChip({ days }: { days: number }) {
   return (
     <span
       className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium ${
-        late ? 'border border-warning-border bg-warning-muted text-warning' : 'bg-slate-100 text-slate-600'
+        late ? 'border border-warning-border bg-warning-muted text-warning' : 'bg-fill-alt text-foreground-muted'
       }`}
     >
       <Icon size={12} aria-hidden="true" />
@@ -119,6 +122,8 @@ export function InquiryInboxPage({
   const [busyId, setBusyId] = useState('');
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const { toast, showToast, dismiss } = useToast();
+  // 되돌릴 수 없는 조작 확인(v2 §6-4) — dialog를 아래에서 반드시 그린다.
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     void fetchCompaniesResult().then((res) => {
@@ -212,7 +217,12 @@ export function InquiryInboxPage({
     if (
       draft &&
       draft !== q.answer.trim() &&
-      !window.confirm('저장하지 않은 답변이 있어요. 종결하면 작성 중인 내용이 사라집니다. 답변 없이 종결할까요?')
+      !(await confirm({
+        title: '답변 없이 종결할까요?',
+        body: '저장하지 않은 답변이 있어요. 종결하면 작성 중인 내용이 사라집니다.',
+        confirmLabel: '종결',
+        tone: 'negative',
+      }))
     ) {
       return;
     }
@@ -253,6 +263,7 @@ export function InquiryInboxPage({
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />
+      {dialog}
 
       {/* 낭독용 한 줄. 컨테이너는 분기 밖에 둬야 이후 변경이 읽힌다(MyInquiriesPage와 같은 원칙). */}
       <p role="status" aria-live="polite" className="sr-only">
@@ -263,27 +274,17 @@ export function InquiryInboxPage({
             : `문의 ${visible.length}건을 표시하고 있습니다. 미답 ${openCount}건.`}
       </p>
 
-      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="문의 상태 필터">
-        {FILTERS.map(({ key, label }) => {
-          const on = filter === key;
-          const count = key === 'ALL' ? rows.length : rows.filter((q) => q.status === key).length;
-          return (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={on}
-              onClick={() => setFilter(key)}
-              className={`min-h-11 rounded-element border px-3 text-xs font-medium transition sm:min-h-control-sm ${
-                on
-                  ? 'border-primary bg-primary-subtle text-primary'
-                  : 'border-border bg-card text-foreground-muted hover:border-primary hover:text-primary'
-              }`}
-            >
-              {label} {loading || error ? '' : count}
-            </button>
-          );
-        })}
-      </div>
+      <FilterChips
+        className="mb-5"
+        label="문의 상태 필터"
+        value={filter}
+        onChange={setFilter}
+        options={FILTERS.map(({ key, label }) => ({
+          value: key,
+          label,
+          count: key === 'ALL' ? rows.length : rows.filter((q) => q.status === key).length,
+        }))}
+      />
 
       {loading ? (
         <div className="py-12 text-center text-foreground-subtle">불러오는 중…</div>
@@ -323,7 +324,7 @@ export function InquiryInboxPage({
             const canSave = draft.trim().length > 0 && draft.trim() !== q.answer.trim() && !busyId;
 
             return (
-              <article key={q.id} className="rounded-container border border-border bg-card p-5 shadow-sm">
+              <article key={q.id} className="rounded-container border border-border bg-card p-5 shadow-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <InquiryStatusBadge status={q.status} />
                   {q.waitingDays !== null && <WaitingDaysChip days={q.waitingDays} />}

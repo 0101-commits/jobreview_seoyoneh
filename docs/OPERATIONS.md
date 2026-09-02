@@ -687,3 +687,40 @@ SELECT id, sme_id, step, created_at,
 - `docs/PLAN.html` — 이 개편의 기준 문서(§8 보안, §10 로드맵, §12 오픈 이슈). `docs/PLAN.txt`는 grep용 평문 사본.
 - `docs/PILOT.md` — 파일럿 체크리스트(Phase 5). 운영 전환 **전에** 전 경로를 한 번 완주하는 절차.
 - `README.md` — 개발자용 시작 절차와 기능·데이터 요약.
+
+
+---
+
+## v2.0 운영 점검 추가 항목 (2026-09-02)
+
+### 세션·인증
+
+| 항목 | 값 | 어디서 확인 |
+| --- | --- | --- |
+| 유휴 자동 로그아웃 | **30분**(결정 D8), 1분 전 화면 경고 | 화면 동작 — `src/App.tsx` `IDLE_LIMIT_MS` |
+| JWT 만료 | 1시간 권장 | Supabase Dashboard → Authentication → Sessions |
+| Refresh 토큰 재사용 감지 | 켠다 | 같은 화면 |
+| 이메일 발송 rate limit | 기본값 확인(비밀번호 재설정이 이 한도를 쓴다) | Authentication → Rate limits |
+| 비밀번호 재설정 redirect 허용 목록 | `https://<도메인>/jobreview_seoyoneh/reset-password` 를 Redirect URLs에 등록 | Authentication → URL Configuration |
+
+재설정 링크가 "허용되지 않은 주소"로 거부되면 마지막 항목이 원인이다. 등록하지 않으면 메일은 가지만
+링크를 열었을 때 세션이 만들어지지 않아 화면이 "링크가 만료되었어요"를 띄운다.
+
+### CSP
+
+`index.html`에 `<meta http-equiv="Content-Security-Policy">`로 건다(GitHub Pages는 응답 헤더를 세울 수 없다).
+`connect-src`의 Supabase 도메인은 빌드 시 `VITE_SUPABASE_URL`에서 치환된다(`vite.config.ts`의 `cspEnv`).
+
+- Supabase 프로젝트를 옮기면 **빌드 변수만 바꾸면 된다** — CSP는 따라간다.
+- 빌드 변수가 비어 있으면 `connect-src`가 `'self'`만 남아 로그인부터 막힌다. 배포 후 첫 로그인으로 확인한다.
+- meta CSP의 한계: `frame-ancestors`·`report-uri`는 무시된다. 클릭재킹 방어는 배포 호스팅의 헤더 설정이 필요하다.
+
+### SME 계정 발급(변경됨)
+
+비밀번호는 **서버가 만들어 화면에 1회만 표시한다**(v2 S2 · 결정 D1 ⓑ). 업로드 양식에 비밀번호 열이 없다.
+
+1. 개별 추가: 등록 직후 모달에 임시 비밀번호가 뜬다 → 복사해 당사자에게 개별 전달 → 창을 닫으면 다시 볼 수 없다.
+2. 일괄 업로드: 결과 패널에 `이메일 ⇥ 임시 비밀번호` 목록이 뜬다 → 「목록 복사」 → 창을 닫으면 사라진다.
+3. 잊었으면 재발급이 아니라 **재설정 메일**을 보낸다(계정 관리 → 비밀번호 재설정).
+
+파일로 내려받는 기능은 두지 않았다 — 평문 목록이 파일로 남는 것을 없애려고 한 변경이기 때문이다.

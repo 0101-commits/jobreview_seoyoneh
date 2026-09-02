@@ -11,6 +11,7 @@ import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { AutoTextarea } from '@/pages/sme-review/controls';
 import { fetchCompaniesResult, type Company } from '@/lib/jobApi';
 import {
@@ -139,6 +140,8 @@ function SettingsForm({
    */
   const [reminderReady, setReminderReady] = useState(false);
   const { toast, showToast, dismiss } = useToast();
+  // 되돌릴 수 없는 조작 확인(v2 §6-4) — dialog를 아래에서 반드시 그린다.
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     void fetchCompaniesResult().then((res) => {
@@ -207,9 +210,17 @@ function SettingsForm({
   // 게이트를 켜져 있던 상태에서 끄는 저장인지. 화면 경고와 저장 전 확인에 함께 쓴다.
   const turningGateOff = !!saved?.fte_required && !form.fte_required;
 
-  function onPickCompany(id: string) {
+  async function onPickCompany(id: string) {
     if (id === companyId) return;
-    if (dirty && !window.confirm('저장하지 않은 변경이 있습니다. 회사를 바꾸면 입력한 내용이 사라집니다. 계속할까요?')) {
+    if (
+      dirty &&
+      !(await confirm({
+        title: '회사를 바꿀까요?',
+        body: '저장하지 않은 변경이 있습니다. 회사를 바꾸면 입력한 내용이 사라집니다.',
+        confirmLabel: '바꾸기',
+        tone: 'negative',
+      }))
+    ) {
       return;
     }
     setCompanyId(id);
@@ -223,11 +234,12 @@ function SettingsForm({
     if (saving || !companyId) return;
     if (
       turningGateOff &&
-      !window.confirm(
-        '투입 비중(FTE) 합계 검사를 끕니다.\n' +
-          '저장하면 이 회사의 SME는 합계가 100%가 아니어도, 배분을 한 줄도 하지 않아도 제출할 수 있습니다.\n' +
-          '계속할까요?',
-      )
+      !(await confirm({
+        title: '투입 비중 합계 검사를 끌까요?',
+        body: '저장하면 이 회사의 SME는 합계가 100%가 아니어도, 배분을 한 줄도 하지 않아도 제출할 수 있습니다.',
+        confirmLabel: '끄고 저장',
+        tone: 'negative',
+      }))
     ) {
       return;
     }
@@ -272,6 +284,7 @@ function SettingsForm({
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />
+      {dialog}
 
       {/* 대상 회사 고정 표기 — 설정은 회사당 한 벌이라 "어느 회사를 고치는 중인가"가 가장 중요한 정보다. */}
       <div className="mb-5 rounded-container border border-primary/40 bg-primary-subtle p-5">
@@ -322,7 +335,7 @@ function SettingsForm({
           )}
 
           {/* ── 마감일 ── */}
-          <section className="rounded-container border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-container border border-border bg-card p-5 shadow-1">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
               <CalendarClock size={16} className="text-primary" aria-hidden="true" /> 마감일
             </h3>
@@ -338,7 +351,7 @@ function SettingsForm({
           </section>
 
           {/* ── 예상 소요 ── */}
-          <section className="rounded-container border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-container border border-border bg-card p-5 shadow-1">
             <h3 className="mb-3 text-sm font-semibold text-foreground">예상 소요</h3>
             <Field
               label="직무당 예상 소요(분)"
@@ -360,7 +373,7 @@ function SettingsForm({
           </section>
 
           {/* ── 가이드 추가 안내 ── */}
-          <section className="rounded-container border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-container border border-border bg-card p-5 shadow-1">
             <h3 className="mb-1 text-sm font-semibold text-foreground">가이드 추가 안내</h3>
             {/*
              * 덮어쓰기가 아니라 덧붙이기를 택했다. §6-1의 카드 ①·③·④는 착수보고 문언 그대로이고
@@ -397,7 +410,7 @@ function SettingsForm({
           </section>
 
           {/* ── 문의 담당 ── */}
-          <section className="rounded-container border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-container border border-border bg-card p-5 shadow-1">
             <h3 className="mb-3 text-sm font-semibold text-foreground">문의 담당 표기</h3>
             <label className="block">
               <span className="label">문의 화면에 노출할 담당자·연락 방법</span>
@@ -416,7 +429,7 @@ function SettingsForm({
           </section>
 
           {/* ── 제출 게이트 스위치 ── */}
-          <section className="rounded-container border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-container border border-border bg-card p-5 shadow-1">
             <h3 className="mb-3 text-sm font-semibold text-foreground">제출 게이트 · 투입 비중 합계 검사</h3>
             <label className="flex min-h-11 cursor-pointer items-start gap-3">
               <input
@@ -479,7 +492,7 @@ function SettingsForm({
             <h3 className="mb-1 text-sm font-semibold text-foreground">
               리마인더 템플릿
               {!reminderReady && (
-                <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                <span className="ml-2 rounded-inner bg-fill-alt px-2 py-0.5 t-caption font-medium text-foreground-muted">
                   저장 위치 준비 중
                 </span>
               )}

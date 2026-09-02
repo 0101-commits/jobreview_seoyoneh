@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, CloudOff, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ProgressTracker } from '@/components/ui/ProgressTracker';
 import type { SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback } from '@/types';
 import {
@@ -26,7 +27,6 @@ import {
   SAVE_CHIP_RETRY,
   SAVE_CHIP_SAVED,
   SAVE_CHIP_SAVING,
-  STEP_COMPLETE_SR,
   STEP_LABELS,
   STEP_NAV_LABEL,
   gateStep2Unrated,
@@ -144,55 +144,54 @@ export function StepChecklist({
   current: StepNo;
   onSelect: (step: StepNo) => void;
 }) {
-  // xl 미만에서 이 목록은 가로 스크롤 한 줄이다. 390px에는 2~3개만 보여, 단계를 넘겨도
-  // 강조된 현재 단계가 오른쪽 화면 밖에 남는다. 현재 단계를 가운데로 끌어와 그것을 막는다.
-  // (세로 목록인 xl 이상에서는 이미 보이는 항목이라 block:'nearest'가 아무것도 움직이지 않는다.)
-  const currentRef = useRef<HTMLButtonElement>(null);
+  /*
+    v2 §6-4: 단계 표시가 두 벌이었다(이 목록과 업로드 화면의 StepIndicator).
+    표시는 공용 ProgressTracker 하나로 그리고, 이 파일은 마법사 사정만 남긴다 —
+    라벨 사전(STEP_LABELS)·게이트로 결정되는 reachable·"3/12" 진행 표기·현재 단계 스크롤.
+
+    가로/세로: xl 이상은 세로 목록, 그 아래는 가로 한 줄이다. ProgressTracker의 orientation을
+    화면 폭에 따라 바꿔야 하므로 두 번 그리고 CSS로 하나만 보인다 —
+    JS로 폭을 재면 첫 렌더에서 잘못된 방향이 한 번 그려진다.
+  */
+  const trackerItems = items.map((it) => ({
+    step: it.step,
+    label: STEP_LABELS[it.step - 1],
+    complete: it.complete,
+    reachable: it.reachable || it.step === current,
+    hint: it.total > 0 ? `${it.done}/${it.total}` : undefined,
+  }));
+
+  // 가로 한 줄에서 현재 단계를 가운데로 끌어온다(390px에서는 2~3개만 보인다).
+  const scrollerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    currentRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    const el = scrollerRef.current?.querySelector('[aria-current="step"]');
+    el?.scrollIntoView({ inline: 'center', block: 'nearest' });
   }, [current]);
 
   return (
-    <nav aria-label={STEP_NAV_LABEL} className="rounded-element border border-border bg-card p-3 shadow-sm">
-      <p className="hidden px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground-subtle xl:block">
+    <nav aria-label={STEP_NAV_LABEL} className="rounded-container border border-border bg-card p-3 shadow-1">
+      <p className="hidden px-3 pb-2 t-caption font-semibold uppercase tracking-wider text-foreground-subtle xl:block">
         {STEP_NAV_LABEL}
       </p>
-      {/* 모바일·태블릿: 가로 스크롤 한 줄 / xl 이상: 세로 목록 */}
-      <ol className="flex gap-2 overflow-x-auto pb-1 xl:block xl:gap-0 xl:overflow-x-visible xl:pb-0">
-        {items.map((it) => {
-          const isCurrent = it.step === current;
-          const label = STEP_LABELS[it.step - 1];
-          return (
-            <li key={it.step} className="shrink-0 xl:shrink">
-              <button
-                type="button"
-                ref={isCurrent ? currentRef : undefined}
-                onClick={() => onSelect(it.step)}
-                disabled={!it.reachable && !isCurrent}
-                aria-current={isCurrent ? 'step' : undefined}
-                className={`flex min-h-11 w-full items-center gap-2 rounded-element px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isCurrent ? 'bg-primary-subtle font-semibold text-primary' : 'text-foreground-muted hover:bg-muted'
-                }`}
-              >
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
-                    it.complete ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground-muted'
-                  }`}
-                >
-                  {it.complete ? <Check size={12} aria-hidden="true" /> : it.step}
-                </span>
-                <span className="min-w-0 flex-1 whitespace-nowrap xl:whitespace-normal">{label}</span>
-                {it.total > 0 && (
-                  <span className="hidden shrink-0 text-[11px] font-normal text-foreground-subtle xl:inline">
-                    {it.done}/{it.total}
-                  </span>
-                )}
-                {it.complete && <span className="sr-only">{STEP_COMPLETE_SR}</span>}
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      <div ref={scrollerRef} className="overflow-x-auto pb-1 xl:hidden">
+        <ProgressTracker
+          items={trackerItems}
+          current={current}
+          orientation="horizontal"
+          onSelect={(step) => onSelect(step as StepNo)}
+          label={STEP_NAV_LABEL}
+          className="min-w-max"
+        />
+      </div>
+      <div className="hidden xl:block">
+        <ProgressTracker
+          items={trackerItems}
+          current={current}
+          orientation="vertical"
+          onSelect={(step) => onSelect(step as StepNo)}
+          label={STEP_NAV_LABEL}
+        />
+      </div>
     </nav>
   );
 }

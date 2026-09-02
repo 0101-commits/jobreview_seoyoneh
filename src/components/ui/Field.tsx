@@ -10,9 +10,19 @@ interface FieldBase {
 }
 
 interface FieldInputProps extends FieldBase {
-  /** 제어 입력 모드 — 내부에서 <input>을 직접 그립니다. */
+  /** 제어 입력 모드 — 내부에서 <input>·<textarea>·<select>를 직접 그립니다. */
   value: string;
   onChange: (value: string) => void;
+  /**
+   * 그릴 컨트롤(v2 §6-4 Field 확장). 기본은 input이다.
+   * textarea·select도 라벨·설명·오류·필수 표시를 같은 규칙으로 받게 하려고 넣었다 —
+   * 예전에는 이 둘만 래퍼 모드로 감싸느라 화면마다 마크업이 갈렸다.
+   */
+  as?: 'input' | 'textarea' | 'select';
+  /** as='select'일 때의 선택지. 첫 항목을 placeholder로 쓰려면 value ''로 준다. */
+  options?: { value: string; label: string }[];
+  /** as='textarea'의 기본 줄 수. */
+  rows?: number;
   type?: string;
   placeholder?: string;
   autoComplete?: string;
@@ -55,10 +65,18 @@ export function Field(props: FieldProps) {
   const errId = `${id}-err`;
   const describedBy = [description && descId, error && errId].filter(Boolean).join(' ') || undefined;
 
+  // montage는 필수를 별표가 아니라 작은 배지로 알린다. 색만으로 알리지 않게 글자를 함께 둔다.
   const labelNode = (
     <>
       {label}
-      {required && <span className="ml-0.5 text-destructive" aria-hidden="true">*</span>}
+      {required && (
+        <span
+          className="ml-1.5 rounded-inner bg-destructive-muted px-1.5 py-0.5 t-caption font-medium text-destructive"
+          aria-hidden="true"
+        >
+          필수
+        </span>
+      )}
     </>
   );
 
@@ -108,30 +126,69 @@ export function Field(props: FieldProps) {
     }
   } else {
     const p = props as FieldInputProps;
-    control = (
-      <input
-        id={id}
-        name={p.name}
-        className={`input ${controlState} ${p.inputClassName ?? ''}`}
-        value={p.value}
-        onChange={e => p.onChange(e.target.value)}
-        type={p.type}
-        placeholder={p.placeholder}
-        autoComplete={p.autoComplete}
-        disabled={p.disabled}
-        required={required}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-      />
-    );
+    const shared = {
+      id,
+      name: p.name,
+      value: p.value,
+      disabled: p.disabled,
+      required,
+      'aria-invalid': error ? (true as const) : undefined,
+      'aria-describedby': describedBy,
+    };
+    if (p.as === 'textarea') {
+      control = (
+        <textarea
+          {...shared}
+          rows={p.rows ?? 3}
+          placeholder={p.placeholder}
+          onChange={(e) => p.onChange(e.target.value)}
+          className={`textarea ${controlState} ${p.inputClassName ?? ''}`}
+        />
+      );
+    } else if (p.as === 'select') {
+      control = (
+        <select
+          {...shared}
+          onChange={(e) => p.onChange(e.target.value)}
+          className={`input ${controlState} ${p.inputClassName ?? ''}`}
+        >
+          {(p.options ?? []).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      );
+    } else {
+      control = (
+        <input
+          {...shared}
+          className={`input ${controlState} ${p.inputClassName ?? ''}`}
+          onChange={(e) => p.onChange(e.target.value)}
+          type={p.type}
+          placeholder={p.placeholder}
+          autoComplete={p.autoComplete}
+        />
+      );
+    }
   }
 
   return (
     <div>
-      <label htmlFor={labelFor} className="mb-1.5 block text-sm font-medium text-foreground">{labelNode}</label>
-      {description && <p id={descId} className="mb-1.5 text-xs text-foreground-muted">{description}</p>}
+      <label htmlFor={labelFor} className="mb-1.5 flex items-center t-label font-medium text-foreground">
+        {labelNode}
+      </label>
+      {description && (
+        <p id={descId} className="mb-1.5 t-caption text-foreground-muted">
+          {description}
+        </p>
+      )}
       {control}
-      {error && <p id={errId} className="mt-1.5 text-xs text-destructive">{error}</p>}
+      {error && (
+        <p id={errId} className="mt-1.5 t-caption text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
