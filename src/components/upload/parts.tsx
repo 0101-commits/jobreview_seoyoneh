@@ -293,7 +293,7 @@ export function IntegratedFileDrop({
             onClick={onClear}
             disabled={disabled}
             aria-label={`선택한 파일 ${file.name} 지우기`}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-element text-foreground-subtle transition hover:bg-card hover:text-foreground-muted disabled:opacity-50 sm:h-9 sm:w-9"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-element text-foreground-subtle transition hover:bg-card hover:text-foreground-muted disabled:opacity-50 sm:h-10 sm:w-10"
           >
             <X size={16} aria-hidden="true" />
           </button>
@@ -436,7 +436,7 @@ function SheetValidationCard({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <span
-            className={`flex h-9 w-9 items-center justify-center rounded-full ${
+            className={`flex h-10 w-10 items-center justify-center rounded-full ${
               valid ? 'bg-success text-success-foreground' : 'bg-destructive-muted text-destructive'
             }`}
           >

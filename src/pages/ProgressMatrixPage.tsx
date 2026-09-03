@@ -533,7 +533,7 @@ export function ProgressMatrixPage({
               <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-muted px-4 py-3 font-medium"
+                  className="sticky left-0 z-[1] w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-muted px-4 py-3 font-medium"
                 >
                   조직
                 </th>
@@ -588,7 +588,7 @@ export function ProgressMatrixPage({
                     <tr key={row.orgUnitId ?? "unassigned"} className="border-b border-border last:border-0">
                       <th
                         scope="row"
-                        className="sticky left-0 z-10 w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-card px-2 py-2 text-left font-normal align-top"
+                        className="sticky left-0 z-[1] w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-card px-2 py-2 text-left font-normal align-top"
                       >
                         <div
                           className="flex items-start gap-1"

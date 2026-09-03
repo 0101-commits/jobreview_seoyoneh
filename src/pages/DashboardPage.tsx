@@ -110,7 +110,7 @@ function DurationCard({
   if (!stats) {
     if (!error) return null;
     return (
-      <section className="mt-7 rounded-container border border-border bg-card p-5 text-sm text-foreground-subtle shadow-1">
+      <section className="mt-8 rounded-container border border-border bg-card p-5 text-sm text-foreground-subtle shadow-1">
         소요 실측을 불러오지 못했어요. {error}
       </section>
     );
@@ -123,7 +123,7 @@ function DurationCard({
   const diff = hasMedian && expectedMinutes !== null ? Math.round((medianMinutes - expectedMinutes) * 10) / 10 : null;
 
   return (
-    <section className="mt-7 rounded-container border border-border bg-card p-5 shadow-1">
+    <section className="mt-8 rounded-container border border-border bg-card p-5 shadow-1">
       <div className="flex items-start gap-2">
         <Timer size={15} className="mt-0.5 shrink-0 text-foreground-muted" aria-hidden="true" />
         <div>
@@ -443,7 +443,7 @@ export function Dashboard({
 
   return (
     <>
-      <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="mb-1 text-sm text-foreground-subtle">
             {loading
@@ -474,7 +474,7 @@ export function Dashboard({
         </div>
       )}
 
-      <div className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
@@ -494,7 +494,7 @@ export function Dashboard({
 
       <DurationCard stats={duration} error={durationError} />
 
-      <div className="mt-7 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+      <div className="mt-8 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
         <section className="rounded-container border border-border bg-card p-5 shadow-1">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
@@ -586,7 +586,7 @@ export function Dashboard({
                 : `배정 ${distTotal}건 기준 · SME ${stats?.smeCount ?? 0}명 · 응답률 ${distRate}%`}
           </p>
           {statsState === 'ready' && distTotal > 0 ? (
-            <div className="mt-7 flex flex-col items-center gap-7 sm:flex-row">
+            <div className="mt-8 flex flex-col items-center gap-8 sm:flex-row">
               <div
                 role="img"
                 aria-label={donutLabel}
@@ -629,7 +629,7 @@ export function Dashboard({
             <FallbackView
               compact
               kind={statsState === 'error' ? 'error' : 'empty'}
-              className="mt-7 rounded-element border border-dashed border-border"
+              className="mt-8 rounded-element border border-dashed border-border"
               description={
                 statsState === 'loading'
                   ? '검토 현황을 불러오는 중이에요.'

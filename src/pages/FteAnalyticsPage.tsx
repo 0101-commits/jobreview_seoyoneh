@@ -444,7 +444,7 @@ export function FteAnalyticsPage({
               <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 w-56 min-w-[12rem] border-r border-border bg-muted px-4 py-3 font-medium"
+                  className="sticky left-0 z-[1] w-56 min-w-[12rem] border-r border-border bg-muted px-4 py-3 font-medium"
                 >
                   {COL.task}
                 </th>
@@ -482,7 +482,7 @@ export function FteAnalyticsPage({
                   <tr key={task.key} className="border-b border-border last:border-0">
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 w-56 min-w-[12rem] border-r border-border bg-card px-4 py-3 text-left font-normal align-top text-foreground"
+                      className="sticky left-0 z-[1] w-56 min-w-[12rem] border-r border-border bg-card px-4 py-3 text-left font-normal align-top text-foreground"
                     >
                       {task.task}
                       {task.kind && task.kind !== '기존' && (

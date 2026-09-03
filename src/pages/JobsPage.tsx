@@ -204,7 +204,7 @@ export function JobsPage({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="직무명, 직군, 직렬 검색"
               aria-label="직무 검색"
-              className="input w-full pl-9 md:w-72"
+              className="input w-full pl-10 md:w-72"
             />
           </div>
         </div>

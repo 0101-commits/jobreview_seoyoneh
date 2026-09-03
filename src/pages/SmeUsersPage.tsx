@@ -196,7 +196,7 @@ export function UsersPage({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-1 w-56 rounded-element border border-border bg-card py-1 shadow-2"
+                className="absolute right-0 z-popover mt-1 w-56 rounded-element border border-border bg-elevated py-1 shadow-2"
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
                     setMenuOpen(false);
@@ -242,7 +242,7 @@ export function UsersPage({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="input pl-9"
+              className="input pl-10"
               placeholder="이름, 이메일, 소속조직, 사번 검색"
               aria-label="SME 계정 검색"
             />

@@ -67,7 +67,7 @@ export function DataTable<T>({
                   key={c.key}
                   scope="col"
                   className={`px-4 py-3 font-medium ${align(c.align)} ${
-                    c.sticky ? 'sticky left-0 z-10 bg-fill-alt' : ''
+                    c.sticky ? 'sticky left-0 z-[1] bg-fill-alt' : ''
                   } ${c.className ?? ''}`}
                 >
                   {c.header}
@@ -88,7 +88,7 @@ export function DataTable<T>({
                   <td
                     key={c.key}
                     className={`px-4 py-3 text-foreground-muted ${align(c.align)} ${
-                      c.sticky ? 'sticky left-0 z-10 bg-card' : ''
+                      c.sticky ? 'sticky left-0 z-[1] bg-card' : ''
                     } ${c.className ?? ''}`}
                   >
                     {c.cell(row)}

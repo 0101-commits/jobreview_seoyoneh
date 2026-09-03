@@ -101,7 +101,7 @@ export function ModalShell({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-dimmer/40 p-4"
+      className="fixed inset-0 z-modal flex items-center justify-center scrim p-4"
       onMouseDown={e => { if (e.target === e.currentTarget) requestClose(); }}
     >
       <div
@@ -110,7 +110,7 @@ export function ModalShell({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
-        className={`flex max-h-[calc(100dvh-2rem)] w-full ${sizes[size]} flex-col rounded-container bg-card shadow-2`}
+        className={`flex max-h-[calc(100dvh-2rem)] w-full ${sizes[size]} flex-col rounded-container bg-elevated shadow-2`}
       >
         <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
           <div className="flex items-start gap-2">
@@ -150,12 +150,12 @@ export function ModalShell({
           role="alertdialog"
           aria-modal="true"
           aria-labelledby={`${titleId}-close-ask`}
-          className="absolute inset-0 z-10 flex items-center justify-center bg-dimmer/40 p-4"
+          className="absolute inset-0 z-[1] flex items-center justify-center scrim p-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setAskClose(false);
           }}
         >
-          <div className="w-full max-w-sm rounded-container bg-card p-6 shadow-2">
+          <div className="w-full max-w-sm rounded-container bg-elevated p-6 shadow-2">
             <h4 id={`${titleId}-close-ask`} className="t-headline text-foreground">
               작성 중인 내용이 사라져요
             </h4>

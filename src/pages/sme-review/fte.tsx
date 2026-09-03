@@ -237,8 +237,8 @@ function TotalGauge({
   if (layout === 'bar') {
     return (
       // lg 이상에서는 좌측에 고정 사이드바(w-64)가 있다. inset-x-0으로 두면 바가 그 위를 덮어
-      // 사이드바 하단의 로그아웃 버튼을 가린다(같은 z-30이라 나중에 그려지는 바가 이긴다).
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card px-4 py-3 lg:left-64 xl:hidden">
+      // 사이드바 하단의 로그아웃 버튼을 가린다(같은 z-drawer라 나중에 그려지는 바가 이긴다).
+      <div className="fixed bottom-0 left-0 right-0 z-drawer border-t border-border bg-elevated px-4 py-3 lg:left-64 xl:hidden">
         {/* aria-valuenow는 filled(0~100)로 자른다 — 105%처럼 max를 넘는 값은 ARIA가 정의하지 않은
             상태라 낭독기마다 다르게(또는 아예 읽지 않고) 처리한다. 실제 합계와 사유는 valuetext가 말한다. */}
         <div

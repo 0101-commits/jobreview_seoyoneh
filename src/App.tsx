@@ -419,7 +419,7 @@ function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-3"
+          className="fixed inset-x-0 top-0 z-toast flex justify-center px-4 pt-3"
         >
           <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 t-label text-warning shadow-2">
             {idleLeft}초 후 자동 로그아웃돼요. 계속하시려면 화면을 클릭해 주세요.
@@ -485,7 +485,7 @@ function Shell({
   return (
     <DirtyContext.Provider value={guard}>
       <div className="min-h-screen bg-background text-foreground">
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
+        <aside className="fixed inset-y-0 left-0 z-drawer hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
           <SidebarBody groups={navGroups} onNavigate={closeDrawer} onLogout={onLogout} />
         </aside>
 
@@ -511,7 +511,7 @@ function Shell({
         )}
 
         <div className="lg:pl-64">
-          <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
+          <header className="sticky top-0 z-sticky flex h-20 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -534,7 +534,7 @@ function Shell({
                   {user.organization} · {user.title}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-subtle text-sm font-semibold text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-subtle text-sm font-semibold text-primary">
                 {user.name.slice(0, 1)}
               </div>
             </div>
@@ -645,7 +645,7 @@ function SidebarBody({
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-20 shrink-0 items-center gap-3 border-b border-inverse-label/10 px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand">
           <ClipboardCheck size={19} aria-hidden="true" />
         </div>
         <div>
@@ -747,7 +747,7 @@ function MobileDrawer({ open, onClose, children }: { open: boolean; onClose: () 
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose(); // ::backdrop 클릭은 dialog로 전달된다.
       }}
-      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label backdrop:bg-dimmer/50 lg:hidden"
+      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label scrim-backdrop lg:hidden"
     >
       {children}
     </dialog>

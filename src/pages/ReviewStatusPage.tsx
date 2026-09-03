@@ -233,7 +233,7 @@ export function ReviewTable({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="input pl-9"
+              className="input pl-10"
               placeholder="SME 이름, 조직, 직무 검색"
               aria-label="SME 이름, 조직, 직무 검색"
             />

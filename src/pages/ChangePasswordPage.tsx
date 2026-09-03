@@ -105,7 +105,7 @@ export function ChangePasswordPage({
       <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">
         <div className="w-full max-w-[440px]">
           <Brand />
-          <div className="rounded-container border border-border bg-card p-7 shadow-1 sm:p-9">
+          <div className="rounded-container border border-border bg-card p-6 shadow-1 sm:p-8">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">링크가 만료되었어요</h1>
             <p className="mt-2 text-sm leading-6 text-foreground-muted">
               비밀번호 재설정 링크는 일정 시간이 지나면 쓸 수 없어요. 로그인 화면에서 다시 요청해 주세요.
@@ -123,7 +123,7 @@ export function ChangePasswordPage({
       <div className="w-full max-w-[440px]">
         <Brand />
 
-        <div className="rounded-container border border-border bg-card p-7 shadow-1 sm:p-9">
+        <div className="rounded-container border border-border bg-card p-6 shadow-1 sm:p-8">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             {recovery ? '새 비밀번호 설정' : '비밀번호 변경'}
           </h1>

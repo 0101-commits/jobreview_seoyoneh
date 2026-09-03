@@ -74,7 +74,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
     <div
       aria-live="polite"
       role="status"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-10"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-toast flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-10"
     >
       {toast && Icon && (
         <div

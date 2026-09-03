@@ -83,7 +83,7 @@ export function Login({
             </div>
             <h1 className="t-title text-foreground">Job Review Architecture</h1>
           </div>
-          <div className="rounded-container border border-border bg-card p-7 shadow-1 sm:p-9">
+          <div className="rounded-container border border-border bg-card p-6 shadow-1 sm:p-8">
             {mode === 'login' ? (
               <>
                 <h2 className="t-title text-foreground">로그인</h2>

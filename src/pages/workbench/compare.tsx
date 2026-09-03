@@ -383,7 +383,7 @@ function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFe
               <caption className="sr-only">항목별 SME 적합성 판정 비교</caption>
               <thead>
                 <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                  <th scope="col" className="sticky left-0 z-10 bg-muted px-4 py-3 font-medium">
+                  <th scope="col" className="sticky left-0 z-[1] bg-muted px-4 py-3 font-medium">
                     항목
                   </th>
                   {smes.map((sme) => (
@@ -396,7 +396,7 @@ function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFe
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.key} className="border-b border-destructive-border bg-destructive-muted last:border-0">
-                    <th scope="row" className="sticky left-0 z-10 bg-destructive-muted px-4 py-3 text-left font-normal">
+                    <th scope="row" className="sticky left-0 z-[1] bg-destructive-muted px-4 py-3 text-left font-normal">
                       <span className="block text-[11px] text-foreground-subtle">{row.kind}</span>
                       <span className="block font-medium text-foreground">{row.name}</span>
                       <ReasonChip text={SIGNAL_LABELS.suitabilityMismatch} tone="destructive" />
@@ -482,7 +482,7 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
               <caption className="sr-only">과업별 SME 투입 비중 비교</caption>
               <thead>
                 <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                  <th scope="col" className="sticky left-0 z-10 bg-muted px-4 py-3 font-medium">
+                  <th scope="col" className="sticky left-0 z-[1] bg-muted px-4 py-3 font-medium">
                     과업
                   </th>
                   {smes.map((sme) => (
@@ -503,7 +503,7 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
                     >
                       <th
                         scope="row"
-                        className={`sticky left-0 z-10 px-4 py-3 text-left font-normal ${
+                        className={`sticky left-0 z-[1] px-4 py-3 text-left font-normal ${
                           flagged ? 'bg-warning-muted' : 'bg-card'
                         }`}
                       >

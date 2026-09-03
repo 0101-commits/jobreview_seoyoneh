@@ -88,11 +88,11 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
          · 폭 구간별로 값을 나누지 않는다. 하단 바는 sm~lg에서도 그대로 떠 있어서, 예전처럼
            sm 이상을 1.5rem으로 고정하면 태블릿 폭에서 버튼이 다시 게이지를 덮는다.
          · env(safe-area-inset-bottom) — iOS 홈 인디케이터 영역에 버튼이 걸리지 않게 더한다.
-         · z-40 — 본문 위, ModalShell(z-50) 아래. 모달이 열리면 버튼이 그 아래로 덮인다.
+         · z-drawer — 본문 위, 모달(z-modal) 아래. 모달이 열리면 버튼이 그 아래로 덮인다.
          · pointer-events-none — 토스트가 없을 때 빈 컨테이너가 본문 클릭을 가로채지 않게 한다.
       */}
       <div
-        className="pointer-events-none fixed right-4 z-40 flex w-[min(20rem,calc(100vw-2rem))] flex-col items-end gap-0 bottom-[calc(env(safe-area-inset-bottom,0px)+var(--sme-bottom-bar-h,1.5rem))] sm:right-6"
+        className="pointer-events-none fixed right-4 z-drawer flex w-[min(20rem,calc(100vw-2rem))] flex-col items-end gap-0 bottom-[calc(env(safe-area-inset-bottom,0px)+var(--sme-bottom-bar-h,1.5rem))] sm:right-6"
       >
         <Toast toast={toast} onDismiss={dismiss} className="pointer-events-auto w-full" />
         <Button
