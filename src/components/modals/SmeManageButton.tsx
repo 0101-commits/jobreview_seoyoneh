@@ -108,6 +108,8 @@ export function SmeManageButton({
           description="기존 SME 계정 정보를 수정합니다."
           icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
           onClose={() => setShow(false)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           dirty={dirty && !saving && !deleting}
           closeDisabled={saving || deleting}
           footer={

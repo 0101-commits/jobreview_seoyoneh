@@ -17,6 +17,7 @@ import { AlertCircle, ArrowLeft, Loader2, Lock, RefreshCw, Save } from 'lucide-r
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { fetchJobDetailResult, type JobDetail } from '@/lib/jobApi';
 import {
   buildDraftPayload,
@@ -161,6 +162,8 @@ export function ReviewWorkspace({
   const [collapseDone, setCollapseDone] = useState(true);
 
   const { toast, showToast, dismiss } = useToast();
+  // 닫기가 필요한 알림은 Snackbar로 낸다 — Toast에는 닫기 버튼이 없다(v3 T3).
+  const { snackbar, showSnackbar, dismiss: dismissSnackbar } = useSnackbar();
 
   const locked = review?.status === 'SUBMITTED' || review?.status === 'RESUBMITTED';
   const readOnly = locked || !review;
@@ -587,7 +590,7 @@ export function ReviewWorkspace({
         setMissing(res.missing);
         setReview(saved);
         setSaveState(revRef.current === rev ? 'saved' : 'dirty');
-        showToast({ type: 'warning', msg: gateStep5Missing(res.missing.length), duration: 0 });
+        showSnackbar({ type: 'warning', msg: gateStep5Missing(res.missing.length), duration: 0 });
         return;
       }
 
@@ -601,7 +604,7 @@ export function ReviewWorkspace({
       setSaveError('');
       showToast({ type: 'success', msg: '검토를 제출했어요. 관리자가 확인한 뒤 결과가 반영됩니다.' });
     } catch (e) {
-      showToast({ type: 'error', msg: errMsg(e), duration: 0 });
+      showSnackbar({ type: 'error', msg: errMsg(e), duration: 0 });
     } finally {
       savingRef.current = false;
       setSubmitting(false);
@@ -664,6 +667,7 @@ export function ReviewWorkspace({
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
 
       {loadingDetail ? (
         <div className="flex items-center justify-center gap-2 py-20 t-label text-foreground-muted">
@@ -935,6 +939,8 @@ export function ReviewWorkspace({
           title="검토를 제출할까요?"
           description="최종 제출 후에는 관리자가 재검토를 요청하기 전까지 수정할 수 없어요."
           onClose={() => setConfirmOpen(false)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           closeDisabled={submitting}
           size="sm"
           footer={

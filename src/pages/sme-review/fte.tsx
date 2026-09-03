@@ -669,6 +669,8 @@ export function FteStep({
         <ModalShell
           title={FTE_SINGLE_100_MODAL.title}
           onClose={() => setRevertTo(null)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           size="sm"
           footer={
             <>

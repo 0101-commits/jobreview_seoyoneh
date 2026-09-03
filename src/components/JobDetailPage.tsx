@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { EmptyMessage, RereviewModal, RowActions, Section, SkillGroup, SmeFeedbackPanel } from '@/components/job-detail/FeedbackPanel';
 
 interface Props {
@@ -85,6 +86,8 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
   const [dirty, setDirty] = useState(false);
   const [options, setOptions] = useState<GroupSeriesOption | null>(null);
   const { toast, showToast, dismiss } = useToast();
+  // 닫기가 필요한 알림은 Snackbar로 낸다 — Toast에는 닫기 버튼이 없다(v3 T3).
+  const { snackbar, showSnackbar, dismiss: dismissSnackbar } = useSnackbar();
 
   // Edit state
   const [editName, setEditName] = useState('');
@@ -405,7 +408,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
     if (result.error) {
       // DB 원문은 콘솔에만 남기고, 화면에는 다음 행동을 알려 준다.
       console.error('Job edit save error:', result.error);
-      showToast({
+      showSnackbar({
         type: 'error',
         msg: '직무정보를 저장하지 못했어요. 입력값을 확인한 뒤 다시 시도하고, 같은 문제가 이어지면 관리자에게 알려 주세요.',
         duration: 0,
@@ -633,6 +636,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
 
       {/* 편집 폼(왼쪽)과 SME 피드백(오른쪽)을 나란히 둔다 — 무엇을 왜 고치는지 보면서 수정한다. */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -944,6 +948,8 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
           size="sm"
           icon={<AlertTriangle size={20} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />}
           onClose={() => setConfirmState(null)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           footer={
             <>
               <Button variant="secondary" onClick={() => setConfirmState(null)}>

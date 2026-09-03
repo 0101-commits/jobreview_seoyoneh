@@ -746,11 +746,14 @@ function RejectModal({
     <ModalShell
       title="검토 반려"
       description={`${target.sme_name || 'SME'} 님의 「${jobName}」 검토 1건을 반려합니다.`}
-      size="md"
+      // 반려 사유 textarea를 담는 폼이라 large(480px)를 쓴다.
+      size="lg"
       dirty={reason.trim().length > 0}
       closeDisabled={busy}
       icon={<AlertTriangle size={20} className="mt-0.5 shrink-0 text-destructive" aria-hidden="true" />}
       onClose={onClose}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>

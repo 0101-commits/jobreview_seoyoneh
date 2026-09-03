@@ -41,6 +41,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
 
 // ── 표시용 상수 ─────────────────────────────────────────────────────
 
@@ -107,6 +108,13 @@ export function AssignmentAdminPage({
   const [busy, setBusy] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ job: JobAssignmentRow; sme: AssignedSme } | null>(null);
   const { toast, showToast, dismiss } = useToast();
+  /*
+   * 오류와 되돌릴 수 있는 조작은 Snackbar로 낸다(v3 T3).
+   * 예전에는 서버 오류를 duration: 0인 Toast로 띄웠는데, Toast에는 닫기 버튼이 없어
+   * 화면에 박혀 있었다. 배정 해제는 실행 취소를 줄 수 있는 조작이다 —
+   * addAssignment가 (sme_id, job_id)로 upsert하므로 같은 행을 active로 되올린다.
+   */
+  const { snackbar, showSnackbar, dismiss: dismissSnackbar } = useSnackbar();
 
   const companyId = companyFilter === 'all' ? null : companyFilter;
 
@@ -217,7 +225,7 @@ export function AssignmentAdminPage({
     const result = await addAssignment(pickedSmeId, openJob.jobId);
     setBusy(false);
     if (!result.ok) {
-      showToast({ type: 'error', msg: result.error, duration: 0 });
+      showSnackbar({ type: 'error', msg: result.error, duration: 0 });
       return;
     }
     showToast({
@@ -235,12 +243,25 @@ export function AssignmentAdminPage({
     setBusy(false);
     setConfirmTarget(null);
     if (!result.ok) {
-      showToast({ type: 'error', msg: result.error, duration: 0 });
+      showSnackbar({ type: 'error', msg: result.error, duration: 0 });
       return;
     }
-    showToast({
+    showSnackbar({
       type: 'success',
       msg: `${sme.name} 님의 「${job.jobName}」 배정을 해제했습니다. 응답 데이터는 지워지지 않았습니다.`,
+      duration: 'long',
+      action: {
+        label: '실행 취소',
+        onClick: async () => {
+          const undo = await addAssignment(sme.smeId, job.jobId);
+          if (!undo.ok) {
+            showSnackbar({ type: 'error', msg: undo.error, duration: 0 });
+            return;
+          }
+          showToast({ type: 'success', msg: `${sme.name} 님의 배정을 되돌렸습니다.` });
+          reload();
+        },
+      },
     });
     reload();
   };
@@ -314,6 +335,7 @@ export function AssignmentAdminPage({
       )}
 
       <Toast toast={toast} onDismiss={dismiss} />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
 
       <div className="rounded-container border border-border bg-card shadow-1">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -520,6 +542,8 @@ export function AssignmentAdminPage({
           title="배정을 해제할까요?"
           size="sm"
           onClose={() => setConfirmTarget(null)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           closeDisabled={busy}
           icon={<AlertTriangle size={20} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />}
           description={`${confirmTarget.sme.name} 님 · ${confirmTarget.job.jobName}`}

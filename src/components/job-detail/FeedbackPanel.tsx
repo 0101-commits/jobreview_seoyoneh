@@ -277,11 +277,13 @@ export function RereviewModal({
     <ModalShell
       title="재검토 요청"
       description={`${target.sme_name || 'SME'} 님에게 「${jobName}」 검토를 다시 요청합니다.`}
-      size="md"
+      size="lg"
       dirty={note.trim().length > 0}
       closeDisabled={busy}
       icon={<RotateCcw size={20} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />}
       onClose={onClose}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>

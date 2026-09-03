@@ -2,11 +2,20 @@ import React, { useId } from 'react';
 
 interface FieldBase {
   label: string;
-  /** 라벨 아래 보조 설명. */
+  /**
+   * 라벨 아래 보조 설명.
+   * error가 있으면 그리지 않습니다 — 한 필드가 도움말과 오류를 동시에 노출하지 않는다는
+   * montage 규약(v3 T3). 둘이 같이 뜨면 무엇을 고쳐야 하는지가 흐려집니다.
+   */
   description?: string;
   /** 값이 있으면 오류 상태로 렌더링하고 aria-invalid를 켭니다. */
   error?: string;
   required?: boolean;
+  /**
+   * 글자수 표시. 최대치를 넘어도 입력을 막지 않고 현재값 숫자만 붉게 바꿉니다(montage).
+   * 넘긴 뒤에 무엇을 지워야 할지 스스로 판단하게 두는 편이 잘라내는 것보다 낫습니다.
+   */
+  counter?: { value: number; max: number };
 }
 
 interface FieldInputProps extends FieldBase {
@@ -27,6 +36,11 @@ interface FieldInputProps extends FieldBase {
   placeholder?: string;
   autoComplete?: string;
   disabled?: boolean;
+  /**
+   * 읽기 전용. disabled와 다르게 외형을 죽이지 않고 값이 읽히는 상태를 유지합니다(montage).
+   * 포커스와 복사는 되고 편집만 막힙니다.
+   */
+  readOnly?: boolean;
   name?: string;
   inputClassName?: string;
   children?: never;
@@ -59,11 +73,14 @@ export type FieldProps = FieldInputProps | FieldWrapperProps;
 const FORM_CONTROL_TAGS = new Set(['input', 'select', 'textarea']);
 
 export function Field(props: FieldProps) {
-  const { label, description, error, required } = props;
+  const { label, description, error, required, counter } = props;
   const id = useId();
   const descId = `${id}-desc`;
   const errId = `${id}-err`;
-  const describedBy = [description && descId, error && errId].filter(Boolean).join(' ') || undefined;
+  // 오류가 있으면 도움말을 내리므로(montage) 가리킬 id도 오류 쪽 하나만 남긴다 —
+  // 그리지 않은 요소의 id를 aria-describedby가 가리키면 낭독기가 아무것도 읽지 못한다.
+  const showDescription = Boolean(description) && !error;
+  const describedBy = error ? errId : showDescription ? descId : undefined;
 
   // montage는 필수를 별표가 아니라 작은 배지로 알린다. 색만으로 알리지 않게 글자를 함께 둔다.
   const labelNode = (
@@ -132,6 +149,8 @@ export function Field(props: FieldProps) {
       value: p.value,
       disabled: p.disabled,
       required,
+      readOnly: p.readOnly,
+      'aria-readonly': p.readOnly || undefined,
       'aria-invalid': error ? (true as const) : undefined,
       'aria-describedby': describedBy,
     };
@@ -175,19 +194,34 @@ export function Field(props: FieldProps) {
 
   return (
     <div>
-      <label htmlFor={labelFor} className="mb-1.5 flex items-center t-label font-medium text-foreground">
+      {/* 조각 사이 간격은 8px 하나로 고정한다(montage FormField gap). */}
+      <label htmlFor={labelFor} className="mb-2 flex items-center t-label font-medium text-foreground">
         {labelNode}
       </label>
-      {description && (
-        <p id={descId} className="mb-1.5 t-caption text-foreground-muted">
+      {showDescription && (
+        <p id={descId} className="mb-2 t-caption text-foreground-muted">
           {description}
         </p>
       )}
       {control}
-      {error && (
-        <p id={errId} className="mt-1.5 t-caption text-destructive">
-          {error}
-        </p>
+      {(error || counter) && (
+        <div className="mt-2 flex items-start justify-between gap-3">
+          {error ? (
+            <p id={errId} className="t-caption text-destructive">
+              {error}
+            </p>
+          ) : (
+            <span />
+          )}
+          {counter && (
+            <span className="shrink-0 t-caption-2 font-medium tabular-nums opacity-[0.74]">
+              <span className={counter.value > counter.max ? 'text-destructive' : 'text-foreground-muted'}>
+                {counter.value}
+              </span>
+              <span className="text-foreground-muted"> / {counter.max}</span>
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

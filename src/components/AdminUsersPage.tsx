@@ -280,6 +280,10 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
       title="관리자 계정 등록"
       icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
       onClose={onClose}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
+      // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
+      size="lg"
       dirty={Boolean(name || email || password) && !submitting}
       closeDisabled={submitting}
       footer={
@@ -450,6 +454,10 @@ function ManageModal({
       title="관리자 계정 관리"
       icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
       onClose={() => onClose()}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
+      // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
+      size="lg"
       dirty={nameChanged && !busy}
       closeDisabled={busy}
       footer={

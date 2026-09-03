@@ -19,6 +19,7 @@ import {
 } from '@/lib/integratedUploadUtils';
 import type { SmeRosterLinkResult } from '@/lib/integratedJobApi';
 import { ProgressTracker } from '@/components/ui/ProgressTracker';
+import { ProgressIndicator } from '@/components/ui/ProgressIndicator';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { SME_SHEET_NOTICE, STEPS, listPreview } from '@/components/upload/constants';
@@ -97,19 +98,15 @@ export function SaveProgress({
         <Loader2 size={14} className="animate-spin" aria-hidden="true" />
         {phase + 1}/{phases.length}단계 · {label}
       </p>
-      <div
-        role="progressbar"
-        aria-valuemin={1}
-        aria-valuemax={phases.length}
-        aria-valuenow={phase + 1}
-        aria-valuetext={`${phase + 1}단계 ${label}`}
-        className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border"
-      >
-        <div
-          className="h-full rounded-full bg-primary transition-all"
-          style={{ width: `${((phase + 1) / phases.length) * 100}%` }}
-        />
-      </div>
+      {/* 단계 진행 — 이름은 위 문장이 말하므로 막대는 잔여량만 전달한다(v3 T3·T4). */}
+      <ProgressIndicator
+        className="mt-2"
+        label="업로드 검증 진행"
+        valueText={`${phase + 1}단계 ${label}`}
+        min={1}
+        max={phases.length}
+        value={phase + 1}
+      />
       <p className="mt-2 t-caption-2 leading-4 text-foreground-subtle">
         직무·과업 {jobRows.toLocaleString()}행, Skill {skillRows.toLocaleString()}행
         {orgRows > 0 ? `, 조직 ${orgRows.toLocaleString()}행` : ''}
@@ -140,8 +137,10 @@ export function ReplaceConfirmModal({
       title="기존 데이터를 전체 교체할까요?"
       description="되돌릴 수 없는 작업입니다. 아래 내용을 확인해 주세요."
       icon={<AlertTriangle size={18} className="mt-0.5 text-destructive" aria-hidden="true" />}
-      size="md"
+      size="lg"
       onClose={onCancel}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
       footer={
         <>
           <Button variant="secondary" onClick={onCancel}>

@@ -452,12 +452,40 @@ function Shell({
   setCompanyFilter: (v: string) => void;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   const [dirty, setDirty] = useState(false);
   const { pathname } = useLocation();
   const isAdmin = user.role === 'admin';
   const navGroups = isAdmin ? adminNav : smeNav;
   const home = isAdmin ? adminHome : smeHome;
   const closeDrawer = useCallback(() => setMobileOpen(false), []);
+  const pageTitle = titleOf(pathname);
+
+  /*
+   * 브라우저 탭 제목(v3 T6).
+   * v2까지 document.title을 한 번도 쓰지 않아 라우트 21개가 index.html의 한 제목을 공유했다.
+   * 관리자는 워크벤치·진행 현황·Export를 탭 여럿에 띄우고 오가는데 제목이 전부 같아
+   * 구분이 불가능했고, 뒤로/앞으로 이력에도 같은 이름만 쌓였다.
+   * 화면 이름은 헤더가 쓰는 titleOf를 그대로 쓴다 — 두 곳이 다른 말을 하지 않게.
+   */
+  useEffect(() => {
+    document.title = `${pageTitle} · 직무정보 검토 시스템`;
+  }, [pageTitle]);
+
+  /*
+   * 화면을 옮길 때 스크롤과 포커스를 본문 맨 위로 되돌린다(v3 T6).
+   *
+   * v2는 이 처리가 없어서, 진행 매트릭스를 아래까지 스크롤한 뒤 워크벤치로 가면 새 화면이
+   * 중간부터 보였다. 낭독기에는 화면이 바뀐 사실 자체가 전달되지 않았다.
+   * preventScroll — 포커스 때문에 화면이 다시 튀지 않게 한다(montage 포커스 규약).
+   *
+   * step 쿼리스트링만 바뀌는 마법사 단계 이동은 pathname이 그대로라 여기 걸리지 않는다.
+   * 그쪽 스크롤은 SmeReviewPage가 따로 맞춘다.
+   */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    mainRef.current?.focus({ preventScroll: true });
+  }, [pathname]);
 
   /** 확인을 기다리는 이탈 동작. null이면 확인창이 닫힌 상태다. */
   const [pendingLeave, setPendingLeave] = useState<{ run: () => void } | null>(null);
@@ -485,6 +513,17 @@ function Shell({
   return (
     <DirtyContext.Provider value={guard}>
       <div className="min-h-screen bg-background text-foreground">
+        {/*
+          본문으로 건너뛰기(WCAG 2.2 · 2.4.1 블록 건너뛰기 · v3 T6).
+          관리자 사이드바는 5그룹 13링크다. 이게 없으면 키보드 사용자는 화면을 옮길 때마다
+          그 13개를 통과해야 본문에 닿았다. 평소에는 화면 밖에 있고 포커스를 받으면 나타난다.
+        */}
+        <a
+          href="#content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-toast focus:rounded-element focus:bg-primary focus:px-4 focus:py-2 focus:t-label focus:font-medium focus:text-primary-foreground focus:shadow-2"
+        >
+          본문으로 건너뛰기
+        </a>
         <aside className="fixed inset-y-0 left-0 z-drawer hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
           <SidebarBody groups={navGroups} onNavigate={closeDrawer} onLogout={onLogout} />
         </aside>
@@ -524,7 +563,7 @@ function Shell({
               </button>
               <div>
                 <p className="t-caption text-foreground-subtle">{isAdmin ? '관리자 포털' : 'SME 검토 포털'}</p>
-                <h1 className="t-headline text-foreground">{titleOf(pathname)}</h1>
+                <h1 className="t-headline text-foreground">{pageTitle}</h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -539,7 +578,8 @@ function Shell({
               </div>
             </div>
           </header>
-          <main className="mx-auto max-w-[1500px] p-5 lg:p-8">
+          {/* tabIndex={-1} — 건너뛰기 링크와 라우트 전환이 여기로 포커스를 옮긴다(v3 T6). */}
+          <main ref={mainRef} id="content" tabIndex={-1} className="mx-auto max-w-[1500px] p-5 outline-none lg:p-8">
             <Routes>
               {isAdmin ? (
                 <>
@@ -747,7 +787,7 @@ function MobileDrawer({ open, onClose, children }: { open: boolean; onClose: () 
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose(); // ::backdrop 클릭은 dialog로 전달된다.
       }}
-      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label scrim-backdrop lg:hidden"
+      className="anim-drawer m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label scrim-backdrop lg:hidden"
     >
       {children}
     </dialog>

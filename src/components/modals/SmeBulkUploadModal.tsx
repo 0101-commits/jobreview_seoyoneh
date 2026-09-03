@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
+import { ProgressIndicator } from '@/components/ui/ProgressIndicator';
 import {
   downloadSmeTemplate,
   validateSmeRows,
@@ -158,7 +159,9 @@ export function SmeBulkUploadModal({
       description="Excel 양식으로 SME 계정을 한 번에 등록합니다. 기존 계정 수정은 목록의 '관리' 버튼을 이용해 주세요."
       icon={<Upload size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
       onClose={onClose}
-      size="lg"
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
+      size="wide"
       dirty={Boolean(validation) && !result && !submitting}
       closeDisabled={submitting}
       footer={
@@ -249,31 +252,19 @@ export function SmeBulkUploadModal({
         </div>
       )}
 
+      {/*
+        진행률을 알 수 있는 작업이라 선형 막대를 쓴다(montage 로딩 3종 선택 기준).
+        v2는 여기에 막대를 직접 그렸다 — 공용 ProgressIndicator로 옮겨 규격(높이·전이·낭독)을
+        한 곳에서 관리한다.
+      */}
       {submitting && (
-        <div className="mb-2" aria-live="polite">
-          <div className="mb-2 flex items-center justify-between t-label">
-            <span className="flex items-center gap-2 text-foreground-muted">
-              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-              {progress.done}/{progress.total}명 처리 중
-            </span>
-            <span className="font-medium text-foreground">
-              {progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%
-            </span>
-          </div>
-          <div
-            className="h-2 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-valuenow={progress.done}
-            aria-valuemin={0}
-            aria-valuemax={progress.total}
-            aria-label="업로드 진행률"
-          >
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
-            />
-          </div>
-        </div>
+        <ProgressIndicator
+          className="mb-2"
+          label="SME 계정 등록 진행률"
+          value={progress.done}
+          max={progress.total}
+          showValue
+        />
       )}
 
       {result && (

@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchCompaniesResult } from '@/lib/jobApi';
 import { Button } from '@/components/ui/Button';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { DataTable } from '@/components/ui/DataTable';
 import { FallbackView } from '@/components/ui/FallbackView';
@@ -66,6 +67,8 @@ export function UsersPage({
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'name', asc: true });
   const [page, setPage] = useState(1);
   const { toast, showToast, dismiss } = useToast();
+  // 닫기가 필요한 알림은 Snackbar로 낸다 — Toast에는 닫기 버튼이 없다(v3 T3).
+  const { snackbar, showSnackbar, dismiss: dismissSnackbar } = useSnackbar();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const loadCompanies = useCallback(async () => {
@@ -223,6 +226,7 @@ export function UsersPage({
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
 
       {companyError && (
         <SectionMessage variant="cautionary" className="mb-4">
@@ -411,13 +415,13 @@ export function UsersPage({
           onClose={() => setShowBulkUpload(false)}
           onCompleted={({ created, failed, aborted }) => {
             if (created > 0) fetchSmes();
-            showToast({
+            showSnackbar({
               type: failed === 0 && !aborted ? 'success' : 'warning',
               msg:
                 failed === 0 && !aborted
                   ? `SME ${created}명을 등록했어요.`
                   : `SME ${created}명 등록, ${failed}명 실패${aborted ? ' (중단됨)' : ''} — 실패 목록은 모달에서 확인해 주세요.`,
-              duration: 8000,
+              duration: 'long',
             });
           }}
         />
@@ -431,13 +435,13 @@ export function UsersPage({
           onClose={() => setShowBulkDelete(false)}
           onCompleted={({ deleted, failed, aborted }) => {
             if (deleted > 0) fetchSmes();
-            showToast({
+            showSnackbar({
               type: failed === 0 && !aborted ? 'success' : 'warning',
               msg:
                 failed === 0 && !aborted
                   ? `SME ${deleted}명을 삭제했어요.`
                   : `SME ${deleted}명 삭제, ${failed}명 실패${aborted ? ' (중단됨)' : ''} — 실패 목록은 모달에서 확인해 주세요.`,
-              duration: 8000,
+              duration: 'long',
             });
           }}
         />
