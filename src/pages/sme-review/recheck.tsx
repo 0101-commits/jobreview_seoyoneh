@@ -45,7 +45,7 @@ export function RecheckBanner({
   return (
     <div
       role="alert"
-      className="mb-5 flex flex-wrap items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning"
+      className="mb-5 flex flex-wrap items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-4 py-3 t-label text-warning"
     >
       <RotateCw size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">
@@ -54,7 +54,7 @@ export function RecheckBanner({
         <p className="mt-1 whitespace-pre-line leading-6">
           {reason.trim() || '반려 사유가 함께 저장되지 않았어요. 관리자에게 확인해 주세요.'}
         </p>
-        <p className="mt-1 text-xs leading-5">
+        <p className="mt-1 t-caption leading-5">
           {step ? `${stepTitle(step)} 단계를 다시 확인한 뒤 ` : '내용을 고친 뒤 '}
           STEP 5에서 다시 제출해 주세요.
         </p>
@@ -99,7 +99,7 @@ export function AnsweredInquiryBanner({
   return (
     <div
       role="status"
-      className="mb-5 flex flex-wrap items-start gap-2 rounded-element border border-primary-border bg-primary-subtle px-4 py-3 text-sm text-primary"
+      className="mb-5 flex flex-wrap items-start gap-2 rounded-element border border-primary-border bg-primary-subtle px-4 py-3 t-label text-primary"
     >
       <MessageSquareText size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
       <p className="min-w-0 flex-1">

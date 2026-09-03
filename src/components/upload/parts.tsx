@@ -31,7 +31,7 @@ import { SME_SHEET_NOTICE, STEPS, listPreview } from '@/components/upload/consta
  */
 export function RosterSummary({ result }: { result: SmeRosterLinkResult }) {
   return (
-    <div className="mt-3 space-y-1 border-t border-success-border pt-3 text-xs leading-5">
+    <div className="mt-3 space-y-1 border-t border-success-border pt-3 t-caption leading-5">
       <p>
         이미 등록된 계정 {result.linkedCount.toLocaleString()}명의 소속 조직을 연결하고, 배정직무{' '}
         {result.assignmentCreatedCount.toLocaleString()}건을 추가했습니다.
@@ -93,7 +93,7 @@ export function SaveProgress({
   const label = phases[Math.min(phase, phases.length - 1)];
   return (
     <div className="mt-4 rounded-element bg-muted px-4 py-3">
-      <p className="flex items-center gap-2 text-xs font-medium text-foreground-muted">
+      <p className="flex items-center gap-2 t-caption font-medium text-foreground-muted">
         <Loader2 size={14} className="animate-spin" aria-hidden="true" />
         {phase + 1}/{phases.length}단계 · {label}
       </p>
@@ -110,7 +110,7 @@ export function SaveProgress({
           style={{ width: `${((phase + 1) / phases.length) * 100}%` }}
         />
       </div>
-      <p className="mt-2 text-[11px] leading-4 text-foreground-subtle">
+      <p className="mt-2 t-caption-2 leading-4 text-foreground-subtle">
         직무·과업 {jobRows.toLocaleString()}행, Skill {skillRows.toLocaleString()}행
         {orgRows > 0 ? `, 조직 ${orgRows.toLocaleString()}행` : ''}
         {smeRows > 0 ? `, SME 명부 ${smeRows.toLocaleString()}행` : ''}을 한 번의 작업으로 저장합니다. 서버가 한 번에
@@ -155,26 +155,26 @@ export function ReplaceConfirmModal({
     >
       <dl className="grid grid-cols-2 gap-3">
         <div className="rounded-element border border-border p-4">
-          <dt className="text-xs text-foreground-muted">현재 등록된 직무</dt>
-          <dd className="mt-1 text-lg font-semibold text-foreground">
+          <dt className="t-caption text-foreground-muted">현재 등록된 직무</dt>
+          <dd className="mt-1 t-headline text-foreground">
             {currentJobCount === undefined ? (
-              <span className="inline-flex items-center gap-1.5 text-sm text-foreground-muted">
+              <span className="inline-flex items-center gap-1.5 t-label text-foreground-muted">
                 <Loader2 size={14} className="animate-spin" aria-hidden="true" /> 확인 중…
               </span>
             ) : currentJobCount === null ? (
-              <span className="text-sm text-foreground-muted">확인하지 못했어요</span>
+              <span className="t-label text-foreground-muted">확인하지 못했어요</span>
             ) : (
               `${currentJobCount.toLocaleString()}건`
             )}
           </dd>
         </div>
         <div className="rounded-element border border-primary-border bg-primary-subtle p-4">
-          <dt className="text-xs text-foreground-muted">업로드 파일의 직무</dt>
-          <dd className="mt-1 text-lg font-semibold text-primary">{fileJobCount.toLocaleString()}건</dd>
+          <dt className="t-caption text-foreground-muted">업로드 파일의 직무</dt>
+          <dd className="mt-1 t-headline text-primary">{fileJobCount.toLocaleString()}건</dd>
         </div>
       </dl>
 
-      <ul className="mt-4 space-y-2 rounded-element border border-destructive-border bg-destructive-muted p-4 text-sm leading-6 text-destructive">
+      <ul className="mt-4 space-y-2 rounded-element border border-destructive-border bg-destructive-muted p-4 t-label-reading text-destructive">
         <li>현재 등록된 직무정보가 이 파일의 내용으로 대체됩니다.</li>
         <li>
           어떤 항목이 지워지고 무엇이 남는지는 서버의 교체 규칙을 따르며, 실행 후에는 화면에서 되돌릴 수 없습니다.
@@ -182,7 +182,7 @@ export function ReplaceConfirmModal({
         <li>불확실하다면 먼저 「기존 데이터에 추가」로 올리거나, 현재 데이터를 내려받아 보관해 주세요.</li>
       </ul>
 
-      <label className="mt-4 flex items-start gap-2 text-sm text-foreground">
+      <label className="mt-4 flex items-start gap-2 t-label text-foreground">
         <input
           type="checkbox"
           checked={acknowledged}
@@ -262,14 +262,14 @@ export function IntegratedFileDrop({
           className={`mb-3 ${dragOver ? 'text-primary' : 'text-foreground-subtle'}`}
           aria-hidden="true"
         />
-        <p className="text-sm font-medium text-foreground">
+        <p className="t-label font-medium text-foreground">
           {dragOver ? '여기에 놓으면 검증을 시작해요' : '파일을 끌어놓거나 클릭하여 선택'}
         </p>
-        <p className="mt-2 text-xs text-foreground-muted">xlsx · xls 파일 1개 · 필수 Sheet 2개</p>
-        <p className="mt-1 text-xs text-foreground-subtle">
+        <p className="mt-2 t-caption text-foreground-muted">xlsx · xls 파일 1개 · 필수 Sheet 2개</p>
+        <p className="mt-1 t-caption text-foreground-subtle">
           {JOB_SHEET_NAME} · {SKILL_SHEET_NAME}
         </p>
-        <p className="mt-1 text-xs text-foreground-subtle">
+        <p className="mt-1 t-caption text-foreground-subtle">
           선택 {ORG_SHEET_NAME} · {SME_SHEET_NAME}
         </p>
         <input
@@ -283,7 +283,7 @@ export function IntegratedFileDrop({
       </label>
 
       {file && (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-element bg-muted px-4 py-3 text-sm">
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-element bg-muted px-4 py-3 t-label">
           <span className="flex min-w-0 items-center gap-2 text-foreground">
             <FileSpreadsheet size={16} className="shrink-0 text-primary" aria-hidden="true" />
             <span className="truncate">{file.name}</span>
@@ -376,7 +376,7 @@ export function ValidationPanel({
       {validation.hasSmeSheet && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-element bg-muted px-4 py-3">
           <Info size={15} className="shrink-0 text-primary" aria-hidden="true" />
-          <p className="min-w-0 flex-1 text-xs leading-5 text-foreground-muted">{SME_SHEET_NOTICE}.</p>
+          <p className="min-w-0 flex-1 t-caption leading-5 text-foreground-muted">{SME_SHEET_NOTICE}.</p>
           {validation.smeRows.length > 0 && (
             <Button size="sm" variant="secondary" onClick={() => downloadNormalizedSmeRoster(validation.smeRows)}>
               <Download size={13} aria-hidden="true" /> 명부 정규화 결과 내려받기
@@ -385,12 +385,12 @@ export function ValidationPanel({
         </div>
       )}
 
-      <p className="mt-3 text-xs leading-5 text-foreground-subtle">
+      <p className="mt-3 t-caption leading-5 text-foreground-subtle">
         「필수값 누락」은 업로드를 막는 오류이고, 「확인 필요」는 선택 항목 공백·중복 제외처럼 업로드는 되는 안내입니다.
       </p>
 
       <div
-        className={`mt-4 flex items-center gap-2 rounded-element px-4 py-3 text-sm ${
+        className={`mt-4 flex items-center gap-2 rounded-element px-4 py-3 t-label ${
           validation.valid ? 'bg-success-muted text-success' : 'bg-destructive-muted text-destructive'
         }`}
       >
@@ -444,16 +444,16 @@ function SheetValidationCard({
             <span className="sr-only">{valid ? '검증 통과' : '오류 있음'}</span>
           </span>
           <div>
-            <p className="text-xs font-medium text-primary">{sheetLabel}</p>
+            <p className="t-caption font-medium text-primary">{sheetLabel}</p>
             <p className="mt-0.5 font-semibold text-foreground">{title}</p>
           </div>
         </div>
         <dl className="grid grid-cols-3 gap-x-5 gap-y-2 sm:grid-cols-6">
           {stats.map(([label, value]) => (
             <div key={label} className="text-right">
-              <dt className="text-[11px] text-foreground-subtle">{label}</dt>
+              <dt className="t-caption-2 text-foreground-subtle">{label}</dt>
               <dd
-                className={`mt-0.5 text-sm font-semibold ${
+                className={`mt-0.5 t-label font-semibold ${
                   value > 0 && (label === '오류' || label === '필수값 누락')
                     ? 'text-destructive'
                     : value > 0 && label === '확인 필요'
@@ -515,7 +515,7 @@ function MessageList({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p
-          className={`flex items-center gap-1.5 text-sm font-medium ${type === 'error' ? 'text-destructive' : 'text-warning'}`}
+          className={`flex items-center gap-1.5 t-label font-medium ${type === 'error' ? 'text-destructive' : 'text-warning'}`}
         >
           <AlertTriangle size={15} aria-hidden="true" />
           {title}
@@ -530,7 +530,7 @@ function MessageList({
         </div>
       </div>
 
-      <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto rounded-inner bg-card/60 p-3 text-xs leading-5 text-foreground-muted">
+      <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto rounded-inner bg-card/60 p-3 t-caption leading-5 text-foreground-muted">
         {visible.map((message, index) => (
           <li key={`${message}-${index}`}>{message}</li>
         ))}
@@ -538,7 +538,7 @@ function MessageList({
 
       {messages.length > visible.length && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-foreground-muted">
+          <span className="t-caption text-foreground-muted">
             {visible.length.toLocaleString()} / {messages.length.toLocaleString()}건 표시 중
           </span>
           <Button size="sm" variant="ghost" onClick={() => setVisibleCount((count) => count + MESSAGE_PAGE * 4)}>
@@ -659,14 +659,14 @@ export function PreviewPanel({ validation }: { validation: IntegratedValidationR
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-foreground-muted">
+      <p className="mt-2 t-caption text-foreground-muted">
         {active.key === 'sme' ? '소속 조직·배정직무를 반영할' : '중복 제외 후 저장될'} {total.toLocaleString()}행 중 상위{' '}
         {Math.min(limit, total).toLocaleString()}행입니다.
         {errorRows.size > 0 && ` 오류가 있는 행은 붉게 표시했습니다.`}
       </p>
 
       <div className="mt-3 overflow-x-auto rounded-element border border-border">
-        <table className="w-full min-w-[720px] text-left text-xs">
+        <table className="w-full min-w-[720px] text-left t-caption">
           <thead className="bg-muted text-foreground-muted">
             <tr>
               <th scope="col" className="whitespace-nowrap px-3 py-2 font-medium">
@@ -713,7 +713,7 @@ export function PreviewPanel({ validation }: { validation: IntegratedValidationR
 
       {total > cells.length && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-foreground-muted">
+          <span className="t-caption text-foreground-muted">
             {cells.length.toLocaleString()} / {total.toLocaleString()}행 표시 중
           </span>
           <Button size="sm" variant="ghost" onClick={() => setLimit((value) => value + 100)}>
@@ -759,8 +759,8 @@ export function ModeOption({
         className="mt-0.5 h-4 w-4 accent-[rgb(var(--primary))]"
       />
       <span>
-        <b className="block text-sm text-foreground">{title}</b>
-        <small className="mt-1 block text-xs leading-5 text-foreground-muted">{description}</small>
+        <b className="block t-label text-foreground">{title}</b>
+        <small className="mt-1 block t-caption leading-5 text-foreground-muted">{description}</small>
       </span>
     </label>
   );

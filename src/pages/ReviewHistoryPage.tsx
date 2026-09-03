@@ -77,10 +77,10 @@ export function HistoryPage({ user }: { user: User }) {
   return (
     <>
       <div className="mb-6">
-        <p className="mb-1 text-sm text-foreground-subtle">
+        <p className="mb-1 t-label text-foreground-subtle">
           내가 작성한 검토 기록{user.company_name && ` · ${user.company_name}`}
         </p>
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">검토 이력</h2>
+        <h2 className="t-title text-foreground">검토 이력</h2>
       </div>
 
       {loading ? (
@@ -88,8 +88,8 @@ export function HistoryPage({ user }: { user: User }) {
       ) : error ? (
         <div className="rounded-container border border-destructive-border bg-destructive-muted p-6 text-center">
           <AlertTriangle size={20} className="mx-auto mb-2 text-destructive" aria-hidden="true" />
-          <p className="text-sm font-medium text-destructive">{error}</p>
-          <p className="mt-1 text-xs text-foreground-muted">
+          <p className="t-label font-medium text-destructive">{error}</p>
+          <p className="mt-1 t-caption text-foreground-muted">
             네트워크 상태를 확인한 뒤 다시 시도해 주세요. 계속 실패하면 관리자에게 문의해 주세요.
           </p>
           <Button variant="secondary" size="sm" className="mt-4" onClick={() => void load()}>
@@ -99,13 +99,13 @@ export function HistoryPage({ user }: { user: User }) {
       ) : rows.length === 0 ? (
         <div className="rounded-container border border-border bg-card p-10 text-center">
           <Inbox size={22} className="mx-auto mb-2 text-foreground-subtle" aria-hidden="true" />
-          <p className="text-sm font-medium text-foreground">검토 이력이 없습니다</p>
-          <p className="mt-1 text-xs text-foreground-muted">내 검토 목록에서 배정된 직무를 먼저 검토해 주세요.</p>
+          <p className="t-label font-medium text-foreground">검토 이력이 없습니다</p>
+          <p className="mt-1 t-caption text-foreground-muted">내 검토 목록에서 배정된 직무를 먼저 검토해 주세요.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {historyError && (
-            <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 text-xs text-warning">
+            <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 t-caption text-warning">
               {historyError}
             </p>
           )}
@@ -117,14 +117,14 @@ export function HistoryPage({ user }: { user: User }) {
                     <h3 className="font-semibold text-foreground">{r.job_name}</h3>
                     <StatusBadge status={mapReviewStatus(r.review_status)} />
                   </div>
-                  <p className="mt-2 text-sm text-foreground-muted">
+                  <p className="mt-2 t-label text-foreground-muted">
                     {r.group_name} · {r.series_name}
                   </p>
-                  <p className="mt-1 text-xs text-foreground-subtle">최종 제출일 {formatAt(r.submitted_at)}</p>
+                  <p className="mt-1 t-caption text-foreground-subtle">최종 제출일 {formatAt(r.submitted_at)}</p>
                 </div>
                 <Link
                   to={`/review/${r.job_id}`}
-                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-element border border-border px-4 text-xs font-medium text-foreground-muted transition hover:border-primary hover:text-primary sm:min-h-control-sm"
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-element border border-border px-4 t-caption font-medium text-foreground-muted transition hover:border-primary hover:text-primary sm:min-h-control-sm"
                 >
                   검토내용 보기
                 </Link>
@@ -141,7 +141,7 @@ export function HistoryPage({ user }: { user: User }) {
 
 function Timeline({ events }: { events: HistoryEvent[] }) {
   if (events.length === 0)
-    return <p className="mt-4 border-t border-border pt-3 text-xs text-foreground-subtle">아직 제출 이력이 없어요.</p>;
+    return <p className="mt-4 border-t border-border pt-3 t-caption text-foreground-subtle">아직 제출 이력이 없어요.</p>;
 
   return (
     <ol className="mt-4 space-y-3 border-t border-border pt-4 pl-4">
@@ -154,9 +154,9 @@ function Timeline({ events }: { events: HistoryEvent[] }) {
             className="absolute -left-[4px] top-1.5 h-2 w-2 rounded-full bg-primary ring-4 ring-card"
             aria-hidden="true"
           />
-          <p className="text-xs font-medium text-foreground">{ACTION_LABEL[e.action] || e.action}</p>
-          <p className="text-[11px] text-foreground-subtle">{formatAt(e.created_at)}</p>
-          {e.note && <p className="mt-1 text-xs text-foreground-muted">{e.note}</p>}
+          <p className="t-caption font-medium text-foreground">{ACTION_LABEL[e.action] || e.action}</p>
+          <p className="t-caption-2 text-foreground-subtle">{formatAt(e.created_at)}</p>
+          {e.note && <p className="mt-1 t-caption text-foreground-muted">{e.note}</p>}
         </li>
       ))}
     </ol>

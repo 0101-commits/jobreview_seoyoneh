@@ -116,8 +116,8 @@ export function ModalShell({
           <div className="flex items-start gap-2">
             {icon}
             <div>
-              <h3 id={titleId} className="text-lg font-semibold text-foreground">{title}</h3>
-              {description && <p id={descId} className="mt-1 text-sm leading-6 text-foreground-muted">{description}</p>}
+              <h3 id={titleId} className="t-headline text-foreground">{title}</h3>
+              {description && <p id={descId} className="mt-1 t-label-reading text-foreground-muted">{description}</p>}
             </div>
           </div>
           <button
@@ -159,7 +159,7 @@ export function ModalShell({
             <h4 id={`${titleId}-close-ask`} className="t-headline text-foreground">
               작성 중인 내용이 사라져요
             </h4>
-            <p className="mt-2 t-label leading-6 text-foreground-muted">
+            <p className="mt-2 t-label-reading text-foreground-muted">
               저장하지 않은 변경 내용이 있어요. 창을 닫으면 입력한 내용이 사라집니다.
             </p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">

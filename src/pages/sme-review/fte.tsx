@@ -206,12 +206,12 @@ function TotalGauge({
   // 진행 막대는 값을 들고만 있고(aria-valuenow·valuetext), 변화를 말하는 일은 이 영역이 맡는다.
   const readout = (
     <div aria-live="polite" className={layout === 'side' ? 'mt-3 text-center' : 'min-w-0'}>
-      <p className="text-sm font-semibold text-foreground">
+      <p className="t-label font-semibold text-foreground">
         {total}% <span className="font-normal text-foreground-subtle">/ 100%</span>
       </p>
       {status.text && (
         <p
-          className={`mt-1 flex items-start gap-1.5 text-xs ${status.tone} ${
+          className={`mt-1 flex items-start gap-1.5 t-caption ${status.tone} ${
             layout === 'side' ? 'justify-center' : ''
           }`}
         >
@@ -262,7 +262,7 @@ function TotalGauge({
 
   return (
     <div className="hidden xl:sticky xl:top-4 xl:block xl:rounded-container xl:border xl:border-border xl:bg-card xl:p-5">
-      <p className="text-sm font-semibold text-foreground">{FTE_TOTAL_LABEL}</p>
+      <p className="t-label font-semibold text-foreground">{FTE_TOTAL_LABEL}</p>
       <div
         role="progressbar"
         aria-label={FTE_TOTAL_LABEL}
@@ -279,7 +279,7 @@ function TotalGauge({
       >
         <span
           aria-hidden="true"
-          className="grid h-20 w-20 place-items-center rounded-full bg-card text-lg font-semibold text-foreground"
+          className="grid h-20 w-20 place-items-center rounded-full bg-card t-headline text-foreground"
         >
           {total}%
         </span>
@@ -441,11 +441,11 @@ export function FteStep({
 
       {/* 겸직·비중 인식 지원(§6-2) — 기간 기준과 겸직 안내는 접지 않고 항상 보이게 둔다. */}
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-element bg-muted px-4 py-3">
-        <span className="rounded-inner bg-card px-2 py-1 text-xs font-semibold text-primary">{FTE_PERIOD_BASIS}</span>
-        <span className="text-xs leading-5 text-foreground-muted">{FTE_MOONLIGHTING_NOTE}</span>
+        <span className="rounded-inner bg-card px-2 py-1 t-caption font-semibold text-primary">{FTE_PERIOD_BASIS}</span>
+        <span className="t-caption leading-5 text-foreground-muted">{FTE_MOONLIGHTING_NOTE}</span>
       </div>
 
-      <p className="mb-5 text-sm leading-6 text-foreground-muted">{FTE_INTRO}</p>
+      <p className="mb-5 t-label-reading text-foreground-muted">{FTE_INTRO}</p>
 
       {/* 입력 칸 공통 안내. 그림 6-A에 이 문장을 놓을 자리가 없어 화면에는 감추고 보조기기에만 읽힌다
           (모든 입력 칸이 aria-describedby로 이 한 문장을 가리킨다). */}
@@ -457,7 +457,7 @@ export function FteStep({
         <div>
           {targets.length === 0 ? (
             // 배분할 과업이 하나도 없는 경우 — 문구는 기획안에 없어 새로 씀.
-            <p className="rounded-element bg-muted px-4 py-6 text-center text-sm text-foreground-muted">
+            <p className="rounded-element bg-muted px-4 py-6 text-center t-label text-foreground-muted">
               배분할 과업이 없어요.{' '}
               <button
                 type="button"
@@ -480,16 +480,16 @@ export function FteStep({
                       {/* STEP 2 판정을 배분 행에서도 읽을 수 있게 한다(v2 §5-3 "행 머리에 STEP 2 결과"). */}
                       {t.suitability && <SuitabilityChip value={t.suitability} />}
                       {t.isNew && (
-                        <span className="shrink-0 rounded-inner bg-primary-subtle px-2 py-0.5 text-[11px] font-semibold text-primary">
+                        <span className="shrink-0 rounded-inner bg-primary-subtle px-2 py-0.5 t-caption-2 font-semibold text-primary">
                           {FTE_SUGGESTED_BADGE}
                         </span>
                       )}
                     </div>
                     {/* 수정 제안명 — 관리자 비교 뷰와 같은 문언으로 붙인다. */}
                     {t.suggestedName && (
-                      <p className="mt-1 text-xs font-medium text-primary">{fteSuggestedNameChip(t.suggestedName)}</p>
+                      <p className="mt-1 t-caption font-medium text-primary">{fteSuggestedNameChip(t.suggestedName)}</p>
                     )}
-                    {t.description && <p className="mt-1 text-xs leading-5 text-foreground-muted">{t.description}</p>}
+                    {t.description && <p className="mt-1 t-caption leading-5 text-foreground-muted">{t.description}</p>}
 
                     {/* 좁은 폭·큰 글꼴에서는 줄을 바꿔 넘치지 않게 한다(막대가 flex-1이라 스스로 다음 줄을 채운다). */}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -531,7 +531,7 @@ export function FteStep({
                         onKeyDown={(e) => onInputKeyDown(e, t.key)}
                         className="input w-16 shrink-0 px-2 text-center tabular-nums disabled:opacity-60"
                       />
-                      <span className="shrink-0 text-sm font-semibold text-foreground">%</span>
+                      <span className="shrink-0 t-label font-semibold text-foreground">%</span>
                       <button
                         type="button"
                         onClick={() => bump(t.key, FTE_STEP_PCT)}
@@ -555,7 +555,7 @@ export function FteStep({
                         type="button"
                         onClick={() => toggleOpen(t.key)}
                         aria-expanded={open}
-                        className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-element px-2 text-xs font-medium text-primary transition hover:bg-primary-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-element px-2 t-caption font-medium text-primary transition hover:bg-primary-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
                         {open ? FTE_REOPEN_CLOSE_BUTTON : FTE_REOPEN_BUTTON}
                         {open ? (
@@ -601,7 +601,7 @@ export function FteStep({
           {/* 삭제 제안 제외 안내 · 되살리기 · 균등 배분으로 시작 */}
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
             {excluded.length > 0 && (
-              <span className="text-xs text-foreground-muted">
+              <span className="t-caption text-foreground-muted">
                 {fteExcludedRestoreLine(excluded.length, parkedPct)}
                 {excluded.map((ex) => (
                   <button
@@ -627,21 +627,21 @@ export function FteStep({
           {/* 품질 가드 ⓑ·ⓒ — 막지 않고 알리기만 한다(§6-2 "허용은 하되 인지시킴"). */}
           <div className="mt-4 space-y-2">
             {zeroCount > 0 && total > 0 && (
-              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 text-xs leading-5 text-foreground-muted">
+              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
                 <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
                 <span>{fteZeroPctNote(zeroCount)}</span>
               </p>
             )}
             {/* 5% 미만이 3건 이상이면 "다수 분산"으로 본다(임계값은 §12에서 확정). */}
             {smallCount >= 3 && (
-              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 text-xs leading-5 text-foreground-muted">
+              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
                 <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
                 <span>{fteTooManySmallNote(smallCount)}</span>
               </p>
             )}
             {/* 이름이 빈 신규 제안은 저장되지 않아 배분 대상에서도 빠진다 — STEP 2로 돌아갈 길을 준다. */}
             {unnamedCount > 0 && (
-              <p className="flex items-start gap-2 rounded-element bg-warning-muted px-4 py-3 text-xs leading-5 text-warning">
+              <p className="flex items-start gap-2 rounded-element bg-warning-muted px-4 py-3 t-caption leading-5 text-warning">
                 <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
                 <span>
                   {GATE_STEP2_NEW_TASK_NAME}{' '}
@@ -686,7 +686,7 @@ export function FteStep({
             </>
           }
         >
-          <p className="text-sm leading-6 text-foreground-muted">{FTE_SINGLE_100_MODAL.body}</p>
+          <p className="t-label-reading text-foreground-muted">{FTE_SINGLE_100_MODAL.body}</p>
         </ModalShell>
       )}
     </section>

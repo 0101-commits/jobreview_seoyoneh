@@ -56,7 +56,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      {body ? <div className="t-label leading-6 text-foreground-muted">{body}</div> : null}
+      {body ? <div className="t-label-reading text-foreground-muted">{body}</div> : null}
     </ModalShell>
   );
 }

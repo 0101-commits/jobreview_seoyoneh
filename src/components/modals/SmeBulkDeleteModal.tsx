@@ -116,17 +116,17 @@ export function SmeBulkDeleteModal({
       }
     >
       <div className="rounded-element border border-destructive-border bg-destructive-muted p-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-4 t-label">
           <div>
-            <p className="text-xs text-destructive">삭제 범위</p>
+            <p className="t-caption text-destructive">삭제 범위</p>
             <p className="mt-1 font-semibold text-destructive">{scopeName}</p>
           </div>
           <div>
-            <p className="text-xs text-destructive">삭제 대상</p>
+            <p className="t-caption text-destructive">삭제 대상</p>
             <p className="mt-1 font-semibold text-destructive">{smeList.length}명</p>
           </div>
         </div>
-        <p className="mt-4 text-xs leading-5 text-destructive">
+        <p className="mt-4 t-caption leading-5 text-destructive">
           삭제된 SME는 더 이상 로그인할 수 없어요. 검토 관련 연결 데이터에도 영향을 줄 수 있으니, 실제 삭제가 필요할
           때만 사용해 주세요.
         </p>
@@ -148,7 +148,7 @@ export function SmeBulkDeleteModal({
 
       {deleting && (
         <div className="mt-6" aria-live="polite">
-          <div className="mb-2 flex items-center justify-between text-sm">
+          <div className="mb-2 flex items-center justify-between t-label">
             <span className="flex items-center gap-2 text-foreground-muted">
               <Loader2 size={16} className="animate-spin" aria-hidden="true" />
               {progress.done}/{progress.total}명 삭제 중
@@ -176,7 +176,7 @@ export function SmeBulkDeleteModal({
       {result && (
         <div className="mt-5 space-y-3" aria-live="polite">
           <div
-            className={`flex items-start gap-2 rounded-element border px-3 py-2.5 text-sm ${
+            className={`flex items-start gap-2 rounded-element border px-3 py-2.5 t-label ${
               result.failed === 0 && !result.aborted
                 ? 'border-success-border bg-success-muted text-success'
                 : 'border-warning-border bg-warning-muted text-warning'
@@ -195,10 +195,10 @@ export function SmeBulkDeleteModal({
 
           {result.errors.length > 0 && (
             <div className="max-h-56 overflow-y-auto rounded-element border border-destructive-border bg-destructive-muted p-3">
-              <p className="mb-2 text-xs font-medium text-destructive">실패 목록 ({result.errors.length}건)</p>
+              <p className="mb-2 t-caption font-medium text-destructive">실패 목록 ({result.errors.length}건)</p>
               <ul className="space-y-1">
                 {result.errors.map((e, i) => (
-                  <li key={i} className="text-xs text-destructive">
+                  <li key={i} className="t-caption text-destructive">
                     {e}
                   </li>
                 ))}

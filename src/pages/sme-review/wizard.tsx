@@ -250,7 +250,7 @@ export function SaveStatusChip({
   return (
     <div role="status" aria-live="polite" className="min-w-0">
       {state === 'error' || retrying ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-1.5 text-xs text-destructive">
+        <div className="flex flex-wrap items-center gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-1.5 t-caption text-destructive">
           <span className="flex items-center gap-1 font-medium">
             {retrying ? (
               <Loader2 size={13} className="animate-spin" aria-hidden="true" />
@@ -280,20 +280,20 @@ export function SaveStatusChip({
           </Button>
         </div>
       ) : state === 'saving' ? (
-        <p className="inline-flex items-center gap-1 rounded-element bg-muted px-3 py-1.5 text-xs text-foreground-muted">
+        <p className="inline-flex items-center gap-1 rounded-element bg-muted px-3 py-1.5 t-caption text-foreground-muted">
           <Loader2 size={13} className="animate-spin" aria-hidden="true" /> {SAVE_CHIP_SAVING}
         </p>
       ) : state === 'saved' ? (
-        <p className="inline-flex items-center gap-1 rounded-element bg-success-muted px-3 py-1.5 text-xs text-success">
+        <p className="inline-flex items-center gap-1 rounded-element bg-success-muted px-3 py-1.5 t-caption text-success">
           <Check size={13} aria-hidden="true" /> {SAVE_CHIP_SAVED}
           {when ? ` · ${when}` : ''}
         </p>
       ) : state === 'dirty' ? (
-        <p className="inline-flex items-center gap-1 rounded-element bg-warning-muted px-3 py-1.5 text-xs text-warning">
+        <p className="inline-flex items-center gap-1 rounded-element bg-warning-muted px-3 py-1.5 t-caption text-warning">
           <Loader2 size={13} aria-hidden="true" /> {SAVE_CHIP_DIRTY}
         </p>
       ) : (
-        <p className="inline-flex items-center gap-1 rounded-element bg-muted px-3 py-1.5 text-xs text-foreground-subtle">
+        <p className="inline-flex items-center gap-1 rounded-element bg-muted px-3 py-1.5 t-caption text-foreground-subtle">
           {SAVE_CHIP_IDLE}
         </p>
       )}
@@ -342,14 +342,14 @@ export function GateNotice({ reasons }: { reasons: string[] }) {
     <div
       ref={boxRef}
       tabIndex={-1}
-      className="mt-5 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warning"
+      className="mt-5 rounded-element border border-warning-border bg-warning-muted px-4 py-3 t-label text-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warning"
     >
       <div role="alert">
         <p className="flex items-center gap-1.5 font-medium">
           <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
           {GATE_BLOCKED_HEADING}
         </p>
-        <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs leading-5">
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 t-caption leading-5">
           {reasons.map((reason) => (
             <li key={reason}>{reason}</li>
           ))}

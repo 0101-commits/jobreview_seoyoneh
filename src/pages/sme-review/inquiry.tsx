@@ -131,7 +131,7 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
             무엇이 함께 전달되는지 먼저 보여 준다. 모르는 채로 쓰면 본문에 같은 정보를 다시 적거나,
             반대로 알려지길 원치 않는 맥락이 붙는다 — 개인정보 최소 수집과 같은 결의 문제다.
           */}
-          <p className="rounded-element border border-border bg-muted px-3 py-2.5 text-xs leading-5 text-foreground-muted">
+          <p className="rounded-element border border-border bg-muted px-3 py-2.5 t-caption leading-5 text-foreground-muted">
             {jobName && (
               <>
                 직무: <span className="font-medium text-foreground">{jobName}</span> ·{' '}
@@ -147,7 +147,7 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
           )}
 
           {!reviewId && (
-            <p className="mt-2 text-xs leading-5 text-foreground-subtle">
+            <p className="mt-2 t-caption leading-5 text-foreground-subtle">
               아직 검토를 시작하지 않아 직무는 함께 전달되지 않습니다. 문의 내용에 직무명을 적어 주시면 확인이 빠릅니다.
             </p>
           )}
@@ -167,7 +167,7 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
           {/* 오류는 폼 안에 남긴다 — 모달이 닫히면 사유도 본문도 함께 사라진다. */}
           <div aria-live="polite" role="status">
             {error && (
-              <div className="mt-3 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 text-xs leading-5 text-destructive">
+              <div className="mt-3 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 t-caption leading-5 text-destructive">
                 {error}
                 <span className="mt-1 block text-foreground-muted">
                   작성하신 내용은 그대로 남아 있습니다. 네트워크를 확인한 뒤 다시 보내 주세요.

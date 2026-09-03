@@ -187,10 +187,10 @@ export function JobsPage({
     <>
       <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             총 {rows.length}개 직무{query && ` · 검색 결과 ${visible.length}개`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">직무정보 관리</h2>
+          <h2 className="t-title text-foreground">직무정보 관리</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />

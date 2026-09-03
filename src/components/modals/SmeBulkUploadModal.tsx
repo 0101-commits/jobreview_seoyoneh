@@ -200,12 +200,12 @@ export function SmeBulkUploadModal({
         />
       </div>
 
-      {fileName && <p className="mb-3 text-xs text-foreground-subtle">선택된 파일: {fileName}</p>}
+      {fileName && <p className="mb-3 t-caption text-foreground-subtle">선택된 파일: {fileName}</p>}
 
       {fileError && (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 text-sm text-destructive"
+          className="mb-4 flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 t-label text-destructive"
         >
           <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>{fileError}</span>
@@ -213,7 +213,7 @@ export function SmeBulkUploadModal({
       )}
 
       {validating && (
-        <div className="py-8 text-center text-sm text-foreground-subtle">
+        <div className="py-8 text-center t-label text-foreground-subtle">
           <Loader2 size={20} className="mx-auto mb-2 animate-spin" aria-hidden="true" /> 검증 중...
         </div>
       )}
@@ -222,24 +222,24 @@ export function SmeBulkUploadModal({
         <div className="mb-4">
           <div className="mb-3 grid grid-cols-3 gap-3">
             <div className="rounded-element border border-border bg-muted p-3 text-center">
-              <p className="text-xs text-foreground-muted">총 대상</p>
-              <p className="mt-1 text-lg font-semibold text-foreground">{validation.total}명</p>
+              <p className="t-caption text-foreground-muted">총 대상</p>
+              <p className="mt-1 t-headline text-foreground">{validation.total}명</p>
             </div>
             <div className="rounded-element border border-success-border bg-success-muted p-3 text-center">
-              <p className="text-xs text-success">정상</p>
-              <p className="mt-1 text-lg font-semibold text-success">{validation.valid}명</p>
+              <p className="t-caption text-success">정상</p>
+              <p className="mt-1 t-headline text-success">{validation.valid}명</p>
             </div>
             <div className="rounded-element border border-destructive-border bg-destructive-muted p-3 text-center">
-              <p className="text-xs text-destructive">오류</p>
-              <p className="mt-1 text-lg font-semibold text-destructive">{validation.errors}명</p>
+              <p className="t-caption text-destructive">오류</p>
+              <p className="mt-1 t-headline text-destructive">{validation.errors}명</p>
             </div>
           </div>
           {validation.errorList.length > 0 && (
             <div className="max-h-48 overflow-y-auto rounded-element border border-destructive-border bg-destructive-muted p-3">
-              <p className="mb-2 text-xs font-medium text-destructive">양식 오류 — 아래 행은 업로드하지 않습니다.</p>
+              <p className="mb-2 t-caption font-medium text-destructive">양식 오류 — 아래 행은 업로드하지 않습니다.</p>
               <ul className="space-y-1">
                 {validation.errorList.map((e, i) => (
-                  <li key={i} className="text-xs text-destructive">
+                  <li key={i} className="t-caption text-destructive">
                     {e.row}행: {e.message}
                   </li>
                 ))}
@@ -251,7 +251,7 @@ export function SmeBulkUploadModal({
 
       {submitting && (
         <div className="mb-2" aria-live="polite">
-          <div className="mb-2 flex items-center justify-between text-sm">
+          <div className="mb-2 flex items-center justify-between t-label">
             <span className="flex items-center gap-2 text-foreground-muted">
               <Loader2 size={16} className="animate-spin" aria-hidden="true" />
               {progress.done}/{progress.total}명 처리 중
@@ -279,7 +279,7 @@ export function SmeBulkUploadModal({
       {result && (
         <div className="space-y-3" aria-live="polite">
           <div
-            className={`flex items-start gap-2 rounded-element border px-3 py-2.5 text-sm ${
+            className={`flex items-start gap-2 rounded-element border px-3 py-2.5 t-label ${
               result.failed === 0 && !result.aborted
                 ? 'border-success-border bg-success-muted text-success'
                 : 'border-warning-border bg-warning-muted text-warning'
@@ -301,10 +301,10 @@ export function SmeBulkUploadModal({
 
           {result.errors.length > 0 && (
             <div className="max-h-56 overflow-y-auto rounded-element border border-destructive-border bg-destructive-muted p-3">
-              <p className="mb-2 text-xs font-medium text-destructive">실패 목록 ({result.errors.length}건)</p>
+              <p className="mb-2 t-caption font-medium text-destructive">실패 목록 ({result.errors.length}건)</p>
               <ul className="space-y-1">
                 {result.errors.map((e, i) => (
-                  <li key={i} className="text-xs text-destructive">
+                  <li key={i} className="t-caption text-destructive">
                     {e.email ? `${e.email}: ` : ''}
                     {e.message}
                   </li>
@@ -331,7 +331,7 @@ function IssuedPasswords({ issued }: { issued: { email: string; tempPassword: st
   return (
     <div className="rounded-element border border-warning-border bg-warning-muted p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-medium text-warning">
+        <p className="t-caption font-medium text-warning">
           임시 비밀번호 {issued.length}건 — 이 창을 닫으면 다시 볼 수 없어요.
         </p>
         <Button
@@ -349,11 +349,11 @@ function IssuedPasswords({ issued }: { issued: { email: string; tempPassword: st
           {copied ? '복사했어요' : '목록 복사'}
         </Button>
       </div>
-      <p className="mb-2 text-xs leading-5 text-warning">
+      <p className="mb-2 t-caption leading-5 text-warning">
         각 SME에게 개별적으로 전달해 주세요. SME는 첫 로그인에서 비밀번호를 반드시 바꿉니다.
       </p>
       <div className="max-h-48 overflow-y-auto rounded-inner bg-card p-2">
-        <table className="w-full text-xs">
+        <table className="w-full t-caption">
           <tbody>
             {issued.map((r) => (
               <tr key={r.email} className="border-b border-border last:border-0">

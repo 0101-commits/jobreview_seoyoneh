@@ -82,10 +82,10 @@ export function WorkbenchPage({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             {loading ? '불러오는 중…' : error ? '조회 실패' : `총 ${rows.length}건`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">제출 큐</h2>
+          <h2 className="t-title text-foreground">제출 큐</h2>
         </div>
         <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
       </div>
@@ -228,11 +228,11 @@ function WorkshopCell({ item }: { item: SubmissionQueueItem }) {
     const reasons = item.workshopReasons.length > 0 ? item.workshopReasons : item.autoReasons;
     return (
       <div className="flex flex-col gap-1">
-        <span className="inline-flex w-fit items-center gap-1 rounded border border-primary-border bg-primary-subtle px-2 py-1 text-[11px] font-medium text-primary">
+        <span className="inline-flex w-fit items-center gap-1 rounded border border-primary-border bg-primary-subtle px-2 py-1 t-caption-2 font-medium text-primary">
           워크숍 후보 · {item.workshopSource === 'MANUAL' ? '수동 지정' : '자동 규칙'}
         </span>
         {reasons.length > 0 && (
-          <span className="text-[11px] leading-5 text-foreground-muted">{reasons.join(' · ')}</span>
+          <span className="t-caption-2 leading-5 text-foreground-muted">{reasons.join(' · ')}</span>
         )}
       </div>
     );
@@ -241,11 +241,11 @@ function WorkshopCell({ item }: { item: SubmissionQueueItem }) {
     // 사람이 내린 해제는 자동 규칙이 다시 걸려도 그대로 둔다. 자동 판정은 참고로만 덧붙인다.
     return (
       <div className="flex flex-col gap-1">
-        <span className="inline-flex w-fit items-center gap-1 rounded border border-border bg-muted px-2 py-1 text-[11px] font-medium text-foreground-muted">
+        <span className="inline-flex w-fit items-center gap-1 rounded border border-border bg-muted px-2 py-1 t-caption-2 font-medium text-foreground-muted">
           대상 아님 · 수동 해제
         </span>
         {item.autoReasons.length > 0 && (
-          <span className="text-[11px] leading-5 text-foreground-muted">
+          <span className="t-caption-2 leading-5 text-foreground-muted">
             자동 규칙 {item.autoReasons.length}건 해당(참고) · {item.autoReasons.join(' · ')}
           </span>
         )}
@@ -255,14 +255,14 @@ function WorkshopCell({ item }: { item: SubmissionQueueItem }) {
   if (state === 'AUTO_PENDING') {
     return (
       <div className="flex flex-col gap-1">
-        <span className="inline-flex w-fit items-center gap-1 rounded border border-warning-border bg-warning-muted px-2 py-1 text-[11px] font-medium text-warning">
+        <span className="inline-flex w-fit items-center gap-1 rounded border border-warning-border bg-warning-muted px-2 py-1 t-caption-2 font-medium text-warning">
           자동 규칙 해당 · 지정 전
         </span>
-        <span className="text-[11px] leading-5 text-foreground-muted">{item.autoReasons.join(' · ')}</span>
+        <span className="t-caption-2 leading-5 text-foreground-muted">{item.autoReasons.join(' · ')}</span>
       </div>
     );
   }
-  return <span className="text-xs text-foreground-subtle">해당 없음</span>;
+  return <span className="t-caption text-foreground-subtle">해당 없음</span>;
 }
 
 export default WorkbenchPage;

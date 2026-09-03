@@ -629,24 +629,24 @@ export function ReviewWorkspace({
           <button
             type="button"
             onClick={onBack}
-            className="flex min-h-11 items-center gap-1 text-sm text-foreground-muted transition hover:text-primary"
+            className="flex min-h-11 items-center gap-1 t-label text-foreground-muted transition hover:text-primary"
           >
             <ArrowLeft size={16} aria-hidden="true" /> 내 검토 목록
           </button>
-          <p className="mb-1 mt-1 text-sm text-foreground-muted">
+          <p className="mb-1 mt-1 t-label text-foreground-muted">
             SME 검토 · {statusLabel}
             {user.company_name && <span className="ml-2 text-primary">· {user.company_name}</span>}
           </p>
           {/* 직무는 배정으로 정해진다. 화면에서는 바꿀 수 없고 읽기 전용으로만 보여 준다. */}
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">{jobDetail?.name || '직무정보 검토'}</h2>
+          <h2 className="t-title text-foreground">{jobDetail?.name || '직무정보 검토'}</h2>
           {jobDetail && (
-            <p className="mt-1 text-sm text-foreground-subtle">
+            <p className="mt-1 t-label text-foreground-subtle">
               {jobDetail.group_name} · {jobDetail.series_name}
             </p>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-foreground-muted">평가 진행률</span>
+          <span className="t-caption text-foreground-muted">평가 진행률</span>
           <div
             className="h-2 w-28 rounded-full bg-border"
             role="progressbar"
@@ -657,7 +657,7 @@ export function ReviewWorkspace({
           >
             <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${percent}%` }} />
           </div>
-          <span className="text-xs font-medium text-primary">
+          <span className="t-caption font-medium text-primary">
             {done}/{total} ({percent}%)
           </span>
         </div>
@@ -666,7 +666,7 @@ export function ReviewWorkspace({
       <Toast toast={toast} onDismiss={dismiss} />
 
       {loadingDetail ? (
-        <div className="flex items-center justify-center gap-2 py-20 text-sm text-foreground-muted">
+        <div className="flex items-center justify-center gap-2 py-20 t-label text-foreground-muted">
           <Loader2 size={16} className="animate-spin" aria-hidden="true" /> 직무 상세 정보를 불러오는 중…
         </div>
       ) : detailError ? (
@@ -686,7 +686,7 @@ export function ReviewWorkspace({
               <h3
                 ref={stepTitleRef}
                 tabIndex={-1}
-                className="min-w-0 text-base font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                className="min-w-0 t-body font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
               >
                 {stepBarTitle(jobDetail.name, step)}
               </h3>
@@ -699,11 +699,11 @@ export function ReviewWorkspace({
             </div>
 
             {reviewError && (
-              <div className="mb-5 flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-4 py-3 text-sm text-destructive">
+              <div className="mb-5 flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-4 py-3 t-label text-destructive">
                 <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p>{reviewError}</p>
-                  <p className="mt-1 text-xs">검토 내용을 저장할 수 없어 입력이 잠겨 있어요.</p>
+                  <p className="mt-1 t-caption">검토 내용을 저장할 수 없어 입력이 잠겨 있어요.</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => setDetailReload((n) => n + 1)}>
                   <RefreshCw size={14} aria-hidden="true" /> 다시 시도
@@ -711,7 +711,7 @@ export function ReviewWorkspace({
               </div>
             )}
             {locked && review && (
-              <div className="mb-5 flex items-start gap-2 rounded-element border border-primary-border bg-primary-subtle px-4 py-3 text-sm text-primary">
+              <div className="mb-5 flex items-start gap-2 rounded-element border border-primary-border bg-primary-subtle px-4 py-3 t-label text-primary">
                 <Lock size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <p>
                   이미 제출한 검토라 수정할 수 없어요
@@ -769,13 +769,13 @@ export function ReviewWorkspace({
                     <ul className="mt-3 space-y-2">
                       {TASK_EXAMPLES.map((ex) => (
                         <li key={ex.group} className="rounded-element bg-card px-3 py-2">
-                          <p className="text-[11px] font-semibold text-primary">{ex.group}</p>
-                          <p className="mt-1 text-sm font-medium text-foreground">{ex.name}</p>
-                          <p className="mt-0.5 text-xs leading-5 text-foreground-muted">{ex.description}</p>
+                          <p className="t-caption-2 font-semibold text-primary">{ex.group}</p>
+                          <p className="mt-1 t-label font-medium text-foreground">{ex.name}</p>
+                          <p className="mt-0.5 t-caption leading-5 text-foreground-muted">{ex.description}</p>
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-3 text-xs leading-5 text-foreground-subtle">{TASK_EXAMPLE_TIP}</p>
+                    <p className="mt-3 t-caption leading-5 text-foreground-subtle">{TASK_EXAMPLE_TIP}</p>
                   </Disclosure>
                   <TaskActivityFeedback
                     tasks={jobDetail.tasks}
@@ -948,7 +948,7 @@ export function ReviewWorkspace({
             </>
           }
         >
-          <ul className="space-y-1.5 text-sm text-foreground-muted">
+          <ul className="space-y-1.5 t-label text-foreground-muted">
             <li>
               평가한 항목 {done}/{total}개
             </li>

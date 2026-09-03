@@ -70,7 +70,7 @@ function WaitingDaysChip({ days }: { days: number }) {
   const Icon = late ? AlertTriangle : Clock;
   return (
     <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium ${
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-1 t-caption-2 font-medium ${
         late ? 'border border-warning-border bg-warning-muted text-warning' : 'bg-fill-alt text-foreground-muted'
       }`}
     >
@@ -247,7 +247,7 @@ export function InquiryInboxPage({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             {loading
               ? '불러오는 중…'
               : error
@@ -256,11 +256,11 @@ export function InquiryInboxPage({
                     lateCount ? ` (${OVERDUE_WARNING_DAYS}일 이상 ${lateCount}건)` : ''
                   }`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">문의 인박스</h2>
+          <h2 className="t-title text-foreground">문의 인박스</h2>
         </div>
         <div className="flex flex-col items-start gap-1 md:items-end">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
-          {companyError && <p className="text-xs text-warning">{companyError}</p>}
+          {companyError && <p className="t-caption text-warning">{companyError}</p>}
         </div>
       </div>
 
@@ -304,10 +304,10 @@ export function InquiryInboxPage({
       ) : visible.length === 0 ? (
         <div className="rounded-container border border-border bg-card p-10 text-center">
           <Inbox size={22} className="mx-auto mb-2 text-foreground-subtle" aria-hidden="true" />
-          <p className="text-sm font-medium text-foreground">
+          <p className="t-label font-medium text-foreground">
             {rows.length === 0 ? '아직 도착한 문의가 없어요' : '이 상태의 문의가 없어요'}
           </p>
-          <p className="mt-1 text-xs leading-5 text-foreground-muted">
+          <p className="mt-1 t-caption leading-5 text-foreground-muted">
             {rows.length === 0
               ? 'SME가 검토 화면에서 남긴 문의가 직무·단계와 함께 이곳에 도착합니다.'
               : '다른 상태 필터를 눌러 보세요.'}
@@ -327,25 +327,25 @@ export function InquiryInboxPage({
                 <div className="flex flex-wrap items-center gap-2">
                   <InquiryStatusBadge status={q.status} />
                   {q.waitingDays !== null && <WaitingDaysChip days={q.waitingDays} />}
-                  <span className="text-xs text-foreground-subtle">{formatAt(q.createdAt)}</span>
+                  <span className="t-caption text-foreground-subtle">{formatAt(q.createdAt)}</span>
                 </div>
 
-                <p className="mt-2 text-sm font-medium text-foreground">
+                <p className="mt-2 t-label font-medium text-foreground">
                   {q.smeName || '이름 미상'}
                   {q.organization && <span className="ml-2 font-normal text-foreground-muted">{q.organization}</span>}
                 </p>
-                <p className="mt-1 text-sm text-foreground-muted">
+                <p className="mt-1 t-label text-foreground-muted">
                   {context || <span className="text-foreground-subtle">직무·단계 정보 없음(검토 시작 전 문의)</span>}
                 </p>
 
-                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-foreground">{q.body}</p>
+                <p className="mt-3 whitespace-pre-line t-label-reading text-foreground">{q.body}</p>
 
                 {q.status === 'CLOSED' ? (
                   <div className="mt-4 rounded-element border border-border bg-muted p-4">
-                    <p className="text-xs font-medium text-foreground-muted">
+                    <p className="t-caption font-medium text-foreground-muted">
                       종결된 문의입니다{q.answer ? ` · 답변 ${formatAt(q.answeredAt)}` : ''}
                     </p>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-foreground">
+                    <p className="mt-2 whitespace-pre-line t-label-reading text-foreground">
                       {q.answer || '답변 없이 종결되었습니다.'}
                     </p>
                   </div>
@@ -364,7 +364,7 @@ export function InquiryInboxPage({
                       />
                     </label>
                     {/* 무엇이 SME에게 전달되는지 먼저 알린다 — 문의 작성 모달이 컨텍스트를 먼저 보여 주는 것과 같은 결. */}
-                    <p className="mt-2 text-xs leading-5 text-foreground-subtle">
+                    <p className="mt-2 t-caption leading-5 text-foreground-subtle">
                       저장하면 SME 검토 화면 상단에 배너로 알려지고, &lsquo;내 문의&rsquo;에서 이 답변 전문이 그대로
                       표시됩니다.
                       {q.answeredAt && ` (마지막 답변 ${formatAt(q.answeredAt)})`}
@@ -373,7 +373,7 @@ export function InquiryInboxPage({
                     {rowError && (
                       <div
                         role="alert"
-                        className="mt-3 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 text-xs leading-5 text-destructive"
+                        className="mt-3 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 t-caption leading-5 text-destructive"
                       >
                         {rowError}
                         <span className="mt-1 block text-foreground-muted">
@@ -390,7 +390,7 @@ export function InquiryInboxPage({
                         종결
                       </Button>
                       {!q.answer && (
-                        <span className="text-xs text-foreground-subtle">
+                        <span className="t-caption text-foreground-subtle">
                           답변 없이 종결하면 SME에게는 답변이 표시되지 않습니다.
                         </span>
                       )}

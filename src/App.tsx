@@ -371,7 +371,7 @@ function App() {
 
   if (booting)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-foreground-subtle">
+      <div className="flex min-h-screen items-center justify-center bg-background t-label text-foreground-subtle">
         불러오는 중…
       </div>
     );
@@ -523,18 +523,18 @@ function Shell({
                 <Menu size={20} aria-hidden="true" />
               </button>
               <div>
-                <p className="text-xs text-foreground-subtle">{isAdmin ? '관리자 포털' : 'SME 검토 포털'}</p>
-                <h1 className="text-lg font-semibold text-foreground">{titleOf(pathname)}</h1>
+                <p className="t-caption text-foreground-subtle">{isAdmin ? '관리자 포털' : 'SME 검토 포털'}</p>
+                <h1 className="t-headline text-foreground">{titleOf(pathname)}</h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
-                <p className="text-sm font-medium text-foreground">{user.name}</p>
-                <p className="text-xs text-foreground-subtle">
+                <p className="t-label font-medium text-foreground">{user.name}</p>
+                <p className="t-caption text-foreground-subtle">
                   {user.organization} · {user.title}
                 </p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-subtle text-sm font-semibold text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-subtle t-label font-semibold text-primary">
                 {user.name.slice(0, 1)}
               </div>
             </div>
@@ -649,7 +649,7 @@ function SidebarBody({
           <ClipboardCheck size={19} aria-hidden="true" />
         </div>
         <div>
-          <p className="text-[15px] font-semibold tracking-tight">Job Review Architecture</p>
+          <p className="t-body-2 font-semibold tracking-tight">Job Review Architecture</p>
           <p className="t-caption uppercase tracking-[0.18em] text-inverse-label-muted">Workforce platform</p>
         </div>
       </div>
@@ -675,7 +675,7 @@ function SidebarBody({
               });
             }}
             className={({ isActive }) =>
-              `flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-3 text-left text-sm transition ${
+              `flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-3 text-left t-label transition ${
                 isActive
                   ? 'bg-inverse-label/10 text-inverse-label'
                   : 'text-inverse-label-muted hover:bg-inverse-label/5 hover:text-inverse-label'
@@ -686,7 +686,7 @@ function SidebarBody({
               <>
                 <Icon size={17} className="shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <span className="block text-sm">{label}</span>
+                  <span className="block t-label">{label}</span>
                   {/*
                     반전 표면(--inverse-bg #182635)의 보조설명. 대비는 이 토큰 쌍으로 고정된다:
                     --inverse-label-muted(#94a3b8)가 #182635 위 5.99:1로 §8 S8의 4.5:1을 넘는다.

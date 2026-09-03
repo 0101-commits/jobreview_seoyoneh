@@ -178,12 +178,12 @@ export function WorkshopFlagPanel({
       <Toast toast={toast} onDismiss={dismiss} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={`workshop-flag-${jobId}`} className="text-sm font-semibold text-foreground">
+        <h3 id={`workshop-flag-${jobId}`} className="t-label font-semibold text-foreground">
           워크숍 대상 지정
         </h3>
         {/* 색만으로 알리지 않는다 — 아이콘·텍스트를 함께 둔다. */}
         <span
-          className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-[11px] font-medium ${
+          className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-1 t-caption-2 font-medium ${
             flagged && !stateUnknown ? 'bg-warning-muted text-warning' : 'bg-muted text-foreground-muted'
           }`}
         >
@@ -203,7 +203,7 @@ export function WorkshopFlagPanel({
       </div>
 
       {/* ── 자동 판정 ────────────────────────────────────────────── */}
-      <p className="mt-4 text-xs font-medium text-foreground-muted">
+      <p className="mt-4 t-caption font-medium text-foreground-muted">
         {evaluation.evaluable === false
           ? '제출된 검토가 없어 자동 판정을 할 수 없습니다.'
           : hitRules.length > 0
@@ -215,7 +215,7 @@ export function WorkshopFlagPanel({
         {evaluation.rules.map((rule) => (
           <li
             key={rule.key}
-            className={`flex items-start gap-2 rounded-element border px-3 py-2 text-xs ${
+            className={`flex items-start gap-2 rounded-element border px-3 py-2 t-caption ${
               rule.hit ? 'border-warning-border bg-warning-muted text-warning' : 'border-border text-foreground-muted'
             }`}
           >
@@ -239,12 +239,12 @@ export function WorkshopFlagPanel({
         ))}
       </ul>
 
-      <p className="mt-2 text-[11px] text-foreground-subtle">
+      <p className="mt-2 t-caption-2 text-foreground-subtle">
         ※ 비교 뷰의 '{SIGNAL_LABELS.fteGap}' 하이라이트는 행 단위 이견 신호이며, 위 자동 플래그 규칙과는 별개입니다.
       </p>
 
       {manualOverridesAuto && (
-        <p className="mt-3 flex items-start gap-2 rounded-element border border-primary-border bg-primary-subtle px-3 py-2 text-xs text-primary">
+        <p className="mt-3 flex items-start gap-2 rounded-element border border-primary-border bg-primary-subtle px-3 py-2 t-caption text-primary">
           <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>
             수동 결정({flagged ? '지정' : '해제'})이 유지됩니다. 자동 규칙 판정은 참고 신호로만 표시하며 상태를 바꾸지
@@ -256,12 +256,12 @@ export function WorkshopFlagPanel({
       {/* ── 저장된 사유(누적) ────────────────────────────────────── */}
       {savedReasons.length > 0 && (
         <div className="mt-4">
-          <p className="text-xs font-medium text-foreground-muted">저장된 사유 (누적)</p>
+          <p className="t-caption font-medium text-foreground-muted">저장된 사유 (누적)</p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
             {savedReasons.map((reason) => (
               <li
                 key={reason}
-                className="rounded border border-border bg-muted px-2 py-1 text-[11px] text-foreground-muted"
+                className="rounded border border-border bg-muted px-2 py-1 t-caption-2 text-foreground-muted"
               >
                 {reason}
               </li>
@@ -274,7 +274,7 @@ export function WorkshopFlagPanel({
       {loadError && (
         <div
           role="alert"
-          className="mt-4 flex flex-wrap items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2 text-xs text-destructive"
+          className="mt-4 flex flex-wrap items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2 t-caption text-destructive"
         >
           <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">저장된 워크숍 대상 지정을 불러오지 못했습니다 — {loadError}</span>
@@ -321,7 +321,7 @@ export function WorkshopFlagPanel({
           자동 판정 반영
         </Button>
       </div>
-      <p className="mt-2 text-[11px] text-foreground-subtle">
+      <p className="mt-2 t-caption-2 text-foreground-subtle">
         [자동 판정 반영]은 위 자동 규칙 결과({evaluation.flagged ? '워크숍 후보' : '대상 아님'})를 그대로 저장하고 이후
         자동 규칙을 다시 따르게 합니다. 수동 사유 입력란은 반영되지 않습니다.
       </p>
@@ -329,7 +329,7 @@ export function WorkshopFlagPanel({
       {failure && (
         <div
           role="alert"
-          className="mt-3 flex flex-wrap items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2 text-xs text-destructive"
+          className="mt-3 flex flex-wrap items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2 t-caption text-destructive"
         >
           <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">저장하지 못했습니다 — {failure.message}</span>

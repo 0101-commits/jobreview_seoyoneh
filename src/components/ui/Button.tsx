@@ -21,9 +21,9 @@ const variants: Record<ButtonVariant, string> = {
 // 모바일에서는 어느 크기든 터치 타깃 44px(min-h-11)을 확보하고,
 // sm 브레이크포인트부터 컨트롤 높이 토큰 32/40/48로 내려갑니다.
 const sizes: Record<ButtonSize, string> = {
-  sm: 'min-h-11 sm:min-h-control-sm gap-1.5 px-3 text-xs',
-  md: 'min-h-11 sm:min-h-control-md gap-1.5 px-4 text-sm',
-  lg: 'min-h-control-lg gap-2 px-5 text-sm',
+  sm: 'min-h-11 sm:min-h-control-sm gap-1.5 px-3 t-caption',
+  md: 'min-h-11 sm:min-h-control-md gap-1.5 px-4 t-label',
+  lg: 'min-h-control-lg gap-2 px-5 t-label',
 };
 
 const spinnerSize: Record<ButtonSize, number> = { sm: 13, md: 15, lg: 16 };

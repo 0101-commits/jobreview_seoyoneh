@@ -380,6 +380,8 @@
     굵기는 3단만 쓴다 — regular 400 / medium 500 / bold.
     bold의 실제 값은 단계별로 갈린다: title 계열만 700, heading 이하는 600.
   */
+  /* display3 — 로그인 좌측 히어로 문장 한 곳에만 쓴다. 화면 제목은 .t-title이다. */
+  .t-display    { font-size: 36px; line-height: 48px; letter-spacing: -0.027em; font-weight: 700; }
   .t-title      { font-size: 24px; line-height: 32px; letter-spacing: -0.023em; font-weight: 700; }
   .t-heading    { font-size: 20px; line-height: 28px; letter-spacing: -0.012em; font-weight: 600; }
   .t-heading-2  { font-size: 22px; line-height: 30px; letter-spacing: -0.0194em; font-weight: 600; }

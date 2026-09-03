@@ -204,10 +204,10 @@ export function ReviewTable({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             {loading ? '불러오는 중…' : error ? '조회 실패' : `총 ${filtered.length}건`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">SME별 검토 현황</h2>
+          <h2 className="t-title text-foreground">SME별 검토 현황</h2>
         </div>
         <div className="flex items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
@@ -215,7 +215,7 @@ export function ReviewTable({
       </div>
 
       {error && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>검토 현황을 불러오지 못했어요. {error} 잠시 후 다시 시도해 주세요.</span>
@@ -370,7 +370,7 @@ export function ReviewTable({
             className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4"
             aria-label="검토 현황 페이지"
           >
-            <p className="text-xs text-foreground-subtle">
+            <p className="t-caption text-foreground-subtle">
               {filtered.length}건 중 {(current - 1) * PAGE_SIZE + 1}–{Math.min(current * PAGE_SIZE, filtered.length)}건
             </p>
             <div className="flex items-center gap-1">
@@ -385,7 +385,7 @@ export function ReviewTable({
               </Button>
               {pageItems(current, totalPages).map((item, i) =>
                 item === '…' ? (
-                  <span key={`gap-${i}`} className="px-2 text-xs text-foreground-subtle" aria-hidden="true">
+                  <span key={`gap-${i}`} className="px-2 t-caption text-foreground-subtle" aria-hidden="true">
                     …
                   </span>
                 ) : (

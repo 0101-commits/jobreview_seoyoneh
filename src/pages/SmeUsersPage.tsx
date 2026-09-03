@@ -161,10 +161,10 @@ export function UsersPage({
     <>
       <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             총 {smeList.length}명{query && ` · 검색 결과 ${visible.length}명`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">SME 계정 관리</h2>
+          <h2 className="t-title text-foreground">SME 계정 관리</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
@@ -212,7 +212,7 @@ export function UsersPage({
                     setMenuOpen(false);
                     setShowBulkDelete(true);
                   }}
-                  className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm text-destructive transition hover:bg-destructive-muted disabled:cursor-not-allowed disabled:text-foreground-subtle disabled:hover:bg-transparent"
+                  className="flex min-h-11 w-full items-center gap-2 px-3 text-left t-label text-destructive transition hover:bg-destructive-muted disabled:cursor-not-allowed disabled:text-foreground-subtle disabled:hover:bg-transparent"
                 >
                   <Trash2 size={15} aria-hidden="true" /> SME 계정 전체 삭제
                 </button>
@@ -230,7 +230,7 @@ export function UsersPage({
         </SectionMessage>
       )}
 
-      <div className="mb-4 rounded-element border border-border bg-muted px-4 py-3 text-xs text-foreground-muted">
+      <div className="mb-4 rounded-element border border-border bg-muted px-4 py-3 t-caption text-foreground-muted">
         개별 추가는 1명씩 등록할 때, 수정은 각 행의 '관리' 버튼을 이용할 때, Excel 전체 업로드는 여러 SME 계정을 한 번에
         등록할 때 사용합니다.
       </div>
@@ -360,7 +360,7 @@ export function UsersPage({
             />
 
             {visible.length > PAGE_SIZE && (
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 t-label">
                 <p className="text-foreground-muted">
                   {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, visible.length)} / 총{' '}
                   {visible.length}명

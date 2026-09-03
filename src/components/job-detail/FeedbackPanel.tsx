@@ -85,21 +85,21 @@ export function SmeFeedbackPanel({
         <Users size={16} className="text-primary" aria-hidden="true" />
         <h3 className="t-headline text-foreground">SME 검토 의견</h3>
         {!loading && !error && data.length > 0 && (
-          <span className="rounded-full bg-primary-subtle px-2 py-0.5 text-xs font-medium text-primary">
+          <span className="rounded-full bg-primary-subtle px-2 py-0.5 t-caption font-medium text-primary">
             {data.length}명
           </span>
         )}
       </div>
 
       {loading && (
-        <p className="flex items-center gap-2 py-6 text-sm text-foreground-subtle">
+        <p className="flex items-center gap-2 py-6 t-label text-foreground-subtle">
           <Loader2 size={15} className="animate-spin" aria-hidden="true" /> 검토 의견을 불러오는 중이에요…
         </p>
       )}
 
       {!loading && error && (
         <div className="rounded-element border border-destructive-border bg-destructive-muted p-4">
-          <p className="flex items-start gap-2 text-sm leading-6 text-destructive">
+          <p className="flex items-start gap-2 t-label-reading text-destructive">
             <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
             {error}
           </p>
@@ -110,7 +110,7 @@ export function SmeFeedbackPanel({
       )}
 
       {!loading && !error && data.length === 0 && (
-        <p className="rounded-element bg-muted px-4 py-8 text-center text-sm text-foreground-subtle">
+        <p className="rounded-element bg-muted px-4 py-8 text-center t-label text-foreground-subtle">
           아직 제출된 검토가 없습니다.
         </p>
       )}
@@ -161,14 +161,14 @@ function ReviewCard({
       className={`rounded-element border p-4 ${focused ? 'border-primary bg-primary-subtle' : 'border-border'}`}
     >
       <header className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm font-semibold text-foreground">{review.sme_name || '이름 미등록'}</span>
-        {review.organization && <span className="text-xs text-foreground-subtle">{review.organization}</span>}
+        <span className="t-label font-semibold text-foreground">{review.sme_name || '이름 미등록'}</span>
+        {review.organization && <span className="t-caption text-foreground-subtle">{review.organization}</span>}
         <StatusBadge status={mapReviewStatus(review.status)} />
-        {when && <span className="w-full text-xs text-foreground-subtle">{when}</span>}
+        {when && <span className="w-full t-caption text-foreground-subtle">{when}</span>}
       </header>
 
       {items.length === 0 && review.feedback.newTasks.length === 0 && review.feedback.newSkills.length === 0 ? (
-        <p className="text-sm text-foreground-subtle">항목별 의견 없이 제출했어요.</p>
+        <p className="t-label text-foreground-subtle">항목별 의견 없이 제출했어요.</p>
       ) : (
         <ul className="space-y-2">
           {items.map((item) => {
@@ -181,20 +181,20 @@ function ReviewCard({
                   onClick={() => onFocusField(item.key)}
                   className={`w-full rounded-element border p-3 text-left transition hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${cls}`}
                 >
-                  <span className="flex items-center gap-1.5 text-xs font-semibold">
+                  <span className="flex items-center gap-1.5 t-caption font-semibold">
                     <Icon size={14} className="shrink-0" aria-hidden="true" />
                     {item.suitability || '의견'}
                     {item.remove && (
-                      <span className="ml-1 rounded bg-black/10 px-1.5 py-0.5 text-[11px]">삭제 요청</span>
+                      <span className="ml-1 rounded bg-black/10 px-1.5 py-0.5 t-caption-2">삭제 요청</span>
                     )}
                   </span>
-                  <span className="mt-1 block text-xs text-foreground-subtle">{kind}</span>
-                  <span className="block text-sm font-medium text-foreground">{name}</span>
+                  <span className="mt-1 block t-caption text-foreground-subtle">{kind}</span>
+                  <span className="block t-label font-medium text-foreground">{name}</span>
                   {item.comment && (
-                    <span className="mt-1 block text-sm leading-6 text-foreground-muted">{item.comment}</span>
+                    <span className="mt-1 block t-label-reading text-foreground-muted">{item.comment}</span>
                   )}
                   {item.suggestion && (
-                    <span className="mt-1 block text-sm leading-6 text-foreground-muted">
+                    <span className="mt-1 block t-label-reading text-foreground-muted">
                       <span className="font-medium">제안</span> {item.suggestion}
                     </span>
                   )}
@@ -227,15 +227,15 @@ function SuggestionList({
   if (items.length === 0) return null;
   return (
     <div className="mt-3">
-      <h5 className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground-muted">
+      <h5 className="mb-1.5 flex items-center gap-1.5 t-caption font-semibold text-foreground-muted">
         <Plus size={13} aria-hidden="true" /> {title}
       </h5>
       <ul className="space-y-1.5">
         {items.map((s, i) => (
-          <li key={`${s.name}-${i}`} className="rounded-element bg-muted px-3 py-2 text-sm">
+          <li key={`${s.name}-${i}`} className="rounded-element bg-muted px-3 py-2 t-label">
             <span className="block font-medium text-foreground">{s.name}</span>
             {s.description && <span className="block text-foreground-muted">{s.description}</span>}
-            {s.reason && <span className="block text-xs text-foreground-subtle">사유: {s.reason}</span>}
+            {s.reason && <span className="block t-caption text-foreground-subtle">사유: {s.reason}</span>}
           </li>
         ))}
       </ul>
@@ -303,7 +303,7 @@ export function RereviewModal({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={5}
-          className="w-full rounded-element border border-border p-3 text-sm leading-6 text-foreground-muted outline-none focus:border-primary"
+          className="w-full rounded-element border border-border p-3 t-label-reading text-foreground-muted outline-none focus:border-primary"
           placeholder="예) 3번 과업의 세부활동이 실제 업무와 달라 보여요. 담당하시는 범위 기준으로 다시 봐 주세요."
         />
       </Field>
@@ -364,7 +364,7 @@ export function Section({ title, children }: { title: string; children: React.Re
 }
 
 export function EmptyMessage({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-element bg-muted px-4 py-6 text-center text-sm text-foreground-subtle">{children}</p>;
+  return <p className="rounded-element bg-muted px-4 py-6 text-center t-label text-foreground-subtle">{children}</p>;
 }
 
 export function SkillGroup({
@@ -384,9 +384,9 @@ export function SkillGroup({
       : 'bg-fill-alt text-foreground border-border';
   return (
     <div>
-      <h4 className="mb-3 text-sm font-semibold text-foreground-muted">{label}</h4>
+      <h4 className="mb-3 t-label font-semibold text-foreground-muted">{label}</h4>
       {skills.length === 0 ? (
-        <p className="text-sm text-foreground-subtle">등록된 {label}이 없습니다.</p>
+        <p className="t-label text-foreground-subtle">등록된 {label}이 없습니다.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {skills.map((s, i) => (
@@ -394,7 +394,7 @@ export function SkillGroup({
               key={s.id ?? `${s.name}-${i}`}
               id={s.id ? fieldId(`skill-${s.id}`) : undefined}
               tabIndex={s.id ? -1 : undefined}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium ${chipClass} ${s.id ? highlightClass(`skill-${s.id}`) : ''}`}
+              className={`rounded-full border px-3 py-1.5 t-label font-medium ${chipClass} ${s.id ? highlightClass(`skill-${s.id}`) : ''}`}
             >
               {s.name}
             </span>
