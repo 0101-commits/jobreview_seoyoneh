@@ -35,6 +35,13 @@ export type User = {
    * 통과 시각을 기록할 곳이 없는 DB에서 가이드를 강제하면 영원히 빠져나올 수 없다.
    */
   guide_completed_at?: string | null;
+  /**
+   * 검토 화면 첫 진입 안내를 본 시각(GUIDE v4 §5 G4). null이면 아직 못 봤다는 뜻이다.
+   * guide_completed_at과 달리 게이트가 아니다 — 안내 한 장을 띄울지 말지만 정한다.
+   * undefined는 컬럼이 없는 DB라는 뜻이고, 그때는 안내를 띄우지 않는다(기록할 곳이 없어
+   * 검토를 열 때마다 같은 안내가 되풀이된다).
+   */
+  coach_completed_at?: string | null;
 };
 
 // ── SME List Item Type ───────────────────────────────────────────────

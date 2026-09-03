@@ -3,6 +3,9 @@ import React from 'react';
 import type { JobDetail } from '@/lib/jobApi';
 import type { SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback } from '@/types';
+import { TermHint } from '@/components/ui/TermHint';
+import type { TermId } from './glossary';
+import { HINT_STEP4_WHO } from './copy';
 import {
   FeedbackNotes,
   ListControls,
@@ -49,7 +52,7 @@ function ItemList({
       <p className="rounded-element bg-muted px-4 py-6 text-center t-label text-foreground-muted">
         {items.length === 0
           ? '등록된 항목이 없습니다.'
-          : '미평가 항목이 없어요. 「미평가만 보기」를 꺼서 전체를 확인할 수 있어요.'}
+          : '남은 항목이 없습니다. 「남은 항목만 보기」를 끄면 전체가 보입니다.'}
       </p>
     );
   }
@@ -85,6 +88,7 @@ function ItemList({
 
 export function FeedbackSection({
   title,
+  term,
   current,
   feedback,
   update,
@@ -92,8 +96,11 @@ export function FeedbackSection({
   large = false,
   done,
   total,
+  hint,
 }: {
   title: string;
+  /** 제목 옆에 붙일 용어(v4 G1). */
+  term?: TermId;
   current: string;
   feedback: Feedback;
   update: (value: Partial<Feedback>) => void;
@@ -101,17 +108,23 @@ export function FeedbackSection({
   large?: boolean;
   done: number;
   total: number;
+  /** 적합성 위 한 줄 안내(v4 G6). 첫 항목에만 준다 — 같은 화면에 두 번 나오면 잔소리가 된다. */
+  hint?: string;
 }) {
   return (
     <div>
-      <SectionHeading title={title} done={done} total={total} />
+      <SectionHeading title={title} done={done} total={total} term={term} />
       <div className="mb-6 rounded-element border border-border bg-muted p-4">
         <p className="mb-2 t-caption font-medium text-foreground-muted">현재 등록 내용</p>
         <p className={`t-label-reading text-foreground ${large ? 'min-h-20' : ''}`}>
           {current || <em className="not-italic text-foreground-subtle">미입력</em>}
         </p>
       </div>
-      <span className="label">적합성 평가</span>
+      <span className="label">
+        적합성 평가
+        <TermHint id="suitability" />
+      </span>
+      {hint && <p className="mb-2 t-caption text-foreground-subtle">{hint}</p>}
       <div className="mb-5">
         <SuitabilityControl
           value={feedback.suitability}
@@ -168,7 +181,7 @@ export function TaskActivityFeedback({
 
   return (
     <div>
-      <SectionHeading title="C. 주요과업 및 세부활동 검토" done={done} total={total} />
+      <SectionHeading title="C. 주요과업 및 세부활동 검토" done={done} total={total} term="task" />
       {tasks.length > 1 && <ListControlsFor state={listState} hiddenCount={done} />}
       <ItemList items={items} feedback={feedback} update={update} {...listState.props} />
       <SuggestionEditor kind="주요과업" items={newTasks} onChange={setNewTasks} />
@@ -211,13 +224,21 @@ export function SkillFeedback({
   return (
     <div>
       <SectionHeading title="D. 필요 Skill 검토" done={done} total={total} />
+      {/* 가장 흔한 오해 — 지금 하시는 분의 스펙을 적는 칸으로 읽는 것(v4 G6). */}
+      <p className="-mt-3 mb-4 t-caption text-foreground-subtle">{HINT_STEP4_WHO}</p>
       {total > 1 && <ListControlsFor state={listState} hiddenCount={done} />}
       <div className="mb-6">
-        <h4 className="mb-3 font-semibold text-foreground">역량 (Soft Skill)</h4>
+        <h4 className="mb-3 font-semibold text-foreground">
+          역량 (Soft Skill)
+          <TermHint id="soft-skill" />
+        </h4>
         <ItemList items={group(softSkills, 'Soft Skill')} feedback={feedback} update={update} {...listState.props} />
       </div>
       <div className="mb-2">
-        <h4 className="mb-3 font-semibold text-foreground">지식/기술 (Hard Skill)</h4>
+        <h4 className="mb-3 font-semibold text-foreground">
+          지식/기술 (Hard Skill)
+          <TermHint id="hard-skill" />
+        </h4>
         <ItemList items={group(hardSkills, 'Hard Skill')} feedback={feedback} update={update} {...listState.props} />
       </div>
       <SuggestionEditor kind="Skill" items={newSkills} onChange={setNewSkills} />
@@ -262,7 +283,7 @@ export function RequirementFeedback({
 
   return (
     <div>
-      <SectionHeading title="E. 수행요건 검토" done={done} total={total} />
+      <SectionHeading title="E. 수행요건 검토" done={done} total={total} term="requirement" />
       <ItemList items={items} feedback={feedback} update={update} {...listState.props} />
     </div>
   );
