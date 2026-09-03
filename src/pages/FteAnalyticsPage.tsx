@@ -440,16 +440,23 @@ export function FteAnalyticsPage({
             <caption className="sr-only">
               선택한 직무의 과업별 · 조직별 SME 평균 투입 비중. 행은 과업, 열은 조직입니다.
             </caption>
+            {/*
+              표 머리를 화면 상단에 고정한다(v3 T3 · montage "표 헤더 항상 표시").
+              조직·직무가 수십 개면 아래로 스크롤한 순간 각 칸이 무슨 뜻인지 알 수 없었다.
+              top-20은 앱 헤더 높이(h-20 = 80px)다. 겹침은 전역 층을 쓰지 않고 표 안에서만
+              정한다 — 모서리 칸이 z-[2], 나머지 머리 칸이 z-[1], 본문 첫 열이 z-[1]이다.
+              sticky 칸은 자기 배경을 가져야 뒤 내용이 비쳐 보이지 않는다.
+            */}
             <thead>
               <tr className="border-b border-border bg-muted t-caption text-foreground-muted">
                 <th
                   scope="col"
-                  className="sticky left-0 z-[1] w-56 min-w-[12rem] border-r border-border bg-muted px-4 py-3 font-medium"
+                  className="sticky left-0 top-20 z-[2] w-56 min-w-[12rem] border-r border-border bg-muted px-4 py-3 font-medium"
                 >
                   {COL.task}
                 </th>
                 {pivot.orgs.map((org) => (
-                  <th key={org.key} scope="col" className="w-36 min-w-[9rem] px-3 py-3 font-medium align-top">
+                  <th key={org.key} scope="col" className="sticky top-20 z-[1] w-36 min-w-[9rem] bg-muted px-3 py-3 font-medium align-top">
                     <span className="block text-foreground">{org.name || '조직 미지정'}</span>
                     <span className="mt-0.5 block t-caption-2 font-normal text-foreground-subtle">
                       {org.code || '조직코드 없음'}
