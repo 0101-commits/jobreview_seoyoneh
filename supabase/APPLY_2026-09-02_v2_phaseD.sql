@@ -5,9 +5,13 @@
      20260902060000_v2_phaseD_last_step.sql — reviews.last_step 컬럼 + 범위 제약 + 컬럼 UPDATE 권한.
      화면(SME 홈의 「이어하기 → STEP n」)이 이 값을 읽고, 검토 화면이 단계를 옮길 때 갱신한다.
 
-   ▣ 적용 전이어도 화면은 동작한다
-     컬럼이 없으면 조회 결과에 값이 없어 last_step이 null이 되고, 이어하기 대신 「검토 시작」이
-     보인다. 갱신 호출은 실패하지만 화면은 콘솔 경고만 남기고 그대로 간다(saveLastStep).
+   ▣ 적용 전에는 SME 홈이 열리지 않는다 (2026-09-03 정정)
+     최초 판단("미적용이어도 화면은 돈다")이 틀렸다. fetchMyAssignments의 select가
+     reviews(…, last_step)을 함께 읽는데(src/lib/reviewApi.ts:272), PostgREST는 미존재 컬럼을
+     무시하지 않고 400/42703("column reviews_1.last_step does not exist")으로 요청 전체를
+     떨어뜨린다. 그 error를 fail()이 그대로 던지므로 배정 목록이 통째로 비어 SME 홈이 깨진다.
+     콘솔 경고로 삼키는 것은 갱신 경로(saveLastStep)뿐이다.
+     → 화면이 이미 배포된 상태라면 이 한 벌이 가장 급하다.
 
    ▣ 적용 후 확인 (SME 세션으로)
      PATCH /rest/v1/reviews?id=eq.<본인 검토>  body {"last_step":3}  → 204
