@@ -61,9 +61,11 @@ export async function fetchDashboardStats(companyId?: string | null): Promise<Ap
     return q;
   });
 
+  // profiles!sme_id — inquiries는 profiles를 두 번(sme_id·answered_by) 참조하므로 힌트가 없으면
+  // PostgREST가 관계를 하나로 좁히지 못하고 거절한다. 미답 문의는 작성자 기준으로 센다.
   let inquiryQuery = supabase
     .from('inquiries')
-    .select('id, profiles!inner(company_id)', { count: 'exact', head: true })
+    .select('id, profiles!sme_id!inner(company_id)', { count: 'exact', head: true })
     .eq('status', 'OPEN');
   if (companyId) inquiryQuery = inquiryQuery.eq('profiles.company_id', companyId);
 
