@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { newSuggestion, type SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback, Suitability } from '@/types';
 import { NOTE_REQUIRED_HINT, REQUIRED_MARK_SR } from './copy';
+import { BP, useMediaQuery } from '@/lib/useMediaQuery';
 
 type Choice = Exclude<Suitability, ''>;
 
@@ -169,14 +170,24 @@ export function AutoTextarea({
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
+  /*
+   * 모바일에서는 최대 높이를 5줄로 묶는다(v3 T5 · montage).
+   *
+   * 키보드가 함께 뜨는 화면에서 칸이 계속 자라면 지금 입력하는 줄이 키보드에 가려진다.
+   * 화면 절반이 키보드인 상태에서 10줄까지 자란 칸은 커서가 어디 있는지 알 수 없다.
+   * sm(640px) 이상에서는 원래 상한(호출부가 준 maxRows)을 그대로 쓴다.
+   */
+  const narrow = !useMediaQuery(BP.sm);
+  const rowCap = narrow ? Math.min(maxRows, 5) : maxRows;
+
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
     const LINE = 24; // leading-6
     const PAD = 22; // py-2.5 + 테두리
-    el.style.height = `${Math.min(el.scrollHeight, maxRows * LINE + PAD)}px`;
-  }, [value, maxRows]);
+    el.style.height = `${Math.min(el.scrollHeight, rowCap * LINE + PAD)}px`;
+  }, [value, rowCap]);
 
   return (
     <textarea

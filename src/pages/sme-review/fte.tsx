@@ -657,23 +657,20 @@ export function FteStep({
             </Button>
           </div>
 
-          {/* 품질 가드 ⓑ·ⓒ — 막지 않고 알리기만 한다(§6-2 "허용은 하되 인지시킴"). */}
-          <div className="mt-4 space-y-2">
-            {zeroCount > 0 && total > 0 && (
-              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
-                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
-                <span>{fteZeroPctNote(zeroCount)}</span>
-              </p>
-            )}
-            {/* 5% 미만이 3건 이상이면 "다수 분산"으로 본다(임계값은 §12에서 확정). */}
-            {smallCount >= 3 && (
-              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
-                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
-                <span>{fteTooManySmallNote(smallCount)}</span>
-              </p>
-            )}
-            {/* 이름이 빈 신규 제안은 저장되지 않아 배분 대상에서도 빠진다 — STEP 2로 돌아갈 길을 준다. */}
-            {unnamedCount > 0 && (
+          {/*
+            품질 가드 ⓑ·ⓒ — 막지 않고 알리기만 한다(§6-2 "허용은 하되 인지시킴").
+
+            v3 T6: 한 번에 한 건만 띄운다. v2는 세 안내가 동시에 뜰 수 있었고(0% 과업 ·
+            5% 미만 다수 분산 · 이름 빈 신규 제안), 상자 셋이 겹치면 무엇을 먼저 손대야
+            하는지가 흐려졌다. montage 규약 — 한 화면에 여러 건이면 우선순위 하나만 남긴다.
+
+            순서는 "손대야 하는 정도"다.
+             ① 이름 빈 신규 제안 — 저장되지 않아 배분 대상에서 빠진다. 고치지 않으면 값이 사라진다.
+             ② 0% 과업        — 허용되지만 제출 요약에 목록으로 남는다.
+             ③ 5% 미만 다수     — 알려만 준다.
+          */}
+          <div className="mt-4">
+            {unnamedCount > 0 ? (
               <p className="flex items-start gap-2 rounded-element bg-warning-muted px-4 py-3 t-caption leading-5 text-warning">
                 <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
                 <span>
@@ -687,7 +684,18 @@ export function FteStep({
                   </button>
                 </span>
               </p>
-            )}
+            ) : zeroCount > 0 && total > 0 ? (
+              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
+                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+                <span>{fteZeroPctNote(zeroCount)}</span>
+              </p>
+            ) : smallCount >= 3 ? (
+              // 5% 미만이 3건 이상이면 "다수 분산"으로 본다(임계값은 §12에서 확정).
+              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
+                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+                <span>{fteTooManySmallNote(smallCount)}</span>
+              </p>
+            ) : null}
           </div>
         </div>
 
