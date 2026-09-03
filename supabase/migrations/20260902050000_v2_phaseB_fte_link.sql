@@ -545,6 +545,11 @@ $$;
 COMMENT ON FUNCTION public.job_has_open_review(uuid) IS
   '이 직무에 응답이 걸린 검토가 있는가(v2 F6). NOT_STARTED는 제외 — 아직 아무 응답도 참조하지 않는다.';
 
+-- SECURITY DEFINER 라 기본 부여된 PUBLIC EXECUTE 를 거둔다. 트리거는 소유자 권한으로 도니
+-- authenticated 에 줄 필요도 없다 — 화면에서 부르는 곳이 없다.
+REVOKE EXECUTE ON FUNCTION public.job_has_open_review(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.job_has_open_review(uuid) FROM anon;
+
 CREATE OR REPLACE FUNCTION public.guard_job_structure_lock()
 RETURNS trigger
 LANGUAGE plpgsql
