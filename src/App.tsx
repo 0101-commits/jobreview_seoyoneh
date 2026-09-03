@@ -35,6 +35,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { isResetPasswordPath, supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { UploadPage } from '@/components/UploadPage';
 import { AdminUsersPage } from '@/components/AdminUsersPage';
@@ -63,7 +64,17 @@ import type { Role, User } from '@/types';
 
 // ── 라우트 정의 ─────────────────────────────────────────────────────
 // 사이드바 메뉴 = 이 목록. 목록에 없는 화면(직무 상세·직무 검토)은 title에서만 이름을 찾는다.
-type NavItem = { to: string; label: string; sub: string; Icon: typeof LayoutDashboard };
+type NavItem = {
+  to: string;
+  label: string;
+  sub: string;
+  Icon: typeof LayoutDashboard;
+  /**
+   * 하단 내비에 쓰는 짧은 라벨(v3 T5). montage는 하단 내비 라벨을 6자 이하로 제한한다 —
+   * 4개 항목이 좁은 화면 폭을 나눠 쓰므로 긴 라벨은 잘린다.
+   */
+  short?: string;
+};
 /**
  * 사이드바 묶음(v2 §6-5). 13개 평면 메뉴를 준비 → 운영 → 검토 → 산출 → 설정 다섯 그룹으로 나눈다.
  * 순서가 관리자 흐름(§5-2)과 같다 — 첫 사용에서 무엇부터 해야 하는지가 순서로 읽혀야 한다.
@@ -115,16 +126,16 @@ const smeNav: NavGroup[] = [
   {
     title: '검토',
     items: [
-      { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList },
-      { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3 },
+      { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList, short: '검토' },
+      { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3, short: '이력' },
     ],
   },
   {
     title: '도움',
     items: [
-      { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText },
+      { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText, short: '문의' },
       // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
-      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen },
+      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen, short: '가이드' },
     ],
   },
 ];
@@ -462,6 +473,19 @@ function Shell({
   const pageTitle = titleOf(pathname);
 
   /*
+   * SME 하단 내비(v3 T5).
+   *
+   * SME 메뉴는 「내 검토 목록 · 검토 이력 · 내 문의 · 가이드」 네 개뿐인데, v2는 1024px 미만에서
+   * 관리자와 같은 햄버거 드로어를 썼다 — 네 항목을 보려고 서랍을 여는 셈이었다.
+   * montage는 항목이 3~5개면 하단 내비를 쓴다. 관리자는 13메뉴 5그룹이라 대상이 아니다.
+   *
+   * 마법사에서는 감춘다. STEP 3의 합계 게이지가 같은 자리에 고정 바로 뜨고, 마법사 셸도
+   * 하단에 이전/다음을 그린다 — 세 겹이 겹치면 아무것도 누를 수 없다.
+   */
+  const smeBottomNav = !isAdmin && !pathname.startsWith('/review/');
+  const bottomNavItems = smeBottomNav ? navGroups.flatMap((g) => g.items) : [];
+
+  /*
    * 브라우저 탭 제목(v3 T6).
    * v2까지 document.title을 한 번도 쓰지 않아 라우트 21개가 index.html의 한 제목을 공유했다.
    * 관리자는 워크벤치·진행 현황·Export를 탭 여럿에 띄우고 오가는데 제목이 전부 같아
@@ -552,15 +576,31 @@ function Shell({
         <div className="lg:pl-64">
           <header className="sticky top-0 z-sticky flex h-20 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(true)}
-                aria-label="메뉴 열기"
-                aria-expanded={mobileOpen}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-element text-foreground-muted hover:bg-muted lg:hidden"
-              >
-                <Menu size={20} aria-hidden="true" />
-              </button>
+              {/*
+                하단 내비를 쓰는 SME 화면에서는 햄버거를 감춘다 — 같은 네 항목을 두 경로로
+                열어 둘 이유가 없다. 대신 서랍에만 있던 로그아웃을 헤더로 올린다.
+              */}
+              {smeBottomNav ? (
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  aria-label="로그아웃"
+                  onClick={onLogout}
+                  className="lg:hidden"
+                >
+                  <LogOut size={19} aria-hidden="true" />
+                </Button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(true)}
+                  aria-label="메뉴 열기"
+                  aria-expanded={mobileOpen}
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-element text-foreground-muted hover:bg-muted lg:hidden"
+                >
+                  <Menu size={20} aria-hidden="true" />
+                </button>
+              )}
               <div>
                 <p className="t-caption text-foreground-subtle">{isAdmin ? '관리자 포털' : 'SME 검토 포털'}</p>
                 <h1 className="t-headline text-foreground">{pageTitle}</h1>
@@ -579,7 +619,15 @@ function Shell({
             </div>
           </header>
           {/* tabIndex={-1} — 건너뛰기 링크와 라우트 전환이 여기로 포커스를 옮긴다(v3 T6). */}
-          <main ref={mainRef} id="content" tabIndex={-1} className="mx-auto max-w-[1500px] p-5 outline-none lg:p-8">
+          <main
+            ref={mainRef}
+            id="content"
+            tabIndex={-1}
+            className={`mx-auto max-w-[1500px] p-5 outline-none lg:p-8 ${
+              // 하단 내비(56px)가 본문 마지막 줄을 덮지 않게 띄운다.
+              smeBottomNav ? 'pb-24 lg:pb-8' : ''
+            }`}
+          >
             <Routes>
               {isAdmin ? (
                 <>
@@ -666,8 +714,59 @@ function Shell({
             </Routes>
           </main>
         </div>
+
+        {smeBottomNav && <BottomNav items={bottomNavItems} />}
       </div>
     </DirtyContext.Provider>
+  );
+}
+
+/*
+ * 하단 내비(v3 T5 · montage Bottom navigation 규약).
+ *
+ * 규격 — 항목 3~5개 · 라벨 6자 이하 · 높이 56px · 활성은 primary, 비활성은 흐린 색으로만 구분한다
+ * (항목마다 다른 색을 주지 않는다). lg 이상에서는 사이드바가 상주하므로 감춘다.
+ *
+ * 이동 전에 requestLeave를 거치는 것은 사이드바와 같다 — 마법사에서 작성 중인 내용이 있으면
+ * 확인 창이 먼저 뜬다. 여기서 그 가드를 빼면 하단 내비만 유일하게 저장 안 한 입력을 날린다.
+ */
+function BottomNav({ items }: { items: NavItem[] }) {
+  const { requestLeave } = React.useContext(DirtyContext);
+  const navigate = useNavigate();
+
+  return (
+    <nav
+      aria-label="주요 메뉴"
+      className="fixed inset-x-0 bottom-0 z-drawer border-t border-border bg-elevated pb-[env(safe-area-inset-bottom)] lg:hidden"
+    >
+      <ul className="flex h-14">
+        {items.map(({ to, label, short, Icon }) => (
+          <li key={to} className="flex-1">
+            <NavLink
+              to={to}
+              onClick={(e) => {
+                e.preventDefault();
+                requestLeave(() => navigate(to));
+              }}
+              className={({ isActive }) =>
+                `flex h-full flex-col items-center justify-center gap-0.5 t-caption-2 font-medium transition ${
+                  isActive ? 'text-primary' : 'text-foreground-subtle'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon size={21} strokeWidth={isActive ? 2.2 : 1.7} aria-hidden="true" />
+                  {/* 화면에는 짧은 라벨, 낭독기에는 원래 이름을 읽힌다. */}
+                  <span aria-hidden="true">{short ?? label}</span>
+                  <span className="sr-only">{label}</span>
+                </>
+              )}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 

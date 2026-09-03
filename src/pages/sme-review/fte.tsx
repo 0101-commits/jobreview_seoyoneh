@@ -424,11 +424,34 @@ export function FteStep({
     onDirty();
   };
 
+  /*
+   * 키보드 조작(v3 T6). montage Slider 키보드 규약을 이 스텝퍼에 옮긴 것이다 —
+   * 방향키 ±step, Shift·PageUp/PageDown ±step×10, Home은 최소, End는 최대.
+   *
+   * v2는 위·아래 화살표 두 키만 받았다. 과업이 스무 개인 직무를 키보드만으로 배분하려면
+   * 5%씩 스무 번을 눌러야 했다. 안내 문구(FTE_INPUT_HINT)도 함께 고쳤다.
+   */
   const onInputKeyDown = (e: KeyboardEvent<HTMLInputElement>, key: string) => {
-    const step = e.key === 'ArrowUp' ? FTE_STEP_PCT : e.key === 'ArrowDown' ? -FTE_STEP_PCT : 0;
-    if (!step) return;
+    const big = FTE_STEP_PCT * 10;
+    const current = pcts.get(key) ?? 0;
+
+    if (e.key === 'Home') {
+      e.preventDefault();
+      setPct(key, 0);
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      setPct(key, 100);
+      return;
+    }
+
+    const dir =
+      e.key === 'ArrowUp' || e.key === 'PageUp' ? 1 : e.key === 'ArrowDown' || e.key === 'PageDown' ? -1 : 0;
+    if (!dir) return;
+    const jump = e.key === 'PageUp' || e.key === 'PageDown' || e.shiftKey;
     e.preventDefault();
-    bump(key, step);
+    setPct(key, current + dir * (jump ? big : FTE_STEP_PCT));
   };
 
   return (
@@ -517,6 +540,16 @@ export function FteStep({
                         // 25개 행마다 같은 문장을 되풀이하지 않으려고 한 문장을 모두가 참조한다.
                         aria-label={fteInputLabel(t.name)}
                         aria-describedby={PCT_HINT_ID}
+                        /*
+                          숫자를 올리고 내리는 칸이라는 사실과 값의 범위를 보조기기에 알린다(v3 T6).
+                          v2는 aria-label만 있어 "지금 몇 %인지 · 어디까지 갈 수 있는지"가
+                          낭독기에 전달되지 않았다. 막대는 aria-hidden이라 그 정보를 대신하지 못한다.
+                        */
+                        role="spinbutton"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuetext={`${pct}%`}
                         // 완전 제어 입력이라 칸이 비지 않는다("0"). 캐럿이 숫자 앞이나 사이에 있으면
                         // 25%를 치는 도중 "250"이 만들어지는데, 그대로 정규화하면 말없이 100%가 된다.
                         // 100을 넘는 입력은 무시해 직전 값을 그대로 둔다(React가 DOM 값을 되돌린다).
