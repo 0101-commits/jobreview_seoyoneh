@@ -401,20 +401,9 @@
 
   .label { @apply mb-2 block text-xs font-medium text-foreground-muted; }
   /* 좁은 화면에서는 손가락이 닿는 높이(44px)를 보장한다 — sm 이상에서는 표 밀도를 위해 그대로 둔다. */
-  .input { @apply w-full min-h-control-lg rounded-element border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; border-color: rgb(var(--border-input)); }
-  .textarea { @apply w-full resize-y rounded-element border bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; border-color: rgb(var(--border-input)); }
+  .input { @apply w-full min-h-control-lg rounded-element border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; }
+  .textarea { @apply w-full resize-y rounded-element border border-input bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; }
 
-  /*
-    .input/.textarea를 쓰지 않고 border-border 유틸을 직접 붙인 입력 칸이 아직 11곳 남아 있다
-    (JobDetailPage 9곳 · MailSendPanel textarea 1곳 · FteAnalyticsPage select 1곳). 그쪽도 같은 1.23:1
-    문제라, 파일마다 클래스를 고치는 대신 여기서 한 번에 받는다. 요소 선택자를 붙여 특이도가
-    .border-border(0,1,0)보다 높고(0,1,1), focus 변형(.focus\:border-primary:focus = 0,2,0)보다는
-    낮아 포커스 테두리는 그대로 primary로 뜬다.
-    ponytail: 특이도로 덮는 임시 조치다. 위 11곳이 .input/.textarea로 옮겨지면 이 블록은 지운다(v3 T6).
-  */
-  input.border-border,
-  select.border-border,
-  textarea.border-border { border-color: rgb(var(--border-input)); }
 
   /*
     배경막(v3 T1). 세기를 사용처에서 정하지 않기 위한 유틸 두 개.

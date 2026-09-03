@@ -259,7 +259,7 @@ export function MailSendPanel({
             rows={10}
             value={body}
             onChange={(e) => { setBody(e.target.value); setEdited(true); }}
-            className="w-full rounded-element border border-border bg-card px-3 py-2 font-mono t-caption leading-relaxed text-foreground focus:border-primary focus:outline-none"
+            className="w-full rounded-element border border-input bg-card px-3 py-2 font-mono t-caption leading-relaxed text-foreground focus:border-primary focus:outline-none"
           />
         </Field>
 

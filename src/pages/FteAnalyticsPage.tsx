@@ -297,7 +297,7 @@ export function FteAnalyticsPage({
             value={selectedJob}
             disabled={!ready || jobs.length === 0}
             onChange={(e) => setSelectedJob(e.target.value)}
-            className="min-h-11 w-full rounded-element border border-border bg-card px-3 t-label text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 sm:min-h-control-md"
+            className="min-h-11 w-full rounded-element border border-input bg-card px-3 t-label text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 sm:min-h-control-md"
           >
             {jobs.length === 0 ? (
               <option value="">선택할 직무가 없습니다</option>

@@ -305,7 +305,7 @@ export function RereviewModal({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={5}
-          className="w-full rounded-element border border-border p-3 t-label-reading text-foreground-muted outline-none focus:border-primary"
+          className="w-full rounded-element border border-input p-3 t-label-reading text-foreground-muted outline-none focus:border-primary"
           placeholder="예) 3번 과업의 세부활동이 실제 업무와 달라 보여요. 담당하시는 범위 기준으로 다시 봐 주세요."
         />
       </Field>

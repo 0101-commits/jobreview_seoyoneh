@@ -535,7 +535,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     setEditSeriesId('');
                     setDirty(true);
                   }}
-                  className="min-h-11 rounded-element border border-border px-3 t-label outline-none focus:border-primary sm:min-h-control-md"
+                  className="min-h-11 rounded-element border border-input px-3 t-label outline-none focus:border-primary sm:min-h-control-md"
                 >
                   {options?.groups.map((g) => (
                     <option key={g.id} value={g.id}>
@@ -557,7 +557,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     setEditSeriesId(e.target.value);
                     setDirty(true);
                   }}
-                  className="min-h-11 rounded-element border border-border px-3 t-label outline-none focus:border-primary sm:min-h-control-md"
+                  className="min-h-11 rounded-element border border-input px-3 t-label outline-none focus:border-primary sm:min-h-control-md"
                 >
                   <option value="">선택</option>
                   {seriesOptions.map((s) => (
@@ -583,7 +583,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     setDirty(true);
                   }}
                   className={`min-h-11 w-56 rounded-element border px-3 t-label font-semibold outline-none focus:border-primary sm:min-h-control-md ${
-                    dupError ? 'border-destructive' : 'border-border'
+                    dupError ? 'border-destructive' : 'border-input'
                   } ${highlightClass('name')}`}
                 />
               ) : (
@@ -684,7 +684,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                   setDirty(true);
                 }}
                 rows={4}
-                className={`w-full rounded-element border border-border p-4 t-label-reading text-foreground-muted outline-none focus:border-primary ${highlightClass('definition')}`}
+                className={`w-full rounded-element border border-input p-4 t-label-reading text-foreground-muted outline-none focus:border-primary ${highlightClass('definition')}`}
                 placeholder="직무 정의를 입력하세요"
               />
             ) : (
@@ -721,7 +721,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                         value={task.name}
                         aria-label={`${ti + 1}번 주요과업명`}
                         onChange={(e) => updateTask(ti, { name: e.target.value })}
-                        className="min-h-11 min-w-0 flex-1 rounded-element border border-border px-3 t-label font-semibold text-foreground outline-none focus:border-primary sm:min-h-control-md"
+                        className="min-h-11 min-w-0 flex-1 rounded-element border border-input px-3 t-label font-semibold text-foreground outline-none focus:border-primary sm:min-h-control-md"
                         placeholder="주요과업명"
                       />
                       <RowActions
@@ -742,7 +742,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                             value={act.activity_name}
                             aria-label={`${ti + 1}번 과업의 ${ai + 1}번 세부활동`}
                             onChange={(e) => updateActivity(ti, ai, e.target.value)}
-                            className="min-h-11 min-w-0 flex-1 rounded-element border border-border px-3 t-label text-foreground-muted outline-none focus:border-primary sm:min-h-control-md"
+                            className="min-h-11 min-w-0 flex-1 rounded-element border border-input px-3 t-label text-foreground-muted outline-none focus:border-primary sm:min-h-control-md"
                             placeholder="세부활동"
                           />
                           <RowActions
@@ -832,7 +832,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                               aria-label={`${label} 이름`}
                               value={s.name}
                               onChange={(e) => updateSkill(s.uid, e.target.value)}
-                              className={`min-h-11 min-w-0 flex-1 rounded-element border border-border px-3 t-label outline-none focus:border-primary sm:min-h-control-md ${
+                              className={`min-h-11 min-w-0 flex-1 rounded-element border border-input px-3 t-label outline-none focus:border-primary sm:min-h-control-md ${
                                 s.id ? highlightClass(`skill-${s.id}`) : ''
                               }`}
                               placeholder="Skill명"
@@ -910,7 +910,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                                   setEditReq((prev) => ({ ...prev, [key]: e.target.value }));
                                   setDirty(true);
                                 }}
-                                className={`min-h-11 w-full rounded-element border border-border px-3 t-label text-foreground-muted outline-none focus:border-primary sm:min-h-control-md ${highlightClass(fkey)}`}
+                                className={`min-h-11 w-full rounded-element border border-input px-3 t-label text-foreground-muted outline-none focus:border-primary sm:min-h-control-md ${highlightClass(fkey)}`}
                                 placeholder={label}
                               />
                             ) : (

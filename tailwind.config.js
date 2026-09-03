@@ -111,6 +111,17 @@ export default {
           foreground: token('--destructive-foreground'),
         },
       },
+      /*
+        컨트롤 테두리 색(v3 T6). --border-input은 색 팔레트가 아니라 "입력 칸의 경계"라는
+        역할이라 colors가 아니라 borderColor에만 둔다 — bg-input·text-input 같은 조합이
+        생기지 않게 한다. 화면은 border-input으로 이 색을 명시적으로 고른다.
+
+        v2까지는 index.css가 `input.border-border { border-color: ... }`로 특이도를 덮어
+        원시 입력 11곳을 몰래 받아 줬다. 그 블록을 지우고 호출부가 직접 고르게 했다.
+      */
+      borderColor: {
+        input: token('--border-input'),
+      },
       borderRadius: {
         inner: 'var(--radius-inner)',
         element: 'var(--radius-element)',
