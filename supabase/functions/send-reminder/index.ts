@@ -232,6 +232,23 @@ Deno.serve(async (req: Request) => {
         });
         continue;
       }
+      /*
+       * 메일 주소 없이 만든 계정은 로그인용으로 지은 .local 주소를 갖고 있다
+       * (admin-create-user 의 LOGIN_ID_DOMAIN). 인터넷으로 라우팅되지 않는 주소라 보내면
+       * 반드시 실패한다. 시도해서 실패로 남기는 대신 사유를 정확히 적고 건너뛴다 —
+       * 관리자가 "왜 이 사람만 안 갔나"를 로그에서 바로 알 수 있어야 한다.
+       */
+      if (profile.email.toLowerCase().endsWith(".local")) {
+        results.push({
+          id: r.id,
+          email: profile.email,
+          name: profile.name,
+          ok: false,
+          simulated,
+          error: "메일 주소가 없는 계정입니다(로그인 ID 전용). 직접 안내해 주세요.",
+        });
+        continue;
+      }
 
       if (simulated) {
         // 아무것도 보내지 않는다. 기록만 남긴다.

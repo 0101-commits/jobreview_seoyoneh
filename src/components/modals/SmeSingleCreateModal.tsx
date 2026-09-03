@@ -36,21 +36,15 @@ export function SmeSingleCreateModal({
     e.preventDefault();
     setLocalError('');
 
-    if (
-      !companyId ||
-      !organization.trim() ||
-      !title.trim() ||
-      !employeeNumber.trim() ||
-      !name.trim() ||
-      !email.trim()
-    ) {
-      setLocalError('회사, 조직, 직급, 사번, 이름, 이메일을 모두 입력해 주세요.');
+    // 이메일은 선택 입력이다(2026-09-03 결정). 비우면 서버가 사번으로 로그인 ID를 만든다.
+    if (!companyId || !organization.trim() || !title.trim() || !employeeNumber.trim() || !name.trim()) {
+      setLocalError('회사, 조직, 직급, 사번, 이름을 모두 입력해 주세요.');
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await callAdminFn<{ tempPassword?: string }>({
+      const res = await callAdminFn<{ tempPassword?: string; email?: string }>({
         mode: 'create-sme',
         sme: {
           name: name.trim(),
@@ -63,7 +57,7 @@ export function SmeSingleCreateModal({
       });
       // 목록 새로고침은 지금 하되 모달은 닫지 않는다 — 임시 비밀번호를 한 번은 보여 줘야 한다.
       setSubmitting(false);
-      setIssued({ email: email.trim().toLowerCase(), tempPassword: res.tempPassword ?? '' });
+      setIssued({ email: res.email || email.trim().toLowerCase(), tempPassword: res.tempPassword ?? '' });
       onSuccess({ keepOpen: true });
     } catch (err) {
       setLocalError(errorMessage(err, 'SME 계정 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
@@ -81,8 +75,15 @@ export function SmeSingleCreateModal({
         footer={<Button onClick={onClose}>닫기</Button>}
       >
         <div className="space-y-3">
+          {/* 이메일을 비우고 만들면 로그인 ID가 사번으로 지어진다. 그 값을 여기서 알려 주지 않으면
+              관리자가 무엇으로 로그인하라고 전해야 할지 알 수 없다. */}
+          <div className="rounded-element border border-border bg-card px-3.5 py-3 text-sm">
+            <p className="text-xs font-medium text-foreground-muted">로그인 ID</p>
+            <p className="mt-0.5 break-all font-mono text-base font-semibold text-foreground">{issued.email}</p>
+          </div>
           <div className="rounded-element border border-warning-border bg-warning-muted px-3.5 py-3 text-sm text-warning">
-            아래 임시 비밀번호를 {issued.email} 님에게 개별적으로 전달해 주세요. 첫 로그인에서 반드시 바꾸게 됩니다.
+            위 로그인 ID와 아래 임시 비밀번호를 본인에게 개별적으로 전달해 주세요. 첫 로그인에서 반드시 바꾸게
+            됩니다.
           </div>
           <div className="flex items-center justify-between gap-3 rounded-element border border-border bg-card px-3.5 py-3">
             <span className="font-mono text-base font-semibold text-foreground">{issued.tempPassword}</span>
@@ -146,13 +147,15 @@ export function SmeSingleCreateModal({
           <Field label="이름" required value={name} onChange={setName} placeholder="이름" />
         </div>
 
+        {/* type을 email이 아니라 text로 둔다 — 이 칸은 이메일 대신 로그인 ID도 받으므로
+            브라우저 기본 이메일 검증이 켜지면 'sme01' 같은 값에서 제출이 막힌다. */}
         <Field
-          label="이메일"
-          required
-          type="email"
+          label="이메일 (선택)"
+          description="메일 주소가 없으면 비워 두세요. 사번으로 로그인 ID를 만듭니다."
+          type="text"
           value={email}
           onChange={setEmail}
-          placeholder="name@company.com"
+          placeholder="비워 두면 사번으로 로그인 ID를 만들어요"
           autoComplete="off"
         />
 

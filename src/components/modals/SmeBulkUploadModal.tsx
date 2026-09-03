@@ -119,7 +119,7 @@ export function SmeBulkUploadModal({
       if (abortRef.current) break;
       const row = rows[i];
       try {
-        const created1 = await callAdminFn<{ tempPassword?: string }>(
+        const created1 = await callAdminFn<{ tempPassword?: string; email?: string }>(
           {
             mode: 'create-sme',
             sme: {
@@ -134,9 +134,12 @@ export function SmeBulkUploadModal({
           token,
         );
         created++;
-        if (created1.tempPassword) issued.push({ email: String(row.이메일), tempPassword: created1.tempPassword });
+        // 이메일을 비운 행은 서버가 사번으로 로그인 ID를 만든다. 관리자가 전달해야 하는 값은
+        // 엑셀에 적힌 값이 아니라 서버가 돌려준 그 ID다.
+        if (created1.tempPassword)
+          issued.push({ email: created1.email || String(row.이메일), tempPassword: created1.tempPassword });
       } catch (err) {
-        errors.push({ email: String(row.이메일), message: errorMessage(err, '등록하지 못했어요.') });
+        errors.push({ email: String(row.이메일 || row.사번), message: errorMessage(err, '등록하지 못했어요.') });
       }
       setProgress({ done: i + 1, total: rows.length });
     }
