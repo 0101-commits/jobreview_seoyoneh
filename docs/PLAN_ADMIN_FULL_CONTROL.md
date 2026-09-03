@@ -172,8 +172,15 @@ Edge Function에는 이미 같은 방어가 두 곳에 있어(`index.ts:299` `to
 
 - [x] `npm run typecheck` · `npx eslint .`(오류 0, 경고 23건은 전부 기존 파일의 react-refresh 경고) ·
       `npm run build` · `npm test`(35 tests) 통과 — 2026-09-03 실행
-- [ ] **Edge Function 재배포** `supabase functions deploy admin-create-user` — 이걸 빼면 새 모드가
-      404로 떨어지고 화면에는 "서버 기능을 찾을 수 없어요"만 뜬다
+- [x] **Edge Function 재배포** — 2026-09-03 실행. `supabase functions deploy admin-create-user
+      --project-ref yktdlcpovntegiwfnied --no-verify-jwt` → version 2 → 3, ACTIVE.
+      `--no-verify-jwt`는 선택이 아니다: 기존 배포본이 `verify_jwt: false`이고, 기본값(true)으로
+      올리면 CORS preflight(OPTIONS)에 Authorization 헤더가 없어 게이트웨이에서 막힌다 —
+      함수의 OPTIONS 분기에 닿지 못해 브라우저가 본 요청을 보내지 않고, 계정 관리 화면 전체가
+      "서버에 연결하지 못했어요"로 죽는다.
+- [x] 배포 확인(원격 호출) — 인증 없는 `set-password` 호출이 `401 {"error":"Unauthorized"}`,
+      `OPTIONS`가 `200`. 새 모드가 기존 관리자 검증(JWT → `profiles.role='admin'`)을 지나고
+      CORS 분기가 살아 있다는 뜻이다.
 - 아래 항목은 **실제 Supabase에 붙여 확인해야 하는 것들이다. 아직 하나도 확인하지 않았다.**
 - [ ] SME 관리 모달에서 임시 비밀번호 재발급 → 표시된 값으로 그 SME 로그인 → 비밀번호 변경 화면이 뜬다
 - [ ] 비밀번호 직접 지정 9자 입력 → 저장 거절 + 사유 표기, 10자 → 통과

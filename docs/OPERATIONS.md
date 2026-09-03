@@ -257,11 +257,29 @@ SELECT column_name, data_type, is_nullable FROM information_schema.columns
 SQL과 별개로, 아래 두 함수는 Supabase CLI로 따로 배포해야 화면이 동작한다.
 
 ```bash
-supabase functions deploy admin-create-user   # 계정 생성·삭제 화면(/users, /admin-users)
-supabase functions deploy send-reminder        # 리마인더 발송(/progress)
+supabase functions deploy admin-create-user --no-verify-jwt   # 계정 관리 화면(/users, /admin-users)
+supabase functions deploy send-reminder      --no-verify-jwt   # 리마인더 발송(/progress)
 ```
 
 배포하지 않으면 해당 화면의 버튼만 실패하고, 나머지 기능은 정상이다.
+
+**`--no-verify-jwt`를 빼면 안 된다.** 두 함수는 현재 `verify_jwt: false`로 배포되어 있고
+(`supabase functions list --project-ref <ref>`로 확인 가능), 이 플래그를 빼면 CLI 기본값(true)으로
+올라가 설정이 바뀐다. 그러면 브라우저의 CORS preflight(`OPTIONS`)에 `Authorization` 헤더가 없어
+게이트웨이가 먼저 401로 끊는다 — 함수 안의 `OPTIONS` 분기에 닿지 못하므로 브라우저는 본 요청을
+아예 보내지 않고, 화면에는 "서버에 연결하지 못했어요"만 뜬다. 권한 검증이 사라지는 것은 아니다:
+두 함수 모두 첫 줄에서 `Authorization` 헤더를 직접 읽어 `auth.getUser` → `profiles.role='admin'`을
+확인하고, 실패하면 401/403으로 끊는다(`admin-create-user/index.ts` 진입부).
+
+배포 후 확인 — 인증 없이 부르면 401, `OPTIONS`는 200이어야 한다.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  https://<ref>.supabase.co/functions/v1/admin-create-user \
+  -H 'Content-Type: application/json' -d '{"mode":"check-auth"}'   # 401 이어야 한다
+curl -s -o /dev/null -w '%{http_code}\n' -X OPTIONS \
+  https://<ref>.supabase.co/functions/v1/admin-create-user         # 200 이어야 한다
+```
 
 ---
 
@@ -479,7 +497,7 @@ Supabase 프로젝트 자체의 자동 백업(플랜별 제공 여부·보존 �
 - [ ] Supabase Edge Function secrets에 `RESEND_API_KEY` 등록
 - [ ] **같이** `RESEND_FROM` 등록 — 인증된 도메인의 주소여야 한다. 빠뜨리면 발송이 500으로 실패한다
 - [ ] (선택) `RESEND_REPLY_TO` 등록
-- [ ] `supabase functions deploy send-reminder` 재배포 — 시크릿 변경 후 반영 확인
+- [ ] `supabase functions deploy send-reminder --no-verify-jwt` 재배포 — 시크릿 변경 후 반영 확인 (플래그 생략 금지 — 1-9 참고)
 - [ ] **본인 계정 1명에게 먼저 보내 본다.** 스팸함으로 가지 않는지, 발신자 이름이 맞는지 확인
 - [ ] 확인 쿼리로 실발송 전환을 확인한다:
 
@@ -666,8 +684,8 @@ SELECT id, sme_id, step, created_at,
 | 반려가 **"반려 사유를 입력해 주세요."** | — | 정상 동작이다(§7-2). 사유는 SME 화면에 배너로 그대로 나가므로 무엇을 고쳐야 하는지 적는다 |
 | 리마인더를 보냈다는데 **메일이 안 온다** | `SELECT kind, simulated, sent_at FROM public.mail_logs ORDER BY sent_at DESC LIMIT 10;` → `simulated`가 `true`인가 | `true`면 `RESEND_API_KEY`가 없는 시뮬레이션 모드다(오류 아님). 6-1의 수동 안내로 운영하거나 6-2로 실발송 전환 |
 | 리마인더 발송이 **500 + "발신 주소(RESEND_FROM)가 설정되어 있지 않아…"** | Edge Function secrets에 `RESEND_FROM`이 있는가 | `RESEND_API_KEY`만 넣고 `RESEND_FROM`을 빠뜨린 것이다. 인증된 도메인 주소를 등록하고 재배포 |
-| 리마인더 발송 버튼이 아무 반응이 없다 / 404 | `send-reminder` Edge Function이 배포되어 있는가 | `supabase functions deploy send-reminder` |
-| 계정 생성·삭제 화면이 실패한다 | `admin-create-user` Edge Function 배포 여부 | `supabase functions deploy admin-create-user` |
+| 리마인더 발송 버튼이 아무 반응이 없다 / 404 | `send-reminder` Edge Function이 배포되어 있는가 | `supabase functions deploy send-reminder --no-verify-jwt` |
+| 계정 관리 화면(비밀번호 재발급·로그인 ID·역할 포함)이 실패한다 | `admin-create-user` Edge Function 배포 여부·버전 (`supabase functions list`) | `supabase functions deploy admin-create-user --no-verify-jwt` |
 | 화면이 **"데이터베이스에 연결되어 있지 않습니다"** | Actions **Variables**에 `VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY`가 있는가(Secrets가 아니라 Variables다) | Variables에 등록하고 워크플로를 다시 돌린다. 값은 빌드 시점에 번들로 들어가므로 **재배포해야 반영된다** |
 | 로그인이 반복 실패하고 잠금 문구가 뜬다 | 60초 잠금은 클라이언트다. 그래도 안 되면 Supabase Authentication → Rate Limits | 서버 한도에 걸렸으면 한도를 확인하고 잠시 기다린다. 비밀번호를 잊었으면 관리자가 대시보드에서 재설정 |
 | 새로고침하면 404가 뜬다 (`/review/…` 같은 경로) | 워크플로에 `cp dist/index.html dist/404.html` 스텝이 있는가 | 있다. 없어졌다면 되살린다 — GitHub Pages는 실제 파일이 없는 경로에 404를 준다 |
