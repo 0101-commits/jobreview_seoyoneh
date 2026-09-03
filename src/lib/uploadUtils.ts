@@ -369,8 +369,16 @@ export interface SmeValidationResult {
  * 수십 명의 초기 비밀번호가 담긴 xlsx가 관리자 PC·메일에 남는 구조를 없애려는 것이다.
  * 비밀번호는 서버(Edge Function)가 만들어 등록 결과에 1회만 표시한다.
  */
+/*
+ * '이메일'은 양식에는 있지만 필수 열이 아니다(2026-09-03 결정) — 파일럿 대상 중 회사 메일이 없는
+ * 사람이 있어 비워 둘 수 있어야 한다. 비우면 서버가 사번으로 로그인 ID를 만든다.
+ * 그래서 열 존재 검사(SME_REQUIRED_COLS)와 양식 열 목록(SME_COLS)을 갈라 둔다.
+ */
 const SME_COLS = ['회사', '조직', '직급', '사번', '이름', '이메일'];
+const SME_REQUIRED_COLS = ['회사', '조직', '직급', '사번', '이름'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** '@' 없이 넣으면 로그인 ID로 본다. 서버가 뒤에 도메인을 붙이므로 이메일 로컬파트 글자만 받는다. */
+const LOGIN_ID_RE = /^[a-zA-Z0-9._-]+$/;
 
 export function validateSmeRows(
   rows: Record<string, unknown>[],
@@ -389,7 +397,7 @@ export function validateSmeRows(
 
   // Check required columns
   const firstRow = rows[0];
-  const missingCols = SME_COLS.filter((c) => !(c in firstRow));
+  const missingCols = SME_REQUIRED_COLS.filter((c) => !(c in firstRow));
   if (missingCols.length > 0) {
     return { total: 0, valid: 0, errors: 1, errorList: [{ row: 0, message: `필수 열 누락: ${missingCols.join(', ')}` }], validRows: [] };
   }
@@ -415,11 +423,15 @@ export function validateSmeRows(
     if (!row.사번) { errorList.push({ row: rowNum, message: '사번이 입력되지 않았습니다.' }); hasError = true; }
     if (!row.이름) { errorList.push({ row: rowNum, message: '이름이 입력되지 않았습니다.' }); hasError = true; }
 
-    if (!row.이메일) { errorList.push({ row: rowNum, message: '이메일이 입력되지 않았습니다.' }); hasError = true; }
-    else if (!EMAIL_RE.test(row.이메일)) { errorList.push({ row: rowNum, message: `이메일 형식이 올바르지 않습니다. (${row.이메일})` }); hasError = true; }
-    else if (existingEmails.has(row.이메일)) { errorList.push({ row: rowNum, message: `이미 등록된 이메일입니다. (${row.이메일})` }); hasError = true; }
-    else if (seenEmails.has(row.이메일)) { errorList.push({ row: rowNum, message: `Excel 내 중복 이메일입니다. (${row.이메일})` }); hasError = true; }
-    else { seenEmails.add(row.이메일); }
+    // 이메일은 비워도 된다 — 그때는 사번이 로그인 ID가 되므로 아래 사번 중복 검사가 중복을 막는다.
+    if (row.이메일) {
+      const isAddress = row.이메일.includes('@');
+      if (isAddress && !EMAIL_RE.test(row.이메일)) { errorList.push({ row: rowNum, message: `이메일 형식이 올바르지 않습니다. (${row.이메일})` }); hasError = true; }
+      else if (!isAddress && !LOGIN_ID_RE.test(row.이메일)) { errorList.push({ row: rowNum, message: `로그인 ID에는 영문·숫자와 . _ - 만 쓸 수 있습니다. (${row.이메일})` }); hasError = true; }
+      else if (isAddress && existingEmails.has(row.이메일)) { errorList.push({ row: rowNum, message: `이미 등록된 이메일입니다. (${row.이메일})` }); hasError = true; }
+      else if (seenEmails.has(row.이메일)) { errorList.push({ row: rowNum, message: `Excel 내 중복 이메일입니다. (${row.이메일})` }); hasError = true; }
+      else { seenEmails.add(row.이메일); }
+    }
 
 
     if (row.사번 && row.회사) {
@@ -438,7 +450,8 @@ export function validateSmeRows(
 export function downloadSmeTemplate() {
   const data: SmeUploadRow[] = [
     { 회사: '서연이화', 조직: '생산기술팀', 직급: '대리', 사번: '2024001', 이름: '김서연', 이메일: 'seoyeon@example.com' },
-    { 회사: '서연탑메탈', 조직: '품질팀', 직급: '과장', 사번: '2024002', 이름: '이탑', 이메일: 'topmetal@example.com' },
+    // 둘째 줄은 이메일을 비워 둔 예다 — 비우면 사번이 로그인 ID가 된다.
+    { 회사: '서연이화', 조직: '품질팀', 직급: '과장', 사번: '2024002', 이름: '이탑', 이메일: '' },
   ];
   const ws = XLSX.utils.json_to_sheet(data, { header: SME_COLS });
   ws['!cols'] = [{ wch: 14 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 24 }];

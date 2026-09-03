@@ -64,6 +64,11 @@ export interface AdminInquiry {
 /**
  * 문의 인박스(§6-3 ⓒ). 쿼리 2회(문의+작성자 1 + 검토→직무 해석 1).
  * inquiries에는 company_id가 없으므로 작성자 profiles를 inner join 해서 계열사로 좁힌다.
+ *
+ * profiles 앞의 !sme_id는 어느 외래키로 이을지 찍어 주는 힌트다. inquiries는 profiles를 두 번
+ * 참조하고(sme_id = 작성자, answered_by = 답변한 관리자) 그래서 힌트가 없으면 PostgREST가
+ * "more than one relationship was found for 'inquiries' and 'profiles'"로 거절한다.
+ * 여기서 필요한 것은 작성자이므로 sme_id다.
  */
 export async function fetchInquiries(
   companyId?: string | null,
@@ -76,7 +81,7 @@ export async function fetchInquiries(
     .select(
       `
       id, sme_id, review_id, step, body, status, answer, answered_at, created_at,
-      profiles!inner(id, name, organization, company_id),
+      profiles!sme_id!inner(id, name, organization, company_id),
       reviews(id, assignment_id)
     `,
     )

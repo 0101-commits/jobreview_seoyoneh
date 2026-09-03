@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveLoginEmail } from "./loginEmail.ts";
 
 /*
  * auth.admin.listUsers()는 인자를 주지 않으면 첫 50건만 돌려준다(supabase-js 기본 perPage).
@@ -42,6 +43,13 @@ function generateTempPassword(): string {
   const tail = Array.from({ length: bytes.length - 3 }, (_, k) => pick(all, k + 3));
   return [...head, ...tail].join("");
 }
+
+/*
+ * 로그인 ID 도메인. .local 을 쓰는 이유 — 실제로 메일이 닿을 수 있는 도메인을 지어 쓰면
+ * 리마인더 발송(send-reminder)이 남의 우편함으로 나간다. .local 은 인터넷으로 라우팅되지 않으므로
+ * 그 사고가 구조적으로 막힌다. 운영 전환 때 바꿔야 하면 PILOT_LOGIN_DOMAIN 환경변수로 덮는다.
+ */
+const LOGIN_ID_DOMAIN = (Deno.env.get("PILOT_LOGIN_DOMAIN") || "seoyoneh.local").trim().toLowerCase();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,15 +118,23 @@ Deno.serve(async (req: Request) => {
       const { sme: smeData } = body;
       // smeData: { name, email, company_id, organization, title, employee_number }
       // password는 받지 않는다(v2 S2) — 서버가 만들어 응답으로 한 번만 돌려준다.
-      if (!smeData || !smeData.email || !smeData.name) {
+      if (!smeData || !smeData.name) {
         return new Response(
-          JSON.stringify({ error: "이름과 이메일을 입력해 주세요." }),
+          JSON.stringify({ error: "이름을 입력해 주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // 이메일은 선택 입력이다. 비우면 사번으로 로그인 ID 를 만든다.
+      const normalizedSmeEmail = resolveLoginEmail(smeData.email, smeData.employee_number, LOGIN_ID_DOMAIN);
+      if (!normalizedSmeEmail) {
+        return new Response(
+          JSON.stringify({
+            error: "이메일을 비우려면 영문·숫자 사번을 입력해 주세요. 그 사번으로 로그인 ID를 만듭니다.",
+          }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       const smeTempPassword = generateTempPassword();
-
-      const normalizedSmeEmail = smeData.email.trim().toLowerCase();
 
       // Check for duplicate email in profiles
       const { data: existingSme } = await adminClient
@@ -128,7 +144,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (existingSme) {
         return new Response(
-          JSON.stringify({ error: `이미 등록된 이메일입니다. (${smeData.email})` }),
+          JSON.stringify({ error: `이미 등록된 로그인 ID입니다. (${normalizedSmeEmail})` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -154,7 +170,7 @@ Deno.serve(async (req: Request) => {
       const existingSmeAuth = await findAuthUserByEmail(adminClient, normalizedSmeEmail);
       if (existingSmeAuth) {
         return new Response(
-          JSON.stringify({ error: `이미 등록된 이메일입니다. (${smeData.email})` }),
+          JSON.stringify({ error: `이미 등록된 로그인 ID입니다. (${normalizedSmeEmail})` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -171,12 +187,12 @@ Deno.serve(async (req: Request) => {
         const msg = smeAuthErr?.message || "SME 계정 등록 중 오류가 발생했습니다.";
         if (msg.includes("already") || msg.includes("exists")) {
           return new Response(
-            JSON.stringify({ error: `이미 등록된 이메일입니다. (${smeData.email})` }),
+            JSON.stringify({ error: `이미 등록된 로그인 ID입니다. (${normalizedSmeEmail})` }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
         return new Response(
-          JSON.stringify({ error: `SME 계정 등록 중 오류가 발생했습니다. (${smeData.email})` }),
+          JSON.stringify({ error: `SME 계정 등록 중 오류가 발생했습니다. (${normalizedSmeEmail})` }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -199,7 +215,7 @@ Deno.serve(async (req: Request) => {
         console.error("SME profile insert failed:", smeProfileErr);
         await adminClient.auth.admin.deleteUser(smeUserId);
         return new Response(
-          JSON.stringify({ error: `SME 계정 등록 중 오류가 발생했습니다. (${smeData.email})` }),
+          JSON.stringify({ error: `SME 계정 등록 중 오류가 발생했습니다. (${normalizedSmeEmail})` }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -224,7 +240,7 @@ Deno.serve(async (req: Request) => {
 
       // tempPassword는 이 응답에만 있다. 화면은 관리자에게 1회 표시한 뒤 버린다(D1 ⓑ).
       return new Response(
-        JSON.stringify({ success: true, userId: smeUserId, tempPassword: smeTempPassword }),
+        JSON.stringify({ success: true, userId: smeUserId, email: normalizedSmeEmail, tempPassword: smeTempPassword }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -413,9 +429,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Default mode: create new admin user
-    if (!name || !email || !password) {
+    // 이메일 칸은 로그인 ID 도 받는다('@' 없이 sme01 처럼 넣으면 도메인을 붙인다).
+    if (!name || !password || !(typeof email === "string" && email.trim())) {
       return new Response(
-        JSON.stringify({ error: "이름, 이메일, 비밀번호를 모두 입력해 주세요." }),
+        JSON.stringify({ error: "이름, 이메일(또는 로그인 ID), 비밀번호를 모두 입력해 주세요." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    // 값은 있는데 로그인 ID 로 쓸 글자가 하나도 없는 경우(예: 한글만 입력)를 빈칸과 갈라 알린다.
+    const normalizedEmail = resolveLoginEmail(email, null, LOGIN_ID_DOMAIN);
+    if (!normalizedEmail) {
+      return new Response(
+        JSON.stringify({ error: "로그인 ID에는 영문·숫자와 . _ - 만 쓸 수 있어요. 이메일 주소를 넣어도 됩니다." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -427,8 +452,6 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const normalizedEmail = email.trim().toLowerCase();
 
     // Check for duplicate email in profiles
     const { data: existing } = await adminClient
@@ -500,7 +523,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, userId: newUserId }),
+      JSON.stringify({ success: true, userId: newUserId, email: normalizedEmail }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

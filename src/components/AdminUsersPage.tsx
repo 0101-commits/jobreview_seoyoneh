@@ -217,9 +217,11 @@ export function AdminUsersPage({ currentUser }: Props) {
       {showRegister && (
         <RegisterModal
           onClose={() => setShowRegister(false)}
-          onSuccess={() => {
+          onSuccess={(loginId) => {
             setShowRegister(false);
-            showToast({ type: 'success', msg: '관리자 계정을 등록했어요.' });
+            // 로그인 ID를 함께 알린다 — 이메일 대신 ID를 넣으면 서버가 도메인을 붙이므로
+            // 실제로 로그인할 주소가 입력값과 다르다.
+            showToast({ type: 'success', msg: `관리자 계정을 등록했어요. 로그인 ID: ${loginId}` });
             fetchAdmins();
           }}
         />
@@ -242,7 +244,7 @@ export function AdminUsersPage({ currentUser }: Props) {
 
 const REGISTER_FORM_ID = 'admin-register-form';
 
-function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (loginId: string) => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -255,7 +257,7 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
     setLocalError('');
 
     if (!name.trim() || !email.trim() || !password) {
-      setLocalError('이름, 이메일, 비밀번호를 모두 입력해 주세요.');
+      setLocalError('이름, 이메일(또는 로그인 ID), 비밀번호를 모두 입력해 주세요.');
       return;
     }
     if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
@@ -265,8 +267,8 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 
     setSubmitting(true);
     try {
-      await callAdminFn({ name: name.trim(), email: email.trim(), password });
-      onSuccess();
+      const res = await callAdminFn<{ email?: string }>({ name: name.trim(), email: email.trim(), password });
+      onSuccess(res.email || email.trim().toLowerCase());
     } catch (err) {
       setLocalError(errorMessage(err, '관리자 계정을 등록하지 못했어요. 잠시 후 다시 시도해 주세요.'));
       setSubmitting(false);
@@ -293,13 +295,16 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
     >
       <form id={REGISTER_FORM_ID} onSubmit={handleSubmit} className="space-y-5">
         <Field label="이름" required value={name} onChange={setName} placeholder="이름을 입력해 주세요" />
+        {/* 메일 주소가 없는 파일럿 계정을 위해 로그인 ID도 받는다(2026-09-03 결정).
+            type을 email로 두면 'hcg-admin' 같은 ID에서 브라우저 기본 검증이 제출을 막는다. */}
         <Field
-          label="이메일"
+          label="이메일 또는 로그인 ID"
           required
-          type="email"
+          description="메일 주소가 없으면 영문·숫자 ID만 넣어 주세요. 로그인은 ID@seoyoneh.local 로 합니다."
+          type="text"
           value={email}
           onChange={setEmail}
-          placeholder="name@company.com"
+          placeholder="name@company.com 또는 hcg-admin"
           autoComplete="off"
         />
         {/*
