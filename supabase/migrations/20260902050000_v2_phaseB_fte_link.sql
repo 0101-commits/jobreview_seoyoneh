@@ -525,6 +525,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_job_id uuid;
+  v_task_id uuid;
   v_removing boolean;
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -534,22 +535,31 @@ BEGIN
     v_removing := (OLD.active IS TRUE AND NEW.active IS NOT TRUE);
   END IF;
 
+  -- 여기 오는 것은 UPDATE 뿐이다 — DELETE는 위에서 항상 v_removing = true다.
   IF NOT v_removing THEN
-    RETURN COALESCE(NEW, OLD);
+    RETURN NEW;
   END IF;
 
-  v_job_id := CASE TG_TABLE_NAME
-    WHEN 'job_tasks'  THEN COALESCE(NEW, OLD).job_id
-    WHEN 'job_skills' THEN COALESCE(NEW, OLD).job_id
-    WHEN 'task_activities' THEN (SELECT t.job_id FROM public.job_tasks t WHERE t.id = COALESCE(NEW, OLD).job_task_id)
-  END;
+  /*
+    NEW·OLD는 record라 COALESCE(NEW, OLD)로 묶을 수 없고, 함수 호출 결과에서 필드를 바로
+    뽑는 문법도 없다 — 처음 판은 COALESCE(NEW, OLD).job_id 라고 써서 CREATE FUNCTION 자체가
+    42601(syntax error at or near ".")로 실패했다. TG_OP로 갈라 각각 읽는다.
+  */
+  IF TG_TABLE_NAME = 'task_activities' THEN
+    IF TG_OP = 'DELETE' THEN v_task_id := OLD.job_task_id; ELSE v_task_id := NEW.job_task_id; END IF;
+    SELECT t.job_id INTO v_job_id FROM public.job_tasks t WHERE t.id = v_task_id;
+  ELSE
+    -- job_tasks · job_skills 는 job_id를 직접 들고 있다.
+    IF TG_OP = 'DELETE' THEN v_job_id := OLD.job_id; ELSE v_job_id := NEW.job_id; END IF;
+  END IF;
 
   IF v_job_id IS NOT NULL AND public.job_has_open_review(v_job_id) THEN
     RAISE EXCEPTION '이 직무는 검토가 진행 중이라 과업·Skill 구조를 바꿀 수 없습니다. 문구·정의 수정은 가능하며, 구조 변경은 검토가 끝난 뒤 재업로드로 해 주세요.'
       USING ERRCODE = '42501';
   END IF;
 
-  RETURN COALESCE(NEW, OLD);
+  -- BEFORE 트리거라 DELETE에서 NEW(=NULL)를 돌려주면 삭제가 취소된다. 반드시 갈라 돌려준다.
+  IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END;
 $$;
 
