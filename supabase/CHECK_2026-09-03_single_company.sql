@@ -73,19 +73,48 @@ END $$;
 */
 
 -- ④ 계열사를 서연이화 하나로 줄인다 --------------------------------------
---    ①에서 남길 회사의 id 를 확인해 아래 두 곳에 넣는다.
---    keep 가 1행이 아니면 조건이 깨져 0행이 지워진다 — id 를 잘못 적어도 전부 삭제되지 않는다.
---    companies 삭제는 딸린 행의 company_id 를 NULL 로 되돌린다(ON DELETE SET NULL).
---    그래서 ①의 직무·계정·배정이 0인지 먼저 확인한 뒤 지운다.
+--
+--    companies 를 참조하는 외래키는 7개이고 삭제 동작이 두 갈래다(2026-09-03 라이브 확인:
+--    pg_constraint.confdeltype). 첫 판은 이걸 전부 SET NULL 로 적어 실패했다 —
+--      23503: update or delete on table "companies" violates foreign key constraint
+--             "survey_settings_company_id_fkey" on table "survey_settings"
+--
+--      SET NULL('n') — jobs · job_groups · job_series · profiles · review_assignments
+--                      → 부모를 지우면 company_id 가 알아서 비워진다. 손댈 것 없다.
+--      NO ACTION('a') — org_units · survey_settings
+--                      → 참조 행이 남아 있으면 부모 삭제를 거절한다. 먼저 지워야 한다.
+--
+--    survey_settings 는 회사당 1행(운영 설정 기본값)이므로 지우는 회사와 함께 사라져야 맞다.
+--    org_units 는 2026-09-03 실측 0행이지만, 나중에 데이터가 생긴 뒤 이 절차를 다시 돌려도
+--    같은 23503 에 걸리지 않도록 함께 지운다.
+--
+--    이 스크립트는 한 트랜잭션이다. ①의 가드가 예외를 던지면 아래 DELETE 는 전부 롤백된다 —
+--    남길 id 를 잘못 적으면 "0행 삭제"가 아니라 "아무 일도 없음"이 된다.
+--    지우기 전에 ①의 직무·계정·배정이 0인지 반드시 확인한다.
 /*
-WITH keep AS (
-  SELECT id FROM public.companies
-   WHERE id = '776963fe-07f4-4354-b0f0-5a1a7bcde64f'  -- 서연이화 (2026-09-03 실측)
-)
-DELETE FROM public.companies
- WHERE id NOT IN (SELECT id FROM keep)
-   AND (SELECT count(*) FROM keep) = 1
+BEGIN;
+
+-- 가드 — 남길 회사가 정확히 1행이어야 한다.
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.companies
+       WHERE id = '776963fe-07f4-4354-b0f0-5a1a7bcde64f') <> 1 THEN
+    RAISE EXCEPTION '남길 회사 id 를 찾지 못했습니다. 아무것도 지우지 않았습니다.';
+  END IF;
+END $$;
+
+-- 부모 삭제를 막는 자식부터.
+DELETE FROM public.org_units       WHERE company_id <> '776963fe-07f4-4354-b0f0-5a1a7bcde64f';
+DELETE FROM public.survey_settings WHERE company_id <> '776963fe-07f4-4354-b0f0-5a1a7bcde64f';
+
+-- 부모. 반환된 5행이 서연 · 서연씨앤에프 · 서연오토비젼 · 서연인테크 · 서연탑메탈 인지 확인한다.
+--        COMMIT 은 이 스크립트에 들어 있다 — SQL Editor 는 실행마다 새 커넥션을 쓰므로
+--        트랜잭션을 열어 둔 채 눈으로 보고 커밋하는 방식이 안 된다. 잘못된 id 는 위 가드가 막고,
+--        결과 확인은 ⑤ 가 맡는다.
+DELETE FROM public.companies       WHERE id         <> '776963fe-07f4-4354-b0f0-5a1a7bcde64f'
 RETURNING id, name;
+
+COMMIT;
 */
 
 -- ⑤ ④ 뒤 검증 — 1행(서연이화)만 남아야 한다. ----------------------------
