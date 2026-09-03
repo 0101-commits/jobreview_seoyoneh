@@ -8,6 +8,11 @@
  *  · 아이콘(또는 그림) + heading(강조가 필요할 때만) + description 2줄 이내 + 조치 1개
  *  · 문구는 '해요'체 — "아직 도착한 문의가 없어요 / SME가 남기면 여기에 도착해요"
  *  · compact — 카드·패널 안에 들어갈 때 여백을 줄인 변형
+ *
+ * v3 T3 — 여백과 폭을 montage 규격에 가깝게 올렸다. v2는 상하 64/32px에 아이콘 32/24px이라
+ * montage 값(160/80px · 아이콘 160/128px)의 절반 이하였고, 빈 화면이 '작게 낀' 인상이었다.
+ * 160px을 그대로 쓰지는 않았다 — 이 앱은 표 위 빈 상태가 많아 화면 한 장을 다 먹는다.
+ * 96/48px로 올리고, 텍스트 폭 상한은 montage의 400/335px을 그대로 쓴다.
  */
 import type { ReactNode } from 'react';
 import { AlertCircle, Inbox, Lock } from 'lucide-react';
@@ -45,13 +50,14 @@ export function FallbackView({
   return (
     <div
       role={kind === 'error' ? 'alert' : undefined}
-      className={`flex flex-col items-center justify-center text-center ${compact ? 'gap-2 px-4 py-8' : 'gap-3 px-6 py-16'} ${className}`}
+      className={`flex flex-col items-center justify-center text-center ${compact ? 'gap-2 px-4 py-12' : 'gap-3 px-6 py-24'} ${className}`}
     >
       <span className={`shrink-0 ${tone}`} aria-hidden="true">
-        {icon ?? <Icon size={compact ? 24 : 32} />}
+        {icon ?? <Icon size={compact ? 32 : 44} strokeWidth={1.5} />}
       </span>
       {heading && <p className="t-headline text-foreground">{heading}</p>}
-      <p className="max-w-[36rem] t-label text-foreground-muted">{description}</p>
+      {/* montage 폭 상한 — 모바일 335px · 데스크톱 400px. 설명은 두 줄을 넘기지 않는다. */}
+      <p className="max-w-[335px] t-label-reading text-foreground-muted sm:max-w-[400px]">{description}</p>
       {action && <div className="mt-1 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );

@@ -29,10 +29,10 @@ const toStepNo = (n: number): StepNo => (n >= 1 && n <= 5 ? (n as StepNo) : 5);
 export function Disclosure({ summary, children }: { summary: string; children: ReactNode }) {
   return (
     <details className="mb-5 rounded-element border border-border bg-muted">
-      <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+      <summary className="min-h-11 cursor-pointer px-4 py-3 t-label font-medium text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
         {summary}
       </summary>
-      <div className="border-t border-border px-4 py-3 text-sm leading-6 text-foreground-muted">{children}</div>
+      <div className="border-t border-border px-4 py-3 t-label-reading text-foreground-muted">{children}</div>
     </details>
   );
 }
@@ -105,14 +105,14 @@ export function SubmitSummary({
           ref={missingRef}
           tabIndex={-1}
           role="alert"
-          className="mb-6 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warning"
+          className="mb-6 rounded-element border border-warning-border bg-warning-muted px-4 py-3 t-label text-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warning"
         >
           <p className="font-medium">{gateStep5Missing(missing.length)}</p>
           <div className="mt-3 space-y-3">
             {[...byStep.entries()].map(([step, items]) => (
               <div key={step}>
-                <p className="text-xs font-semibold">{STEP_TITLES[step - 1]}</p>
-                <ul className="mt-1 list-disc space-y-1 pl-5 text-xs leading-5">
+                <p className="t-caption font-semibold">{STEP_TITLES[step - 1]}</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 t-caption leading-5">
                   {items.map((m, i) => (
                     <li key={`${m.kind}-${i}`}>{m.label}</li>
                   ))}
@@ -133,9 +133,9 @@ export function SubmitSummary({
             key={it.step}
             className="flex flex-wrap items-center justify-between gap-2 rounded-element border border-border px-4 py-3"
           >
-            <span className="min-w-0 text-sm text-foreground">{STEP_TITLES[it.step - 1]}</span>
+            <span className="min-w-0 t-label text-foreground">{STEP_TITLES[it.step - 1]}</span>
             <span className="flex items-center gap-3">
-              <span className={`text-xs font-medium ${it.complete ? 'text-success' : 'text-warning'}`}>
+              <span className={`t-caption font-medium ${it.complete ? 'text-success' : 'text-warning'}`}>
                 {it.complete ? '완료' : '미완료'}
                 {it.total > 0 ? ` · ${it.done}/${it.total}` : ''}
               </span>
@@ -151,21 +151,21 @@ export function SubmitSummary({
 
       <h4 className="mb-3 font-semibold text-foreground">제안 요약</h4>
       <ul className="mb-8 grid gap-2 sm:grid-cols-3">
-        <li className="rounded-element bg-muted px-4 py-3 text-sm text-foreground-muted">
+        <li className="rounded-element bg-muted px-4 py-3 t-label text-foreground-muted">
           수정 제안 <strong className="text-foreground">{revisedCount}</strong>건
         </li>
-        <li className="rounded-element bg-muted px-4 py-3 text-sm text-foreground-muted">
+        <li className="rounded-element bg-muted px-4 py-3 t-label text-foreground-muted">
           신규 제안 과업 <strong className="text-foreground">{newTaskCount}</strong>건 · Skill{' '}
           <strong className="text-foreground">{newSkillCount}</strong>건
         </li>
-        <li className="rounded-element bg-muted px-4 py-3 text-sm text-foreground-muted">
+        <li className="rounded-element bg-muted px-4 py-3 t-label text-foreground-muted">
           삭제 제안 <strong className="text-foreground">{removeCount}</strong>건
         </li>
       </ul>
 
       <h4 className="mb-3 font-semibold text-foreground">투입 비중 상위 과업 (합계 {fteTotal}%)</h4>
       {top3.length === 0 ? (
-        <p className="mb-8 rounded-element bg-muted px-4 py-3 text-sm text-foreground-muted">
+        <p className="mb-8 rounded-element bg-muted px-4 py-3 t-label text-foreground-muted">
           아직 투입 비중을 배분하지 않았어요.
         </p>
       ) : (
@@ -175,10 +175,10 @@ export function SubmitSummary({
               key={t.name}
               className="flex items-center justify-between gap-3 rounded-element border border-border px-4 py-3"
             >
-              <span className="min-w-0 truncate text-sm text-foreground">
+              <span className="min-w-0 truncate t-label text-foreground">
                 {i + 1}. {t.name}
               </span>
-              <span className="shrink-0 text-sm font-semibold text-primary">{t.pct}%</span>
+              <span className="shrink-0 t-label font-semibold text-primary">{t.pct}%</span>
             </li>
           ))}
         </ol>
@@ -186,8 +186,8 @@ export function SubmitSummary({
 
       {zero.length > 0 && (
         <div className="rounded-element border border-border bg-muted px-4 py-3">
-          <p className="text-sm text-foreground-muted">{fteZeroPctNote(zero.length)}</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-foreground-subtle">
+          <p className="t-label text-foreground-muted">{fteZeroPctNote(zero.length)}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 t-caption leading-5 text-foreground-subtle">
             {zero.map((t) => (
               <li key={t.name}>{t.name}</li>
             ))}
@@ -202,9 +202,9 @@ export function ErrorPanel({ title, detail, onRetry }: { title: string; detail: 
   return (
     <div className="rounded-element border border-destructive-border bg-destructive-muted p-8 text-center">
       <AlertCircle size={20} className="mx-auto mb-2 text-destructive" aria-hidden="true" />
-      <p className="text-sm font-medium text-destructive">{title}</p>
-      <p className="mt-1 text-xs text-destructive">{detail}</p>
-      <p className="mt-1 text-xs text-foreground-muted">
+      <p className="t-label font-medium text-destructive">{title}</p>
+      <p className="mt-1 t-caption text-destructive">{detail}</p>
+      <p className="mt-1 t-caption text-foreground-muted">
         네트워크 상태를 확인한 뒤 다시 시도해 주세요. 계속되면 관리자에게 알려 주세요.
       </p>
       <Button variant="secondary" onClick={onRetry} className="mt-4">

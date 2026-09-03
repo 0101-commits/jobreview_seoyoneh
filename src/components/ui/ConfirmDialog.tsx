@@ -45,6 +45,9 @@ export function ConfirmDialog({
       onClose={onCancel}
       size="sm"
       closeDisabled={busy}
+      // footer에 '취소'가 있으므로 우상단 [X]를 감춘다 — 같은 동작을 하는 버튼을 두 개 두지
+      // 않는다는 montage 규약(v3 T3). v2까지는 모든 확인 창에 닫기 버튼이 두 개였다.
+      hideClose
       footer={
         <>
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
@@ -56,7 +59,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      {body ? <div className="t-label leading-6 text-foreground-muted">{body}</div> : null}
+      {body ? <div className="t-label-reading text-foreground-muted">{body}</div> : null}
     </ModalShell>
   );
 }

@@ -199,13 +199,13 @@ export function MailSendPanel({
   return (
     <section className="rounded-card border border-border bg-card">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+        <h2 className="inline-flex items-center gap-2 t-label font-semibold text-foreground">
           <Mail size={16} aria-hidden="true" /> 리마인더 · 초대 메일 발송
         </h2>
-        <p className="text-sm text-foreground-muted">
+        <p className="t-label text-foreground-muted">
           선택한 수신자 <b className="font-semibold text-foreground">{recipients.length}명</b>
           {dueDate && (
-            <span className="ml-2 text-xs text-foreground-subtle">
+            <span className="ml-2 t-caption text-foreground-subtle">
               마감 {dueDate}
               {remainDays !== null && ` · 남은 ${remainDays}일`}
             </span>
@@ -215,7 +215,7 @@ export function MailSendPanel({
 
       <div className="space-y-4 p-4">
         {/* 발송 전 안내 — 시뮬레이션 여부는 아직 알 수 없다는 사실을 그대로 적는다. */}
-        <p className="flex items-start gap-2 rounded-element border border-border bg-muted px-3 py-2 text-xs text-foreground-muted">
+        <p className="flex items-start gap-2 rounded-element border border-border bg-muted px-3 py-2 t-caption text-foreground-muted">
           <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>
             메일 키가 설정되어 있지 않으면 실제 메일은 발송되지 않고 발송 이력만 남습니다. 키 설정 여부는 브라우저에서 확인할 수
@@ -225,7 +225,7 @@ export function MailSendPanel({
 
         {/* 종류 */}
         <div>
-          <p className="mb-1.5 text-xs font-medium text-foreground-muted" id="mail-kind-label">
+          <p className="mb-1.5 t-caption font-medium text-foreground-muted" id="mail-kind-label">
             메일 종류
           </p>
           <div className="flex flex-wrap gap-2" role="group" aria-labelledby="mail-kind-label">
@@ -236,7 +236,7 @@ export function MailSendPanel({
                 aria-pressed={kind === k}
                 onClick={() => setKind(k)}
                 className={[
-                  'inline-flex min-h-11 items-center rounded-element border px-4 text-sm transition sm:min-h-control-sm',
+                  'inline-flex min-h-11 items-center rounded-element border px-4 t-label transition sm:min-h-control-sm',
                   kind === k
                     ? 'border-primary bg-primary-subtle font-semibold text-primary'
                     : 'border-border bg-card text-foreground-muted hover:border-primary hover:text-primary',
@@ -259,7 +259,7 @@ export function MailSendPanel({
             rows={10}
             value={body}
             onChange={(e) => { setBody(e.target.value); setEdited(true); }}
-            className="w-full rounded-element border border-border bg-card px-3 py-2 font-mono text-xs leading-relaxed text-foreground focus:border-primary focus:outline-none"
+            className="w-full rounded-element border border-input bg-card px-3 py-2 font-mono t-caption leading-relaxed text-foreground focus:border-primary focus:outline-none"
           />
         </Field>
 
@@ -271,18 +271,18 @@ export function MailSendPanel({
 
         {/* 미리보기 */}
         <div>
-          <p className="mb-1.5 text-xs font-medium text-foreground-muted">
+          <p className="mb-1.5 t-caption font-medium text-foreground-muted">
             미리보기{previewFor && ` — ${previewFor.name}님에게 나가는 문구`}
           </p>
           {preview ? (
             <div className="rounded-element border border-border bg-muted p-3">
-              <p className="mb-2 text-sm font-semibold text-foreground">{preview.subject}</p>
-              <pre className="whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-foreground-muted">
+              <p className="mb-2 t-label font-semibold text-foreground">{preview.subject}</p>
+              <pre className="whitespace-pre-wrap break-words font-sans t-caption leading-relaxed text-foreground-muted">
                 {preview.body}
               </pre>
             </div>
           ) : (
-            <p className="rounded-element border border-border bg-muted px-3 py-2 text-xs text-foreground-subtle">
+            <p className="rounded-element border border-border bg-muted px-3 py-2 t-caption text-foreground-subtle">
               수신자를 선택하면 실제로 나갈 문구를 여기서 확인할 수 있습니다.
             </p>
           )}
@@ -291,19 +291,19 @@ export function MailSendPanel({
         {/* 수신자 */}
         {recipients.length > 0 && (
           <div>
-            <p className="mb-1.5 text-xs font-medium text-foreground-muted">수신자</p>
+            <p className="mb-1.5 t-caption font-medium text-foreground-muted">수신자</p>
             <ul className="flex flex-wrap gap-1.5">
               {recipients.slice(0, RECIPIENT_PREVIEW).map((r, i) => (
                 <li
                   key={`${r.id}-${r.jobName ?? ''}-${i}`}
-                  className="rounded-element border border-border bg-muted px-2 py-1 text-xs text-foreground-muted"
+                  className="rounded-element border border-border bg-muted px-2 py-1 t-caption text-foreground-muted"
                 >
                   {r.name}
                   {r.jobName && <span className="text-foreground-subtle"> · {r.jobName}</span>}
                 </li>
               ))}
               {recipients.length > RECIPIENT_PREVIEW && (
-                <li className="px-2 py-1 text-xs text-foreground-subtle">
+                <li className="px-2 py-1 t-caption text-foreground-subtle">
                   외 {recipients.length - RECIPIENT_PREVIEW}명
                 </li>
               )}
@@ -312,7 +312,7 @@ export function MailSendPanel({
         )}
 
         {tooMany && (
-          <p className="flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-3 py-2 text-xs text-warning">
+          <p className="flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-3 py-2 t-caption text-warning">
             <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
             한 번에 보낼 수 있는 수신자는 {MAX_RECIPIENTS_PER_SEND}명까지입니다. 대상을 나눠 선택해 주세요.
           </p>
@@ -323,12 +323,12 @@ export function MailSendPanel({
             <Send size={14} aria-hidden="true" /> {MAIL_KIND_LABELS[kind]} 메일 발송 ({recipients.length}명)
           </Button>
           {recipients.length === 0 && (
-            <span className="text-xs text-foreground-subtle">진행 매트릭스에서 대상을 먼저 선택해 주세요.</span>
+            <span className="t-caption text-foreground-subtle">진행 매트릭스에서 대상을 먼저 선택해 주세요.</span>
           )}
         </div>
 
         {sendError && (
-          <p className="flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2 text-sm text-destructive">
+          <p className="flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2 t-label text-destructive">
             <XCircle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
             {sendError}
           </p>
@@ -338,21 +338,21 @@ export function MailSendPanel({
         {result && (
           <div className="rounded-element border border-border">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-              <p className="text-sm font-semibold text-foreground">발송 결과</p>
-              <p className="text-xs text-foreground-muted">
+              <p className="t-label font-semibold text-foreground">발송 결과</p>
+              <p className="t-caption text-foreground-muted">
                 성공 {result.sent}건 · 실패 {result.failed}건 · 이력 {result.logged}건 기록
               </p>
             </div>
 
             {result.simulated && (
-              <p className="flex items-start gap-2 border-b border-border bg-warning-muted px-3 py-2 text-xs text-warning">
+              <p className="flex items-start gap-2 border-b border-border bg-warning-muted px-3 py-2 t-caption text-warning">
                 <FlaskConical size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                 시뮬레이션 모드입니다 — 실제 메일은 발송되지 않습니다. 발송 이력(mail_logs)에는 시뮬레이션으로 기록됐습니다.
               </p>
             )}
 
             {result.logError && (
-              <p className="flex items-start gap-2 border-b border-border bg-warning-muted px-3 py-2 text-xs text-warning">
+              <p className="flex items-start gap-2 border-b border-border bg-warning-muted px-3 py-2 t-caption text-warning">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                 {result.logError}
               </p>
@@ -360,7 +360,7 @@ export function MailSendPanel({
 
             <ul className="divide-y divide-border">
               {result.results.map((r, i) => (
-                <li key={`${r.id}-${i}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+                <li key={`${r.id}-${i}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 t-caption">
                   <span className="text-foreground">
                     {r.name || sentBatch[i]?.name || '이름 없음'}
                     {sentBatch[i]?.jobName && <span className="text-foreground-subtle"> · {sentBatch[i].jobName}</span>}
@@ -397,7 +397,7 @@ export function MailSendPanel({
         {/* 발송 이력 */}
         <div className="rounded-element border border-border">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-            <p className="text-sm font-semibold text-foreground">최근 발송 이력</p>
+            <p className="t-label font-semibold text-foreground">최근 발송 이력</p>
             <Button variant="ghost" size="sm" onClick={() => void loadLogs()} loading={logsLoading}>
               <RotateCw size={13} aria-hidden="true" /> 새로고침
             </Button>
@@ -470,7 +470,7 @@ export function MailSendPanel({
         </div>
       </div>
 
-      <Toast toast={toast} onDismiss={dismiss} className="fixed bottom-4 right-4 z-50" />
+      <Toast toast={toast} onDismiss={dismiss} />
       {dialog}
     </section>
   );

@@ -72,21 +72,25 @@ export function SmeSingleCreateModal({
         description="임시 비밀번호는 이 창을 닫으면 다시 볼 수 없어요."
         icon={<UserPlus size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
         onClose={onClose}
+        // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+        hideClose
+        // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
+        size="lg"
         footer={<Button onClick={onClose}>닫기</Button>}
       >
         <div className="space-y-3">
           {/* 이메일을 비우고 만들면 로그인 ID가 사번으로 지어진다. 그 값을 여기서 알려 주지 않으면
               관리자가 무엇으로 로그인하라고 전해야 할지 알 수 없다. */}
-          <div className="rounded-element border border-border bg-card px-3.5 py-3 text-sm">
-            <p className="text-xs font-medium text-foreground-muted">로그인 ID</p>
-            <p className="mt-0.5 break-all font-mono text-base font-semibold text-foreground">{issued.email}</p>
+          <div className="rounded-element border border-border bg-card px-3.5 py-3 t-label">
+            <p className="t-caption font-medium text-foreground-muted">로그인 ID</p>
+            <p className="mt-0.5 break-all font-mono t-body font-semibold text-foreground">{issued.email}</p>
           </div>
-          <div className="rounded-element border border-warning-border bg-warning-muted px-3.5 py-3 text-sm text-warning">
+          <div className="rounded-element border border-warning-border bg-warning-muted px-3.5 py-3 t-label text-warning">
             위 로그인 ID와 아래 임시 비밀번호를 본인에게 개별적으로 전달해 주세요. 첫 로그인에서 반드시 바꾸게
             됩니다.
           </div>
           <div className="flex items-center justify-between gap-3 rounded-element border border-border bg-card px-3.5 py-3">
-            <span className="font-mono text-base font-semibold text-foreground">{issued.tempPassword}</span>
+            <span className="font-mono t-body font-semibold text-foreground">{issued.tempPassword}</span>
             <Button
               size="sm"
               variant="secondary"
@@ -112,6 +116,10 @@ export function SmeSingleCreateModal({
       description="SME 계정을 1명씩 직접 등록합니다."
       icon={<UserPlus size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
       onClose={onClose}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
+      // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
+      size="lg"
       dirty={dirty && !submitting}
       closeDisabled={submitting}
       footer={
@@ -159,7 +167,7 @@ export function SmeSingleCreateModal({
           autoComplete="off"
         />
 
-        <p className="rounded-element border border-border bg-muted px-3 py-2.5 text-xs leading-5 text-foreground-muted">
+        <p className="rounded-element border border-border bg-muted px-3 py-2.5 t-caption leading-5 text-foreground-muted">
           비밀번호는 서버가 임시로 만들어 등록 직후 이 창에 한 번 보여 드려요. SME는 첫 로그인에서 반드시 새
           비밀번호로 바꿉니다.
         </p>
@@ -167,7 +175,7 @@ export function SmeSingleCreateModal({
         {localError && (
           <div
             role="alert"
-            className="flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 text-sm text-destructive"
+            className="flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 t-label text-destructive"
           >
             <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>{localError}</span>

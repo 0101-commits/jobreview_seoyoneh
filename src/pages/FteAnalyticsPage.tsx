@@ -245,17 +245,17 @@ export function FteAnalyticsPage({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             {loading ? '불러오는 중…' : error ? '조회 실패' : `직무 ${jobs.length}개 · ${FTE_BASIS_LABELS[basis]}`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">FTE 분포</h2>
+          <h2 className="t-title text-foreground">FTE 분포</h2>
         </div>
         <div className="flex items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
         </div>
       </div>
 
-      <div className="mb-5 border border-border bg-muted p-4 text-sm text-foreground-muted">
+      <div className="mb-5 border border-border bg-muted p-4 t-label text-foreground-muted">
         <p className="flex items-start gap-2">
           <Info size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>
@@ -266,7 +266,7 @@ export function FteAnalyticsPage({
       </div>
 
       {error && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>투입 비중 분포를 불러오지 못했어요. {error} 잠시 후 다시 시도해 주세요.</span>
@@ -280,7 +280,7 @@ export function FteAnalyticsPage({
       {/* 조건 — 집계 기준과 직무 선택. 직무 선택은 네이티브 select를 쓴다(모바일에서 그대로 동작). */}
       <div className="mb-5 flex flex-col gap-4 rounded-container border border-border bg-card p-4 shadow-1 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="mb-2 text-xs font-medium text-foreground-muted">집계 기준</p>
+          <p className="mb-2 t-caption font-medium text-foreground-muted">집계 기준</p>
           <FilterChips
             label="집계 기준 선택"
             value={basis}
@@ -289,7 +289,7 @@ export function FteAnalyticsPage({
           />
         </div>
         <div className="lg:w-96">
-          <label htmlFor="fte-job" className="mb-2 block text-xs font-medium text-foreground-muted">
+          <label htmlFor="fte-job" className="mb-2 block t-caption font-medium text-foreground-muted">
             직무
           </label>
           <select
@@ -297,7 +297,7 @@ export function FteAnalyticsPage({
             value={selectedJob}
             disabled={!ready || jobs.length === 0}
             onChange={(e) => setSelectedJob(e.target.value)}
-            className="min-h-11 w-full rounded-element border border-border bg-card px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 sm:min-h-control-md"
+            className="min-h-11 w-full rounded-element border border-input bg-card px-3 t-label text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 sm:min-h-control-md"
           >
             {jobs.length === 0 ? (
               <option value="">선택할 직무가 없습니다</option>
@@ -315,10 +315,10 @@ export function FteAnalyticsPage({
       {/* ① 직무별 과업 비중 평균 + 상위 과업 순위 — 한 표에서 순위·막대·편차를 함께 읽는다. */}
       <section className="mb-5 rounded-container border border-border bg-card shadow-1" aria-labelledby="fte-rank-title">
         <div className="border-b border-border p-4">
-          <h3 id="fte-rank-title" className="text-base font-semibold text-foreground">
+          <h3 id="fte-rank-title" className="t-body font-semibold text-foreground">
             과업별 SME 평균 비중 · 상위 과업 순위
           </h3>
-          <p className="mt-1 text-xs text-foreground-subtle">
+          <p className="mt-1 t-caption text-foreground-subtle">
             {selected ? `${selected.job} · ${selected.group} / ${selected.series}` : '직무를 선택하세요'} ·{' '}
             {FTE_BASIS_LABELS[basis]}
           </p>
@@ -427,31 +427,38 @@ export function FteAnalyticsPage({
       {/* ② 조직별 피벗 표 — R8(조직 단위 분석)의 축. 행=과업, 열=조직. */}
       <section className="mb-5 rounded-container border border-border bg-card shadow-1" aria-labelledby="fte-pivot-title">
         <div className="border-b border-border p-4">
-          <h3 id="fte-pivot-title" className="text-base font-semibold text-foreground">
+          <h3 id="fte-pivot-title" className="t-body font-semibold text-foreground">
             조직별 피벗
           </h3>
-          <p className="mt-1 text-xs text-foreground-subtle">
+          <p className="mt-1 t-caption text-foreground-subtle">
             {E2.sheets[0].name} · 같은 과업을 어느 조직이 얼마나 맡고 있는지. 칸의 아래 숫자는 그 평균의 분모(응답
             수)입니다.
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-max text-left text-sm">
+          <table className="w-full min-w-max text-left t-label">
             <caption className="sr-only">
               선택한 직무의 과업별 · 조직별 SME 평균 투입 비중. 행은 과업, 열은 조직입니다.
             </caption>
+            {/*
+              표 머리를 화면 상단에 고정한다(v3 T3 · montage "표 헤더 항상 표시").
+              조직·직무가 수십 개면 아래로 스크롤한 순간 각 칸이 무슨 뜻인지 알 수 없었다.
+              top-20은 앱 헤더 높이(h-20 = 80px)다. 겹침은 전역 층을 쓰지 않고 표 안에서만
+              정한다 — 모서리 칸이 z-[2], 나머지 머리 칸이 z-[1], 본문 첫 열이 z-[1]이다.
+              sticky 칸은 자기 배경을 가져야 뒤 내용이 비쳐 보이지 않는다.
+            */}
             <thead>
-              <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
+              <tr className="border-b border-border bg-muted t-caption text-foreground-muted">
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 w-56 min-w-[12rem] border-r border-border bg-muted px-4 py-3 font-medium"
+                  className="sticky left-0 top-20 z-[2] w-56 min-w-[12rem] border-r border-border bg-muted px-4 py-3 font-medium"
                 >
                   {COL.task}
                 </th>
                 {pivot.orgs.map((org) => (
-                  <th key={org.key} scope="col" className="w-36 min-w-[9rem] px-3 py-3 font-medium align-top">
+                  <th key={org.key} scope="col" className="sticky top-20 z-[1] w-36 min-w-[9rem] bg-muted px-3 py-3 font-medium align-top">
                     <span className="block text-foreground">{org.name || '조직 미지정'}</span>
-                    <span className="mt-0.5 block text-[11px] font-normal text-foreground-subtle">
+                    <span className="mt-0.5 block t-caption-2 font-normal text-foreground-subtle">
                       {org.code || '조직코드 없음'}
                     </span>
                   </th>
@@ -482,11 +489,11 @@ export function FteAnalyticsPage({
                   <tr key={task.key} className="border-b border-border last:border-0">
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 w-56 min-w-[12rem] border-r border-border bg-card px-4 py-3 text-left font-normal align-top text-foreground"
+                      className="sticky left-0 z-[1] w-56 min-w-[12rem] border-r border-border bg-card px-4 py-3 text-left font-normal align-top text-foreground"
                     >
                       {task.task}
                       {task.kind && task.kind !== '기존' && (
-                        <span className="mt-1 block text-[11px] text-foreground-subtle">{task.kind}</span>
+                        <span className="mt-1 block t-caption-2 text-foreground-subtle">{task.kind}</span>
                       )}
                     </th>
                     {pivot.orgs.map((org) => {
@@ -499,7 +506,7 @@ export function FteAnalyticsPage({
                           ) : (
                             <>
                               <span className="block text-foreground">{pctText(cell.avg)}</span>
-                              <span className="block text-[11px] text-foreground-subtle">
+                              <span className="block t-caption-2 text-foreground-subtle">
                                 {cell.n === 1 ? '응답 1건' : cell.n === null ? '' : `응답 ${cell.n}건`}
                               </span>
                             </>
@@ -519,7 +526,7 @@ export function FteAnalyticsPage({
         범위 종료선 — §6-3 ⓒ의 고정 문언(16면). 화면 하단에 그대로 붙인다.
         착수보고 문언 = 제품 문구(§4-1 P1)이므로 요약·의역하지 않는다. 원문은 exportSchema.ts의 FTE_SCOPE_NOTICE.
       */}
-      <p className="mt-6 border-t border-border pt-4 text-sm leading-relaxed text-foreground-muted">
+      <p className="mt-6 border-t border-border pt-4 t-label leading-relaxed text-foreground-muted">
         {FTE_SCOPE_NOTICE}
       </p>
     </>

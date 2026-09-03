@@ -45,7 +45,7 @@ function Alert({ tone, children }: { tone: 'error' | 'warning' | 'success'; chil
   }[tone];
   const Icon = tone === 'success' ? ShieldCheck : AlertTriangle;
   return (
-    <div role="alert" className={`flex items-start gap-2 rounded-element border px-3.5 py-2.5 text-sm ${styles}`}>
+    <div role="alert" className={`flex items-start gap-2 rounded-element border px-3.5 py-2.5 t-label ${styles}`}>
       <Icon size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
       <span>{children}</span>
     </div>
@@ -123,8 +123,8 @@ export function AdminUsersPage({ currentUser }: Props) {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">관리자 계정 관리</h2>
-          <p className="mt-1 text-sm text-foreground-muted">시스템 관리자 계정을 등록하고 관리합니다.</p>
+          <h2 className="t-heading text-foreground">관리자 계정 관리</h2>
+          <p className="mt-1 t-label text-foreground-muted">시스템 관리자 계정을 등록하고 관리합니다.</p>
         </div>
         <Button onClick={() => setShowRegister(true)}>
           <Plus size={16} aria-hidden="true" /> 관리자 계정 등록
@@ -280,6 +280,10 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
       title="관리자 계정 등록"
       icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
       onClose={onClose}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
+      // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
+      size="lg"
       dirty={Boolean(name || email || password) && !submitting}
       closeDisabled={submitting}
       footer={
@@ -450,6 +454,10 @@ function ManageModal({
       title="관리자 계정 관리"
       icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
       onClose={() => onClose()}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
+      // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
+      size="lg"
       dirty={nameChanged && !busy}
       closeDisabled={busy}
       footer={
@@ -478,10 +486,10 @@ function ManageModal({
         />
 
         <div>
-          <span className="mb-1.5 block text-sm font-medium text-foreground">상태</span>
+          <span className="mb-1.5 block t-label font-medium text-foreground">상태</span>
           <div className="flex flex-wrap items-center gap-3">
             <span
-              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              className={`rounded-full px-2.5 py-1 t-caption font-medium ${
                 admin.active ? 'bg-success-muted text-success' : 'bg-muted text-foreground-muted'
               }`}
             >
@@ -500,8 +508,8 @@ function ManageModal({
         </div>
 
         <div className="border-t border-border pt-4">
-          <span className="mb-1.5 block text-sm font-medium text-foreground">비밀번호</span>
-          <p className="mb-2 text-xs leading-5 text-foreground-muted">
+          <span className="mb-1.5 block t-label font-medium text-foreground">비밀번호</span>
+          <p className="mb-2 t-caption leading-5 text-foreground-muted">
             비밀번호는 본인만 지정할 수 있어요. 재설정 메일을 보내면 해당 관리자가 링크에서 새 비밀번호를 정합니다.
           </p>
           <Button variant="secondary" size="sm" onClick={handleResetPassword} loading={resetting} disabled={busy}>
@@ -516,7 +524,7 @@ function ManageModal({
             </Button>
           ) : (
             <div className="rounded-element border border-destructive-border bg-destructive-muted p-4">
-              <div className="flex items-start gap-2 text-sm text-destructive">
+              <div className="flex items-start gap-2 t-label text-destructive">
                 <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <p>관리자 계정을 삭제할까요? 삭제하면 해당 계정으로 더 이상 로그인할 수 없어요.</p>
               </div>

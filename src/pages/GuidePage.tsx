@@ -192,11 +192,11 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
             {cards.map((c, i) => (
               <span
                 key={c.title}
-                className={`h-1.5 rounded-full transition-all ${i === index ? 'w-7 bg-primary' : 'w-1.5 bg-border'}`}
+                className={`h-1.5 rounded-full transition-all ${i === index ? 'w-8 bg-primary' : 'w-1.5 bg-border'}`}
               />
             ))}
           </div>
-          <p aria-live="polite" className="text-xs font-medium text-foreground-muted">
+          <p aria-live="polite" className="t-caption font-medium text-foreground-muted">
             {index + 1} / {cards.length}
           </p>
         </div>
@@ -213,14 +213,14 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
               id={titleId}
               ref={titleRef}
               tabIndex={-1}
-              className="mt-1.5 text-lg font-semibold tracking-tight text-foreground outline-none sm:text-xl"
+              className="mt-1.5 t-heading text-foreground outline-none"
             >
               {card.title}
             </h1>
           </div>
 
           {card.body && (
-            <p className="mt-4 text-sm leading-relaxed text-foreground-muted">
+            <p className="mt-4 t-label leading-relaxed text-foreground-muted">
               {withEmphasis(card.body, card.emphasis)}
             </p>
           )}
@@ -230,7 +230,7 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
               {card.steps.map((step) => (
                 <li
                   key={step}
-                  className="rounded-element border border-border bg-background px-3.5 py-2.5 text-sm text-foreground"
+                  className="rounded-element border border-border bg-background px-3.5 py-2.5 t-label text-foreground"
                 >
                   {step}
                 </li>
@@ -255,9 +255,9 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
         {isLast && guideMd.trim() && (
           <section
             aria-label="추가 안내"
-            className="mt-4 rounded-container border border-border bg-muted p-5 text-sm leading-relaxed text-foreground-muted"
+            className="mt-4 rounded-container border border-border bg-muted p-5 t-label leading-relaxed text-foreground-muted"
           >
-            <h2 className="mb-2 text-sm font-semibold text-foreground">추가 안내</h2>
+            <h2 className="mb-2 t-label font-semibold text-foreground">추가 안내</h2>
             <p className="whitespace-pre-line">{guideMd}</p>
           </section>
         )}
@@ -284,7 +284,7 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
         {saveError && (
           <div
             role="alert"
-            className="mt-4 rounded-element border border-destructive-border bg-destructive-muted px-4 py-3 text-sm"
+            className="mt-4 rounded-element border border-destructive-border bg-destructive-muted px-4 py-3 t-label"
           >
             <p className="flex items-start gap-2 text-destructive">
               <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />

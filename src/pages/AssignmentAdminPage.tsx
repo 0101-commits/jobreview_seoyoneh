@@ -41,6 +41,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
 
 // ── 표시용 상수 ─────────────────────────────────────────────────────
 
@@ -107,6 +108,13 @@ export function AssignmentAdminPage({
   const [busy, setBusy] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ job: JobAssignmentRow; sme: AssignedSme } | null>(null);
   const { toast, showToast, dismiss } = useToast();
+  /*
+   * 오류와 되돌릴 수 있는 조작은 Snackbar로 낸다(v3 T3).
+   * 예전에는 서버 오류를 duration: 0인 Toast로 띄웠는데, Toast에는 닫기 버튼이 없어
+   * 화면에 박혀 있었다. 배정 해제는 실행 취소를 줄 수 있는 조작이다 —
+   * addAssignment가 (sme_id, job_id)로 upsert하므로 같은 행을 active로 되올린다.
+   */
+  const { snackbar, showSnackbar, dismiss: dismissSnackbar } = useSnackbar();
 
   const companyId = companyFilter === 'all' ? null : companyFilter;
 
@@ -217,7 +225,7 @@ export function AssignmentAdminPage({
     const result = await addAssignment(pickedSmeId, openJob.jobId);
     setBusy(false);
     if (!result.ok) {
-      showToast({ type: 'error', msg: result.error, duration: 0 });
+      showSnackbar({ type: 'error', msg: result.error, duration: 0 });
       return;
     }
     showToast({
@@ -235,12 +243,25 @@ export function AssignmentAdminPage({
     setBusy(false);
     setConfirmTarget(null);
     if (!result.ok) {
-      showToast({ type: 'error', msg: result.error, duration: 0 });
+      showSnackbar({ type: 'error', msg: result.error, duration: 0 });
       return;
     }
-    showToast({
+    showSnackbar({
       type: 'success',
       msg: `${sme.name} 님의 「${job.jobName}」 배정을 해제했습니다. 응답 데이터는 지워지지 않았습니다.`,
+      duration: 'long',
+      action: {
+        label: '실행 취소',
+        onClick: async () => {
+          const undo = await addAssignment(sme.smeId, job.jobId);
+          if (!undo.ok) {
+            showSnackbar({ type: 'error', msg: undo.error, duration: 0 });
+            return;
+          }
+          showToast({ type: 'success', msg: `${sme.name} 님의 배정을 되돌렸습니다.` });
+          reload();
+        },
+      },
     });
     reload();
   };
@@ -258,14 +279,14 @@ export function AssignmentAdminPage({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             {loading
               ? '불러오는 중…'
               : error
                 ? '조회 실패'
                 : `직무 ${counts.total}개 · 적정 ${counts.fit} · 미배정 ${counts.none} · 과다 ${counts.over}`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">SME 배정 관리</h2>
+          <h2 className="t-title text-foreground">SME 배정 관리</h2>
         </div>
         <div className="flex items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
@@ -273,7 +294,7 @@ export function AssignmentAdminPage({
       </div>
 
       {/* R6 근거 — 착수보고 원문. 이 화면의 판정 기준이 어디서 왔는지 항상 보이게 고정한다. */}
-      <p className="mb-3 flex items-start gap-2 border border-border bg-muted p-3 text-xs leading-5 text-foreground-muted">
+      <p className="mb-3 flex items-start gap-2 border border-border bg-muted p-3 t-caption leading-5 text-foreground-muted">
         <BookOpen size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
         <span>
           <b className="font-semibold text-foreground">R6 · 착수보고 7·12면</b> — &ldquo;업무 조사는 직무별 최소
@@ -281,7 +302,7 @@ export function AssignmentAdminPage({
         </span>
       </p>
 
-      <div className="mb-5 border border-warning-border bg-warning-muted p-4 text-sm leading-6 text-warning">
+      <div className="mb-5 border border-warning-border bg-warning-muted p-4 t-label-reading text-warning">
         <p className="flex items-start gap-2">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>
@@ -296,13 +317,13 @@ export function AssignmentAdminPage({
       </div>
 
       {companyError && (
-        <p role="alert" className="mb-5 border border-border bg-muted p-3 text-xs leading-5 text-foreground-muted">
+        <p role="alert" className="mb-5 border border-border bg-muted p-3 t-caption leading-5 text-foreground-muted">
           {companyError} 계열사 필터가 비어 있어도 아래 목록은 현재 범위로 조회됩니다.
         </p>
       )}
 
       {error && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>배정 현황을 불러오지 못했어요. {error} 잠시 후 다시 시도해 주세요.</span>
@@ -314,6 +335,7 @@ export function AssignmentAdminPage({
       )}
 
       <Toast toast={toast} onDismiss={dismiss} />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
 
       <div className="rounded-container border border-border bg-card shadow-1">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -326,7 +348,7 @@ export function AssignmentAdminPage({
               { value: 'violation', label: 'R6 위반만 (0명 · 3명 이상)', count: counts.none + counts.over },
             ]}
           />
-          <p className="text-xs text-foreground-subtle">직무를 누르면 SME를 추가하거나 해제할 수 있습니다.</p>
+          <p className="t-caption text-foreground-subtle">직무를 누르면 SME를 추가하거나 해제할 수 있습니다.</p>
         </div>
 
         {loading ? (
@@ -334,15 +356,15 @@ export function AssignmentAdminPage({
             <Skeleton.Table rows={5} cols={4} />
           </div>
         ) : error ? (
-          <p className="px-4 py-12 text-center text-sm text-destructive">
+          <p className="px-4 py-12 text-center t-label text-destructive">
             배정 현황을 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요.
           </p>
         ) : counts.total === 0 ? (
-          <p className="px-4 py-12 text-center text-sm text-foreground-subtle">
+          <p className="px-4 py-12 text-center t-label text-foreground-subtle">
             등록된 활성 직무가 없습니다. 「직무정보 업로드」에서 직무를 먼저 등록해 주세요.
           </p>
         ) : visibleJobs.length === 0 ? (
-          <p className="px-4 py-12 text-center text-sm text-foreground-subtle">
+          <p className="px-4 py-12 text-center t-label text-foreground-subtle">
             R6(직무별 1~2명)에 어긋나는 직무가 없습니다. 필터를 「전체」로 바꾸면 모든 직무를 볼 수 있습니다.
           </p>
         ) : (
@@ -366,12 +388,12 @@ export function AssignmentAdminPage({
                       ) : (
                         <ChevronRight size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
                       )}
-                      <span className="text-sm font-medium text-foreground">{job.jobName}</span>
-                      <span className="text-xs text-foreground-subtle">
+                      <span className="t-label font-medium text-foreground">{job.jobName}</span>
+                      <span className="t-caption text-foreground-subtle">
                         {[job.groupName, job.seriesName, job.companyName].filter(Boolean).join(' · ')}
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-element border px-2 py-0.5 text-[11px] font-medium ${badge.chip}`}
+                        className={`inline-flex items-center gap-1 rounded-element border px-2 py-0.5 t-caption-2 font-medium ${badge.chip}`}
                       >
                         <badge.Icon size={11} className="shrink-0" aria-hidden="true" />
                         {badge.label} · SME {job.smes.length}명
@@ -379,14 +401,14 @@ export function AssignmentAdminPage({
                     </span>
                     <span className="flex flex-wrap gap-1.5 pl-6">
                       {job.smes.length === 0 ? (
-                        <span className="text-xs text-foreground-muted">배정된 SME가 없습니다</span>
+                        <span className="t-caption text-foreground-muted">배정된 SME가 없습니다</span>
                       ) : (
                         job.smes.map((sme) => {
                           const statusStyle = STATUS_STYLE[sme.status];
                           return (
                             <span
                               key={sme.assignmentId}
-                              className={`inline-flex items-center gap-1 rounded-element border px-2 py-0.5 text-[11px] ${statusStyle.chip}`}
+                              className={`inline-flex items-center gap-1 rounded-element border px-2 py-0.5 t-caption-2 ${statusStyle.chip}`}
                             >
                               <statusStyle.Icon size={11} className="shrink-0" aria-hidden="true" />
                               {sme.name} · {CELL_STATUS_LABELS[sme.status]}
@@ -399,11 +421,11 @@ export function AssignmentAdminPage({
 
                   {open && (
                     <div id={panelId} className="border-t border-border bg-muted p-4">
-                      <h3 className="text-xs font-semibold text-foreground-muted">
+                      <h3 className="t-caption font-semibold text-foreground-muted">
                         배정된 SME {job.smes.length}명
                       </h3>
                       {job.smes.length === 0 ? (
-                        <p className="mt-2 text-sm text-foreground-muted">
+                        <p className="mt-2 t-label text-foreground-muted">
                           아직 배정된 SME가 없습니다. 아래에서 담당 SME를 1~2명 배정해 주세요.
                         </p>
                       ) : (
@@ -417,13 +439,13 @@ export function AssignmentAdminPage({
                                 className="flex flex-col gap-3 rounded-container border border-border bg-card p-3 sm:flex-row sm:items-start sm:justify-between"
                               >
                                 <div className="min-w-0">
-                                  <p className="text-sm text-foreground">
+                                  <p className="t-label text-foreground">
                                     <b className="font-medium">{sme.name}</b>
                                     {personLine(sme) && (
                                       <span className="text-foreground-subtle"> · {personLine(sme)}</span>
                                     )}
                                   </p>
-                                  <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-foreground-muted">
+                                  <p className="mt-1 flex flex-wrap items-center gap-1 t-caption text-foreground-muted">
                                     <statusStyle.Icon size={12} className="shrink-0" aria-hidden="true" />
                                     <span>{CELL_STATUS_LABELS[sme.status]}</span>
                                     {sme.submittedAt && <span>· 제출 {shortDate(sme.submittedAt)}</span>}
@@ -434,7 +456,7 @@ export function AssignmentAdminPage({
                                   {sme.guard.blocked && (
                                     <p
                                       id={reasonId}
-                                      className="mt-2 flex items-start gap-1.5 border border-warning-border bg-warning-muted p-2 text-xs leading-5 text-warning"
+                                      className="mt-2 flex items-start gap-1.5 border border-warning-border bg-warning-muted p-2 t-caption leading-5 text-warning"
                                     >
                                       <Lock size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
                                       <span>{sme.guard.blocked}</span>
@@ -458,9 +480,9 @@ export function AssignmentAdminPage({
                       )}
 
                       <div className="mt-4 border-t border-border pt-4">
-                        <h3 className="text-xs font-semibold text-foreground-muted">SME 추가</h3>
+                        <h3 className="t-caption font-semibold text-foreground-muted">SME 추가</h3>
                         {job.smes.length >= 2 && (
-                          <p className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-warning">
+                          <p className="mt-2 flex items-start gap-1.5 t-caption leading-5 text-warning">
                             <AlertTriangle size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
                             <span>이미 {job.smes.length}명이 배정되어 있습니다. 더 추가하면 R6(1~2명)을 넘습니다.</span>
                           </p>
@@ -499,7 +521,7 @@ export function AssignmentAdminPage({
                           </Button>
                         </div>
                         {candidates.length === 0 && (
-                          <p className="mt-2 text-xs leading-5 text-foreground-muted">
+                          <p className="mt-2 t-caption leading-5 text-foreground-muted">
                             {smeQuery.trim()
                               ? '검색어에 맞는 SME가 없습니다. 검색어를 지우고 다시 골라 주세요.'
                               : '추가할 수 있는 SME가 없습니다. 이 회사의 활성 SME가 모두 이 직무에 배정되어 있거나, 「SME 계정 관리」에 등록된 계정이 없습니다.'}
@@ -520,6 +542,8 @@ export function AssignmentAdminPage({
           title="배정을 해제할까요?"
           size="sm"
           onClose={() => setConfirmTarget(null)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           closeDisabled={busy}
           icon={<AlertTriangle size={20} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />}
           description={`${confirmTarget.sme.name} 님 · ${confirmTarget.job.jobName}`}
@@ -538,8 +562,8 @@ export function AssignmentAdminPage({
             </>
           }
         >
-          <p className="text-sm leading-6 text-foreground-muted">{confirmTarget.sme.guard.warning}</p>
-          <p className="mt-3 text-sm leading-6 text-foreground-muted">
+          <p className="t-label-reading text-foreground-muted">{confirmTarget.sme.guard.warning}</p>
+          <p className="mt-3 t-label-reading text-foreground-muted">
             해제는 삭제가 아닙니다. 배정만 내려 두므로 이미 저장된 응답은 데이터베이스에 남고, 다시 배정하면 이어서
             작성할 수 있습니다.
           </p>

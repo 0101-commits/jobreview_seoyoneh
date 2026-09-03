@@ -217,8 +217,8 @@ export function UploadPage({
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">직무정보 통합 업로드</h2>
-        <p className="mt-2 text-sm text-foreground-muted">
+        <h2 className="t-title text-foreground">직무정보 통합 업로드</h2>
+        <p className="mt-2 t-label text-foreground-muted">
           하나의 Excel 파일로 직무·과업 정보와 Skill·수행요건을 한 번에 등록합니다.
         </p>
       </div>
@@ -232,7 +232,7 @@ export function UploadPage({
       {saveError && (
         <div
           role="alert"
-          className="mb-5 flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive"
+          className="mb-5 flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted p-4 t-label text-destructive"
         >
           <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           <p className="min-w-0 flex-1 whitespace-pre-line">{saveError}</p>
@@ -243,7 +243,7 @@ export function UploadPage({
       )}
 
       {state === 'done' && saveResult && (
-        <div className="mb-5 rounded-element border border-success-border bg-success-muted p-4 text-sm text-success">
+        <div className="mb-5 rounded-element border border-success-border bg-success-muted p-4 t-label text-success">
           <p className="flex items-center gap-2 font-semibold">
             <Check size={16} aria-hidden="true" /> 직무정보 업로드가 완료되었습니다.
           </p>
@@ -258,8 +258,8 @@ export function UploadPage({
               ...(rosterResult ? [['배정직무 추가', rosterResult.assignmentCreatedCount]] : []),
             ].map(([label, value]) => (
               <div key={label as string}>
-                <dt className="text-xs opacity-80">{label}</dt>
-                <dd className="mt-0.5 text-base font-semibold">{Number(value).toLocaleString()}건</dd>
+                <dt className="t-caption opacity-80">{label}</dt>
+                <dd className="mt-0.5 t-body font-semibold">{Number(value).toLocaleString()}건</dd>
               </div>
             ))}
           </dl>
@@ -273,10 +273,10 @@ export function UploadPage({
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h3 className="font-semibold text-foreground">통합 Excel 파일 업로드</h3>
-                <p className="mt-1 text-xs text-foreground-subtle">
+                <p className="mt-1 t-caption text-foreground-subtle">
                   Sheet 1 {JOB_SHEET_NAME} · Sheet 2 {SKILL_SHEET_NAME}
                 </p>
-                <p className="mt-1 text-xs text-foreground-subtle">
+                <p className="mt-1 t-caption text-foreground-subtle">
                   Sheet 3 {ORG_SHEET_NAME} · Sheet 4 {SME_SHEET_NAME} (선택 — 없어도 업로드됩니다)
                 </p>
               </div>
@@ -298,7 +298,7 @@ export function UploadPage({
 
             <div className="mt-4 flex flex-wrap items-center gap-3 rounded-element bg-primary-subtle px-4 py-3">
               <FileSpreadsheet size={16} className="shrink-0 text-primary" aria-hidden="true" />
-              <p className="min-w-0 flex-1 text-xs leading-5 text-foreground-muted">
+              <p className="min-w-0 flex-1 t-caption leading-5 text-foreground-muted">
                 처음이라면 양식부터 받아 그대로 채워 주세요. 헤더 이름과 순서가 다르면 검증에서 막힙니다.
               </p>
               <Button size="sm" onClick={downloadIntegratedTemplate}>
@@ -309,7 +309,7 @@ export function UploadPage({
             {state === 'validating' && (
               <div
                 role="status"
-                className="mt-5 flex items-center gap-2 rounded-element bg-muted px-4 py-3 text-sm text-foreground-muted"
+                className="mt-5 flex items-center gap-2 rounded-element bg-muted px-4 py-3 t-label text-foreground-muted"
               >
                 <Loader2 size={16} className="animate-spin" aria-hidden="true" /> 두 Sheet의 데이터 검증 및 매칭 중…
               </div>
@@ -317,7 +317,7 @@ export function UploadPage({
           </div>
 
           {parseError && (
-            <div className="rounded-container border border-destructive-border bg-destructive-muted p-6 text-sm text-destructive">
+            <div className="rounded-container border border-destructive-border bg-destructive-muted p-6 t-label text-destructive">
               <p className="flex items-start gap-2 font-medium">
                 <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 {parseError}
@@ -353,12 +353,12 @@ export function UploadPage({
               className="w-full"
             />
             {companyId ? (
-              <p className="mt-2 text-xs text-foreground-muted">
+              <p className="mt-2 t-caption text-foreground-muted">
                 이 파일의 직무·과업·Skill이 <span className="font-medium text-foreground">{companyName}</span> 에
                 저장됩니다.
               </p>
             ) : (
-              <p className="mt-2 text-xs text-warning">업로드할 회사를 선택해 주세요. 「전체 회사」로는 저장할 수 없어요.</p>
+              <p className="mt-2 t-caption text-warning">업로드할 회사를 선택해 주세요. 「전체 회사」로는 저장할 수 없어요.</p>
             )}
           </div>
 
@@ -380,7 +380,7 @@ export function UploadPage({
             />
           </div>
 
-          <div className="mt-4 flex gap-2 rounded-element bg-muted px-3 py-3 text-xs leading-5 text-foreground-muted">
+          <div className="mt-4 flex gap-2 rounded-element bg-muted px-3 py-3 t-caption leading-5 text-foreground-muted">
             <Info size={15} className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
             <span>
               두 Sheet가 하나의 작업으로 검증되고 저장됩니다. {ORG_SHEET_NAME} Sheet가 있으면 이어서 반영하고,{' '}
@@ -410,9 +410,9 @@ export function UploadPage({
             />
           )}
 
-          {!file && <p className="mt-3 text-center text-xs text-foreground-subtle">먼저 Excel 파일을 선택해 주세요.</p>}
+          {!file && <p className="mt-3 text-center t-caption text-foreground-subtle">먼저 Excel 파일을 선택해 주세요.</p>}
           {file && validation && !validation.valid && state !== 'saving' && (
-            <p className="mt-3 text-center text-xs text-destructive">오류를 수정한 후 파일을 다시 선택해 주세요.</p>
+            <p className="mt-3 text-center t-caption text-destructive">오류를 수정한 후 파일을 다시 선택해 주세요.</p>
           )}
         </aside>
       </div>

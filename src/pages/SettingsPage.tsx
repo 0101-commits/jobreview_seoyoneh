@@ -269,10 +269,10 @@ function SettingsForm({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             마감일 · 예상 소요 · 가이드 문구 · 문의 담당
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">운영 설정</h2>
+          <h2 className="t-title text-foreground">운영 설정</h2>
         </div>
         <div className="flex flex-col items-start gap-1 md:items-end">
           <CompanyFilterDropdown
@@ -280,7 +280,7 @@ function SettingsForm({
             value={companyId || 'all'}
             onChange={(v) => onPickCompany(v === 'all' ? '' : v)}
           />
-          {companyError && <p className="text-xs text-warning">{companyError}</p>}
+          {companyError && <p className="t-caption text-warning">{companyError}</p>}
         </div>
       </div>
 
@@ -289,12 +289,12 @@ function SettingsForm({
 
       {/* 대상 회사 고정 표기 — 설정은 회사당 한 벌이라 "어느 회사를 고치는 중인가"가 가장 중요한 정보다. */}
       <div className="mb-5 rounded-container border border-primary/40 bg-primary-subtle p-5">
-        <p className="text-xs font-medium text-primary">지금 편집 중인 회사</p>
-        <p className="mt-1 flex items-center gap-2 text-xl font-semibold text-foreground">
+        <p className="t-caption font-medium text-primary">지금 편집 중인 회사</p>
+        <p className="mt-1 flex items-center gap-2 t-heading text-foreground">
           <Building2 size={20} className="shrink-0 text-primary" aria-hidden="true" />
           {companyId ? companyName || '이름을 불러오지 못한 회사' : '회사를 선택해 주세요'}
         </p>
-        <p className="mt-2 text-xs leading-5 text-foreground-muted">
+        <p className="mt-2 t-caption leading-5 text-foreground-muted">
           아래 값은 이 회사에만 적용됩니다. 다른 계열사는 위 드롭다운에서 회사를 바꿔 따로 저장해 주세요.
           {saved ? ` · 마지막 저장 ${formatAt(saved.updated_at)}` : ''}
         </p>
@@ -307,8 +307,8 @@ function SettingsForm({
       {!companyId ? (
         <div className="rounded-container border border-border bg-card p-10 text-center">
           <Building2 size={22} className="mx-auto mb-2 text-foreground-subtle" aria-hidden="true" />
-          <p className="text-sm font-medium text-foreground">회사를 먼저 선택해 주세요</p>
-          <p className="mt-1 text-xs leading-5 text-foreground-muted">
+          <p className="t-label font-medium text-foreground">회사를 먼저 선택해 주세요</p>
+          <p className="mt-1 t-caption leading-5 text-foreground-muted">
             운영 설정은 회사마다 한 벌입니다. &lsquo;전체 회사&rsquo; 상태로는 편집할 수 없습니다.
           </p>
         </div>
@@ -328,7 +328,7 @@ function SettingsForm({
       ) : (
         <div className="space-y-4">
           {!saved && (
-            <p className="rounded-element border border-border bg-muted px-4 py-3 text-xs leading-5 text-foreground-muted">
+            <p className="rounded-element border border-border bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
               이 회사는 아직 저장된 설정이 없습니다. 아래 값을 저장하면 새로 만들어집니다. 그때까지 마감일·예상
               소요는 미설정으로, 투입 비중 합계 검사는 꺼진 상태로 동작합니다.
             </p>
@@ -336,7 +336,7 @@ function SettingsForm({
 
           {/* ── 마감일 ── */}
           <section className="rounded-container border border-border bg-card p-5 shadow-1">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <h3 className="mb-3 flex items-center gap-2 t-label font-semibold text-foreground">
               <CalendarClock size={16} className="text-primary" aria-hidden="true" /> 마감일
             </h3>
             <Field
@@ -347,12 +347,12 @@ function SettingsForm({
               onChange={(v) => patch({ due_date: v || null })}
               inputClassName="max-w-xs"
             />
-            <p className="mt-2 text-xs leading-5 text-foreground-muted">{dDayPreview(form.due_date)}</p>
+            <p className="mt-2 t-caption leading-5 text-foreground-muted">{dDayPreview(form.due_date)}</p>
           </section>
 
           {/* ── 예상 소요 ── */}
           <section className="rounded-container border border-border bg-card p-5 shadow-1">
-            <h3 className="mb-3 text-sm font-semibold text-foreground">예상 소요</h3>
+            <h3 className="mb-3 t-label font-semibold text-foreground">예상 소요</h3>
             <Field
               label="직무당 예상 소요(분)"
               description={`시작 가이드의 "예상 소요는 직무당 약 N분" 문장에 그대로 들어갑니다. 비워 두면 그 문장이 통째로 빠집니다 — 앱이 숫자를 지어내지 않습니다. 1~${EXPECTED_MINUTES_MAX} 사이의 정수로 입력해 주세요.`}
@@ -365,7 +365,7 @@ function SettingsForm({
               inputClassName="max-w-[10rem]"
             />
             {/* §12 오픈이슈 1번 — 이 값은 파일럿 실측으로 확정된다. 지금 입력값은 잠정치다. */}
-            <p className="mt-2 text-xs leading-5 text-foreground-muted">
+            <p className="mt-2 t-caption leading-5 text-foreground-muted">
               이 값은 파일럿 실측 중앙값으로 확정할 잠정치입니다(착수보고 11면 &ldquo;착수 후 확정&rdquo;).
               실측 중앙값은 SME 화면에 노출하지 않고 관리자만 봅니다 — 관리자 대시보드의 &lsquo;직무당 소요
               중앙값(실측)&rsquo; 카드와 Export E5 &lsquo;소요 실측 요약&rsquo;에서 확인할 수 있습니다.
@@ -374,14 +374,14 @@ function SettingsForm({
 
           {/* ── 가이드 추가 안내 ── */}
           <section className="rounded-container border border-border bg-card p-5 shadow-1">
-            <h3 className="mb-1 text-sm font-semibold text-foreground">가이드 추가 안내</h3>
+            <h3 className="mb-1 t-label font-semibold text-foreground">가이드 추가 안내</h3>
             {/*
              * 덮어쓰기가 아니라 덧붙이기를 택했다. §6-1의 카드 ①·③·④는 착수보고 문언 그대로이고
              * 원칙 P1이 "이 절의 문구를 UI 카피로 그대로 사용"하라고 못박고 있다. 관리자가 그 문장을
              * 통째로 대체할 수 있으면 플랫폼이 착수보고의 이행 증빙이라는 전제(§1 결론 ③)가 무너진다.
              * 그래서 이 입력은 고정 문언 아래에 붙는 별도 안내로만 쓴다.
              */}
-            <p className="mb-3 text-xs leading-5 text-foreground-muted">
+            <p className="mb-3 t-caption leading-5 text-foreground-muted">
               시작 가이드의 고정 문언 <strong className="font-semibold text-foreground">아래에 덧붙는</strong>{' '}
               추가 안내입니다. 착수보고 문언은 제품 문구이므로 이 입력으로 대체되지 않습니다.
             </p>
@@ -396,22 +396,22 @@ function SettingsForm({
                 placeholder="예) 이번 조사는 10월 10일까지입니다. 문항이 헷갈리면 문의하기로 남겨 주세요."
               />
             </label>
-            <p className="mt-2 text-xs leading-5 text-foreground-muted">
+            <p className="mt-2 t-caption leading-5 text-foreground-muted">
               시작 가이드 마지막 카드 아래에 &lsquo;추가 안내&rsquo;로 그대로 표시됩니다. 마크다운 렌더러는 쓰지
               않으므로 기호(**굵게**, - 목록 등)는 친 그대로 보입니다 — 아래 미리보기가 SME에게 보이는 모습과
               같습니다(줄바꿈만 반영).
             </p>
             {form.guide_md.trim() && (
               <div className="mt-3 rounded-element border border-border bg-muted p-4">
-                <p className="mb-1.5 text-xs font-medium text-foreground-muted">미리보기(줄바꿈만 반영)</p>
-                <p className="whitespace-pre-line text-sm leading-6 text-foreground">{form.guide_md}</p>
+                <p className="mb-1.5 t-caption font-medium text-foreground-muted">미리보기(줄바꿈만 반영)</p>
+                <p className="whitespace-pre-line t-label-reading text-foreground">{form.guide_md}</p>
               </div>
             )}
           </section>
 
           {/* ── 문의 담당 ── */}
           <section className="rounded-container border border-border bg-card p-5 shadow-1">
-            <h3 className="mb-3 text-sm font-semibold text-foreground">문의 담당 표기</h3>
+            <h3 className="mb-3 t-label font-semibold text-foreground">문의 담당 표기</h3>
             <label className="block">
               <span className="label">문의 화면에 노출할 담당자·연락 방법</span>
               <AutoTextarea
@@ -423,14 +423,14 @@ function SettingsForm({
                 placeholder="예) 인사기획팀 김OO 책임 · 내선 1234 · hr@example.com (평일 09:00~18:00)"
               />
             </label>
-            <p className="mt-2 text-xs leading-5 text-foreground-muted">
+            <p className="mt-2 t-caption leading-5 text-foreground-muted">
               SME가 문의하기 화면에서 보게 되는 안내입니다. 비워 두면 담당자 표기 없이 문의만 접수됩니다.
             </p>
           </section>
 
           {/* ── 제출 게이트 스위치 ── */}
           <section className="rounded-container border border-border bg-card p-5 shadow-1">
-            <h3 className="mb-3 text-sm font-semibold text-foreground">제출 게이트 · 투입 비중 합계 검사</h3>
+            <h3 className="mb-3 t-label font-semibold text-foreground">제출 게이트 · 투입 비중 합계 검사</h3>
             <label className="flex min-h-11 cursor-pointer items-start gap-3">
               <input
                 type="checkbox"
@@ -438,11 +438,11 @@ function SettingsForm({
                 checked={form.fte_required}
                 onChange={(e) => patch({ fte_required: e.target.checked })}
               />
-              <span className="text-sm leading-6 text-foreground">
+              <span className="t-label-reading text-foreground">
                 제출 시 투입 비중(FTE) 합계 100%를 검사한다
                 {/* 색만으로 알리지 않는다 — 켜짐/꺼짐을 글자로도 적는다. */}
                 <span
-                  className={`ml-2 rounded px-2 py-0.5 text-[11px] font-medium ${
+                  className={`ml-2 rounded px-2 py-0.5 t-caption-2 font-medium ${
                     form.fte_required ? 'bg-success-muted text-success' : 'bg-warning-muted text-warning'
                   }`}
                 >
@@ -451,7 +451,7 @@ function SettingsForm({
               </span>
             </label>
             <div
-              className={`mt-3 rounded-element border px-4 py-3 text-xs leading-5 ${
+              className={`mt-3 rounded-element border px-4 py-3 t-caption leading-5 ${
                 form.fte_required
                   ? 'border-border bg-muted text-foreground-muted'
                   : 'border-warning-border bg-warning-muted text-warning'
@@ -472,7 +472,7 @@ function SettingsForm({
               )}
             </div>
             {turningGateOff && (
-              <p role="alert" className="mt-2 text-xs font-medium leading-5 text-destructive">
+              <p role="alert" className="mt-2 t-caption font-medium leading-5 text-destructive">
                 저장하면 이 회사의 검사가 켜짐 → 꺼짐으로 바뀝니다. 변경 사실은 감사 로그에 기록됩니다.
               </p>
             )}
@@ -489,7 +489,7 @@ function SettingsForm({
               reminderReady ? 'border-border' : 'border-dashed border-border'
             }`}
           >
-            <h3 className="mb-1 text-sm font-semibold text-foreground">
+            <h3 className="mb-1 t-label font-semibold text-foreground">
               리마인더 템플릿
               {!reminderReady && (
                 <span className="ml-2 rounded-inner bg-fill-alt px-2 py-0.5 t-caption font-medium text-foreground-muted">
@@ -497,12 +497,12 @@ function SettingsForm({
                 </span>
               )}
             </h3>
-            <p className="mb-3 text-xs leading-5 text-foreground-muted">
+            <p className="mb-3 t-caption leading-5 text-foreground-muted">
               {reminderReady ? (
                 <>
                   진행 현황(/progress)의 리마인더 발송에서 기본으로 채워집니다. 비워 두면 발송 화면의 기본 문구가
                   쓰입니다. 치환 토큰:{' '}
-                  <code className="rounded bg-muted px-1 py-0.5 text-[11px]">{TEMPLATE_TOKENS.join(' ')}</code>
+                  <code className="rounded bg-muted px-1 py-0.5 t-caption-2">{TEMPLATE_TOKENS.join(' ')}</code>
                 </>
               ) : (
                 REMINDER_TEMPLATE_MISSING_NOTE
@@ -539,7 +539,7 @@ function SettingsForm({
           {saveError && (
             <div
               role="alert"
-              className="rounded-element border border-destructive-border bg-destructive-muted px-4 py-3 text-xs leading-5 text-destructive"
+              className="rounded-element border border-destructive-border bg-destructive-muted px-4 py-3 t-caption leading-5 text-destructive"
             >
               {saveError}
               <span className="mt-1 block text-foreground-muted">
@@ -557,7 +557,7 @@ function SettingsForm({
                 변경 취소
               </Button>
             )}
-            <span className="text-xs text-foreground-subtle">
+            <span className="t-caption text-foreground-subtle">
               {dirty ? '저장하지 않은 변경이 있습니다.' : saved ? '저장된 값과 같습니다.' : '아직 저장된 설정이 없습니다.'}
             </span>
           </div>

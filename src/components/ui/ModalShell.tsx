@@ -1,7 +1,16 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
-export type ModalSize = 'sm' | 'md' | 'lg';
+/*
+ * 폭 4단은 montage 규격(small 360 / medium 400 / large 480 / xlarge 560px)을 그대로 옮긴 것이다.
+ * v2는 448 / 512 / 672 세 단이었고 내부 여백이 세 단 모두 24px로 고정이라
+ * 좁은 모달은 답답하고 넓은 모달은 헐거웠다.
+ *
+ * 'wide'(720px)는 montage에 없는 이 앱의 단계다. montage는 모바일 우선 시스템이라 560px에서
+ * 끊기지만, 이 앱에는 관리자가 데스크톱에서 표를 미리 보는 모달이 하나 있다
+ * (SmeBulkUploadModal의 SME 명부 미리보기). 그 한 곳만 이 단계를 쓴다.
+ */
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'wide';
 
 export interface ModalShellProps {
   title: string;
@@ -21,12 +30,26 @@ export interface ModalShellProps {
   dirty?: boolean;
   /** 처리 중이라 닫기를 막아야 할 때(예: 삭제 진행 중). */
   closeDisabled?: boolean;
+  /**
+   * 우상단 [X]를 감춘다.
+   * montage 규약 — 닫기 버튼과 [X]를 한 창에 중복해 두지 않는다. footer에 '취소'가 있으면 이걸 켠다.
+   * ESC와 배경 클릭은 그대로 살아 있으므로 닫는 길이 사라지지는 않는다.
+   */
+  hideClose?: boolean;
 }
 
-const sizes: Record<ModalSize, string> = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
+/*
+ * 크기마다 폭·내부 여백·반경이 함께 움직인다(montage: "크기를 키우면 여백도 같이 커져야 밀도가 유지된다").
+ * montage 여백은 20/20/24/32px, 반경은 12/12/20/20px이다. 반경은 이 앱의 토큰으로 받는다 —
+ * rounded-container(10px) ≈ montage 12px, rounded-page(16px) ≈ montage 20px.
+ * 새 반경 값을 만들지 않으려고 가까운 토큰에 붙였다.
+ */
+const sizes: Record<ModalSize, { w: string; pad: string; radius: string }> = {
+  sm: { w: 'max-w-[360px]', pad: 'px-5', radius: 'rounded-container' },
+  md: { w: 'max-w-[400px]', pad: 'px-5', radius: 'rounded-container' },
+  lg: { w: 'max-w-[480px]', pad: 'px-6', radius: 'rounded-page' },
+  xl: { w: 'max-w-[560px]', pad: 'px-8', radius: 'rounded-page' },
+  wide: { w: 'max-w-[720px]', pad: 'px-8', radius: 'rounded-page' },
 };
 
 const FOCUSABLE =
@@ -42,7 +65,9 @@ export function ModalShell({
   size = 'md',
   dirty = false,
   closeDisabled = false,
+  hideClose = false,
 }: ModalShellProps) {
+  const box = sizes[size];
   const panelRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -61,11 +86,19 @@ export function ModalShell({
     onClose();
   }, [closeDisabled, dirty, onClose]);
 
-  // 열릴 때 첫 포커스 이동 → 닫힐 때 트리거로 복귀
+  /*
+   * 열릴 때 첫 포커스 → 닫힐 때 트리거로 복귀.
+   *
+   * v3 T3에서 첫 포커스를 '첫 입력 칸'에서 '창 자신'으로 바꿨다(montage 규약).
+   * 폼 모달을 열자마자 커서가 첫 칸에 들어가면 낭독기가 제목을 읽지 못한 채 입력 칸부터
+   * 읽는다. 창에 포커스를 주면 제목(aria-labelledby)과 설명(aria-describedby)이 먼저 읽히고,
+   * Tab 한 번으로 첫 칸에 닿는다.
+   *
+   * preventScroll — 포커스 때문에 뒤 배경이 스크롤되어 창이 튀는 것을 막는다.
+   */
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
-    const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
-    (first ?? closeBtnRef.current)?.focus();
+    (panelRef.current ?? closeBtnRef.current)?.focus({ preventScroll: true });
     return () => trigger?.focus?.();
   }, []);
 
@@ -101,42 +134,56 @@ export function ModalShell({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-dimmer/40 p-4"
+      className="anim-scrim fixed inset-0 z-modal flex items-center justify-center scrim p-4"
       onMouseDown={e => { if (e.target === e.currentTarget) requestClose(); }}
     >
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
-        className={`flex max-h-[calc(100dvh-2rem)] w-full ${sizes[size]} flex-col rounded-container bg-card shadow-2`}
+        className={`anim-panel flex max-h-[calc(100dvh-2rem)] w-full ${box.w} flex-col ${box.radius} bg-elevated shadow-2 outline-none`}
       >
-        <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
+        <div className={`flex items-start justify-between gap-3 ${box.pad} pb-4 pt-6`}>
           <div className="flex items-start gap-2">
             {icon}
             <div>
-              <h3 id={titleId} className="text-lg font-semibold text-foreground">{title}</h3>
-              {description && <p id={descId} className="mt-1 text-sm leading-6 text-foreground-muted">{description}</p>}
+              <h3 id={titleId} className="t-headline text-foreground">{title}</h3>
+              {description && <p id={descId} className="mt-1 t-label-reading text-foreground-muted">{description}</p>}
             </div>
           </div>
-          <button
-            ref={closeBtnRef}
-            type="button"
-            onClick={requestClose}
-            disabled={closeDisabled}
-            aria-label="닫기"
-            className="-mr-1.5 -mt-1.5 rounded-element p-1.5 text-foreground-subtle transition hover:bg-muted hover:text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+          {/* montage — footer에 '취소'가 있으면 [X]를 두지 않는다(hideClose). ESC와 배경 클릭은 그대로다. */}
+          {!hideClose && (
+            <button
+              ref={closeBtnRef}
+              type="button"
+              onClick={requestClose}
+              disabled={closeDisabled}
+              aria-label="닫기"
+              className="-mr-1.5 -mt-1.5 rounded-element p-1.5 text-foreground-subtle transition hover:bg-muted hover:text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         {/* 본문만 스크롤 — 8필드 폼에서도 하단 버튼이 화면 밖으로 밀리지 않습니다. */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">{children}</div>
+        <div className={`min-h-0 flex-1 overflow-y-auto ${box.pad} pb-6`}>{children}</div>
 
+        {/*
+          액션 줄. montage는 배치를 폭이 결정한다고 본다 — 오른쪽 정렬(Compact)은 560px 이상에서만
+          쓰고, 그보다 좁으면 세로로 쌓아 main을 위에 둔다.
+          좁은 화면에서는 어느 크기든 세로로 쌓고 버튼을 폭 전체로 늘린다. flex-col-reverse라
+          footer에 (보조, main) 순으로 넘긴 것이 화면에서는 main이 위에 온다.
+        */}
         {footer && (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-border px-6 py-4">{footer}</div>
+          <div
+            className={`flex flex-col-reverse gap-2 border-t border-border ${box.pad} py-4 [&>*]:w-full sm:flex-row sm:flex-wrap sm:justify-end sm:[&>*]:w-auto`}
+          >
+            {footer}
+          </div>
         )}
       </div>
 
@@ -150,16 +197,16 @@ export function ModalShell({
           role="alertdialog"
           aria-modal="true"
           aria-labelledby={`${titleId}-close-ask`}
-          className="absolute inset-0 z-10 flex items-center justify-center bg-dimmer/40 p-4"
+          className="absolute inset-0 z-[1] flex items-center justify-center scrim p-4"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setAskClose(false);
           }}
         >
-          <div className="w-full max-w-sm rounded-container bg-card p-6 shadow-2">
+          <div className="w-full max-w-sm rounded-container bg-elevated p-6 shadow-2">
             <h4 id={`${titleId}-close-ask`} className="t-headline text-foreground">
               작성 중인 내용이 사라져요
             </h4>
-            <p className="mt-2 t-label leading-6 text-foreground-muted">
+            <p className="mt-2 t-label-reading text-foreground-muted">
               저장하지 않은 변경 내용이 있어요. 창을 닫으면 입력한 내용이 사라집니다.
             </p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">

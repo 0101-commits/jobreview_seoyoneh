@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { EmptyMessage, RereviewModal, RowActions, Section, SkillGroup, SmeFeedbackPanel } from '@/components/job-detail/FeedbackPanel';
 
 interface Props {
@@ -85,6 +86,8 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
   const [dirty, setDirty] = useState(false);
   const [options, setOptions] = useState<GroupSeriesOption | null>(null);
   const { toast, showToast, dismiss } = useToast();
+  // 닫기가 필요한 알림은 Snackbar로 낸다 — Toast에는 닫기 버튼이 없다(v3 T3).
+  const { snackbar, showSnackbar, dismiss: dismissSnackbar } = useSnackbar();
 
   // Edit state
   const [editName, setEditName] = useState('');
@@ -405,7 +408,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
     if (result.error) {
       // DB 원문은 콘솔에만 남기고, 화면에는 다음 행동을 알려 준다.
       console.error('Job edit save error:', result.error);
-      showToast({
+      showSnackbar({
         type: 'error',
         msg: '직무정보를 저장하지 못했어요. 입력값을 확인한 뒤 다시 시도하고, 같은 문제가 이어지면 관리자에게 알려 주세요.',
         duration: 0,
@@ -473,7 +476,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
     return (
       <div className="rounded-container border border-border bg-card p-12 text-center">
         <AlertTriangle size={20} className="mx-auto mb-3 text-warning" aria-hidden="true" />
-        <p className="text-sm text-foreground-muted">
+        <p className="t-label text-foreground-muted">
           {loadError ?? '요청하신 직무를 찾을 수 없어요. 목록에서 다시 선택해 주세요.'}
         </p>
         <div className="mt-4 flex justify-center gap-2">
@@ -508,7 +511,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
   return (
     <>
       {/* Breadcrumb */}
-      <nav className="mb-5 flex items-center gap-1.5 text-sm text-foreground-subtle">
+      <nav className="mb-5 flex items-center gap-1.5 t-label text-foreground-subtle">
         <button onClick={handleBack} className="flex items-center gap-1 rounded-element transition hover:text-primary">
           <ArrowLeft size={15} aria-hidden="true" /> 직무정보 관리
         </button>
@@ -519,10 +522,10 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
       {/* Top header */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4 rounded-container border border-border bg-card p-6 shadow-1">
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">직무 상세정보</h2>
+          <h2 className="t-heading text-foreground">직무 상세정보</h2>
           <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-foreground-subtle">직군</span>
+              <span className="t-caption font-medium text-foreground-subtle">직군</span>
               {editMode ? (
                 <select
                   aria-label="직군"
@@ -532,7 +535,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     setEditSeriesId('');
                     setDirty(true);
                   }}
-                  className="min-h-11 rounded-element border border-border px-3 text-sm outline-none focus:border-primary sm:min-h-control-md"
+                  className="min-h-11 rounded-element border border-input px-3 t-label outline-none focus:border-primary sm:min-h-control-md"
                 >
                   {options?.groups.map((g) => (
                     <option key={g.id} value={g.id}>
@@ -541,11 +544,11 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                   ))}
                 </select>
               ) : (
-                <span className="text-sm text-foreground-muted">{detail.group_name}</span>
+                <span className="t-label text-foreground-muted">{detail.group_name}</span>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-foreground-subtle">직렬</span>
+              <span className="t-caption font-medium text-foreground-subtle">직렬</span>
               {editMode ? (
                 <select
                   aria-label="직렬"
@@ -554,7 +557,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     setEditSeriesId(e.target.value);
                     setDirty(true);
                   }}
-                  className="min-h-11 rounded-element border border-border px-3 text-sm outline-none focus:border-primary sm:min-h-control-md"
+                  className="min-h-11 rounded-element border border-input px-3 t-label outline-none focus:border-primary sm:min-h-control-md"
                 >
                   <option value="">선택</option>
                   {seriesOptions.map((s) => (
@@ -564,11 +567,11 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                   ))}
                 </select>
               ) : (
-                <span className="text-sm text-foreground-muted">{detail.series_name}</span>
+                <span className="t-label text-foreground-muted">{detail.series_name}</span>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-foreground-subtle">직무</span>
+              <span className="t-caption font-medium text-foreground-subtle">직무</span>
               {editMode ? (
                 <input
                   id={fieldId('name')}
@@ -579,15 +582,15 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     setEditName(e.target.value);
                     setDirty(true);
                   }}
-                  className={`min-h-11 w-56 rounded-element border px-3 text-sm font-semibold outline-none focus:border-primary sm:min-h-control-md ${
-                    dupError ? 'border-destructive' : 'border-border'
+                  className={`min-h-11 w-56 rounded-element border px-3 t-label font-semibold outline-none focus:border-primary sm:min-h-control-md ${
+                    dupError ? 'border-destructive' : 'border-input'
                   } ${highlightClass('name')}`}
                 />
               ) : (
                 <span
                   id={fieldId('name')}
                   tabIndex={-1}
-                  className={`text-sm font-semibold text-foreground ${highlightClass('name')}`}
+                  className={`t-label font-semibold text-foreground ${highlightClass('name')}`}
                 >
                   {detail.name}
                 </span>
@@ -595,7 +598,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
             </div>
           </div>
           {dupError && (
-            <p className="mt-3 flex items-center gap-1.5 text-sm text-destructive">
+            <p className="mt-3 flex items-center gap-1.5 t-label text-destructive">
               <AlertTriangle size={14} aria-hidden="true" /> {dupError}
             </p>
           )}
@@ -603,7 +606,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
           {editMode && structureLocked && (
             <p
               role="status"
-              className="mt-3 flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-3.5 py-2.5 text-sm text-warning"
+              className="mt-3 flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-3.5 py-2.5 t-label text-warning"
             >
               <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
               <span>
@@ -633,6 +636,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
 
       {/* 편집 폼(왼쪽)과 SME 피드백(오른쪽)을 나란히 둔다 — 무엇을 왜 고치는지 보면서 수정한다. */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -640,7 +644,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
           {/* Section 1: 직무분류체계 */}
           <Section title="1. 직무분류체계">
             <div className="overflow-x-auto rounded-element border border-border">
-              <table className="w-full min-w-[24rem] text-sm">
+              <table className="w-full min-w-[24rem] t-label">
                 <tbody>
                   {[
                     [
@@ -656,7 +660,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     <tr key={label} className={i > 0 ? 'border-t border-border' : ''}>
                       <th
                         scope="row"
-                        className="w-32 bg-muted px-5 py-3.5 text-left text-xs font-medium text-foreground-muted"
+                        className="w-32 bg-muted px-5 py-3.5 text-left t-caption font-medium text-foreground-muted"
                       >
                         {label}
                       </th>
@@ -680,7 +684,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                   setDirty(true);
                 }}
                 rows={4}
-                className={`w-full rounded-element border border-border p-4 text-sm leading-7 text-foreground-muted outline-none focus:border-primary ${highlightClass('definition')}`}
+                className={`w-full rounded-element border border-input p-4 t-label-reading text-foreground-muted outline-none focus:border-primary ${highlightClass('definition')}`}
                 placeholder="직무 정의를 입력하세요"
               />
             ) : (
@@ -690,9 +694,9 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                 className={`rounded-element border border-border bg-muted p-5 ${highlightClass('definition')}`}
               >
                 {detail.definition ? (
-                  <p className="text-sm leading-7 text-foreground-muted">{detail.definition}</p>
+                  <p className="t-label-reading text-foreground-muted">{detail.definition}</p>
                 ) : (
-                  <p className="text-sm text-foreground-subtle">등록된 직무정의 정보가 없습니다.</p>
+                  <p className="t-label text-foreground-subtle">등록된 직무정의 정보가 없습니다.</p>
                 )}
               </div>
             )}
@@ -710,14 +714,14 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     className={`rounded-element border border-border p-5 ${task.id ? highlightClass(`task-${task.id}`) : ''}`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-xs font-semibold text-primary">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-subtle t-caption font-semibold text-primary">
                         {ti + 1}
                       </span>
                       <input
                         value={task.name}
                         aria-label={`${ti + 1}번 주요과업명`}
                         onChange={(e) => updateTask(ti, { name: e.target.value })}
-                        className="min-h-11 min-w-0 flex-1 rounded-element border border-border px-3 text-sm font-semibold text-foreground outline-none focus:border-primary sm:min-h-control-md"
+                        className="min-h-11 min-w-0 flex-1 rounded-element border border-input px-3 t-label font-semibold text-foreground outline-none focus:border-primary sm:min-h-control-md"
                         placeholder="주요과업명"
                       />
                       <RowActions
@@ -733,12 +737,12 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     <div className="mt-3 space-y-2 sm:pl-8">
                       {task.activities.map((act, ai) => (
                         <div key={act.uid} className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-foreground-subtle">{ai + 1}.</span>
+                          <span className="t-caption text-foreground-subtle">{ai + 1}.</span>
                           <input
                             value={act.activity_name}
                             aria-label={`${ti + 1}번 과업의 ${ai + 1}번 세부활동`}
                             onChange={(e) => updateActivity(ti, ai, e.target.value)}
-                            className="min-h-11 min-w-0 flex-1 rounded-element border border-border px-3 text-sm text-foreground-muted outline-none focus:border-primary sm:min-h-control-md"
+                            className="min-h-11 min-w-0 flex-1 rounded-element border border-input px-3 t-label text-foreground-muted outline-none focus:border-primary sm:min-h-control-md"
                             placeholder="세부활동"
                           />
                           <RowActions
@@ -780,17 +784,17 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                     className={`rounded-element border border-border p-5 ${highlightClass(`task-${task.id}`)}`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-subtle text-xs font-semibold text-primary">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-subtle t-caption font-semibold text-primary">
                         {ti + 1}
                       </span>
                       <h4 className="font-semibold text-foreground">{task.name}</h4>
                     </div>
                     {task.task_activities.length === 0 ? (
-                      <p className="mt-3 pl-8 text-sm text-foreground-subtle">등록된 세부활동 정보가 없습니다.</p>
+                      <p className="mt-3 pl-8 t-label text-foreground-subtle">등록된 세부활동 정보가 없습니다.</p>
                     ) : (
                       <ul className="mt-3 space-y-2 pl-8">
                         {task.task_activities.map((act) => (
-                          <li key={act.id} className="flex items-start gap-2 text-sm leading-6 text-foreground-muted">
+                          <li key={act.id} className="flex items-start gap-2 t-label-reading text-foreground-muted">
                             <span
                               className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle"
                               aria-hidden="true"
@@ -817,7 +821,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                   ] as const
                 ).map(([label, type]) => (
                   <div key={type}>
-                    <h4 className="mb-3 text-sm font-semibold text-foreground-muted">{label}</h4>
+                    <h4 className="mb-3 t-label font-semibold text-foreground-muted">{label}</h4>
                     <div className="space-y-2">
                       {editSkills
                         .filter((s) => s.skill_type === type)
@@ -828,7 +832,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                               aria-label={`${label} 이름`}
                               value={s.name}
                               onChange={(e) => updateSkill(s.uid, e.target.value)}
-                              className={`min-h-11 min-w-0 flex-1 rounded-element border border-border px-3 text-sm outline-none focus:border-primary sm:min-h-control-md ${
+                              className={`min-h-11 min-w-0 flex-1 rounded-element border border-input px-3 t-label outline-none focus:border-primary sm:min-h-control-md ${
                                 s.id ? highlightClass(`skill-${s.id}`) : ''
                               }`}
                               placeholder="Skill명"
@@ -886,13 +890,13 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
               if (!hasAny && !editMode) return <EmptyMessage>등록된 수행요건 정보가 없습니다.</EmptyMessage>;
               return (
                 <div className="overflow-x-auto rounded-element border border-border">
-                  <table className="w-full min-w-[24rem] text-sm">
+                  <table className="w-full min-w-[24rem] t-label">
                     <tbody>
                       {reqFields.map(([key, label, fkey], i) => (
                         <tr key={key} className={i > 0 ? 'border-t border-border' : ''}>
                           <th
                             scope="row"
-                            className="w-40 bg-muted px-5 py-4 text-left text-xs font-medium text-foreground-muted"
+                            className="w-40 bg-muted px-5 py-4 text-left t-caption font-medium text-foreground-muted"
                           >
                             {label}
                           </th>
@@ -906,7 +910,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
                                   setEditReq((prev) => ({ ...prev, [key]: e.target.value }));
                                   setDirty(true);
                                 }}
-                                className={`min-h-11 w-full rounded-element border border-border px-3 text-sm text-foreground-muted outline-none focus:border-primary sm:min-h-control-md ${highlightClass(fkey)}`}
+                                className={`min-h-11 w-full rounded-element border border-input px-3 t-label text-foreground-muted outline-none focus:border-primary sm:min-h-control-md ${highlightClass(fkey)}`}
                                 placeholder={label}
                               />
                             ) : (
@@ -944,6 +948,8 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
           size="sm"
           icon={<AlertTriangle size={20} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />}
           onClose={() => setConfirmState(null)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           footer={
             <>
               <Button variant="secondary" onClick={() => setConfirmState(null)}>
@@ -961,7 +967,7 @@ export function JobDetailPage({ jobId, onBack, userId, companyId, focusSmeId }: 
             </>
           }
         >
-          <p className="text-sm leading-6 text-foreground-muted">
+          <p className="t-label-reading text-foreground-muted">
             되돌릴 수 없는 작업이에요. 내용을 한 번 더 확인해 주세요.
           </p>
         </ModalShell>

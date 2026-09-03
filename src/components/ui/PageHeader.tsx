@@ -2,7 +2,7 @@
  * PageHeader — 화면 제목 줄(montage SectionHeader 규약 차용, v2 §6-4).
  *
  * 왜 필요한가: "부제 p + h2 + 우측 필터/버튼" 마크업이 17개 화면에 복붙돼 있었다.
- * 제목 크기가 화면마다 text-2xl/text-xl로 갈렸고, 우측 정렬 방식도 달랐다.
+ * 제목 크기가 화면마다 .t-title / .t-heading 없이 text-2xl·text-xl로 갈렸고, 우측 정렬 방식도 달랐다.
  *
  * 규약: eyebrow(보조 설명) → 제목(t-title) → 우측 trailing. 데스크톱에서 한 줄, 좁은 화면에서 두 줄.
  * 제목은 최대 2줄까지만 (montage), 그 뒤는 줄바꿈이 아니라 문구를 줄인다.

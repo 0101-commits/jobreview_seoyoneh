@@ -237,11 +237,11 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
           <Button variant="ghost" size="sm" onClick={onBack} className="mb-2 -ml-3">
             <ArrowLeft size={14} aria-hidden="true" /> 제출 큐로
           </Button>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+          <h2 className="t-title text-foreground">
             워크벤치 · {jobName} — SME 응답 비교
           </h2>
           {job && (
-            <p className="mt-1 text-sm text-foreground-subtle">
+            <p className="mt-1 t-label text-foreground-subtle">
               {job.group_name} · {job.series_name}
             </p>
           )}
@@ -252,7 +252,7 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
                 후보 여부는 저장된 결정과 자동 규칙을 함께 보되 사람이 해제한 직무는 후보로 적지 않는다
                 — 제출 큐 칸과 같은 함수(workshopDecisionOf)로 판정한다. */}
             <span
-              className={`inline-flex items-center gap-1 rounded border px-2.5 py-1.5 text-xs font-medium ${
+              className={`inline-flex items-center gap-1 rounded border px-2.5 py-1.5 t-caption font-medium ${
                 comparison.signals.length > 0 || workshopCandidate
                   ? 'border-destructive-border bg-destructive-muted text-destructive'
                   : 'border-border bg-muted text-foreground-muted'
@@ -270,7 +270,7 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
       </div>
 
       {error && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>SME 응답 비교를 불러오지 못했어요. {error} 잠시 후 다시 시도해 주세요.</span>
@@ -288,11 +288,11 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
           {/* 자동 규칙에 걸린 사유·기준·측정값은 아래 워크숍 패널이 규칙 ①~④로 풀어서 보여 준다.
               여기서 같은 말을 다시 적지 않는다(사유 문구의 출처는 workshopThresholds 한 곳이다). */}
           {comparison.smeCount === 0 ? (
-            <p className="rounded-container border border-border bg-card p-8 text-center text-sm text-foreground-subtle">
+            <p className="rounded-container border border-border bg-card p-8 text-center t-label text-foreground-subtle">
               아직 제출된 검토가 없습니다. SME가 제출하면 응답을 나란히 비교할 수 있어요.
             </p>
           ) : crossCheckImpossible ? (
-            <p className="flex flex-wrap items-start gap-2 border border-warning-border bg-warning-muted p-4 text-sm text-warning">
+            <p className="flex flex-wrap items-start gap-2 border border-warning-border bg-warning-muted p-4 t-label text-warning">
               <Users size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
               {/* "1명"을 손으로 적지 않는다 — 교차 확인 최소 인원은 §12에서 조정될 값이다. */}
               <span>
@@ -321,7 +321,7 @@ export function JobComparePage({ jobId, onBack }: { jobId: string; onBack: () =>
           />
 
           {flagError ? (
-            <div className="flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-start gap-2">
                 <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span>
@@ -379,11 +379,11 @@ function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFe
         <>
           {/* 데스크톱 — 표. 첫 열 고정, 표 컨테이너 안에서만 가로 스크롤. */}
           <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[640px] text-left t-label">
               <caption className="sr-only">항목별 SME 적합성 판정 비교</caption>
               <thead>
-                <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                  <th scope="col" className="sticky left-0 z-10 bg-muted px-4 py-3 font-medium">
+                <tr className="border-b border-border bg-muted t-caption text-foreground-muted">
+                  <th scope="col" className="sticky left-0 z-[1] bg-muted px-4 py-3 font-medium">
                     항목
                   </th>
                   {smes.map((sme) => (
@@ -396,8 +396,8 @@ function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFe
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.key} className="border-b border-destructive-border bg-destructive-muted last:border-0">
-                    <th scope="row" className="sticky left-0 z-10 bg-destructive-muted px-4 py-3 text-left font-normal">
-                      <span className="block text-[11px] text-foreground-subtle">{row.kind}</span>
+                    <th scope="row" className="sticky left-0 z-[1] bg-destructive-muted px-4 py-3 text-left font-normal">
+                      <span className="block t-caption-2 text-foreground-subtle">{row.kind}</span>
                       <span className="block font-medium text-foreground">{row.name}</span>
                       <ReasonChip text={SIGNAL_LABELS.suitabilityMismatch} tone="destructive" />
                     </th>
@@ -416,11 +416,11 @@ function SuitabilitySection({ rows, smes }: { rows: SuitRow[]; smes: SmeReviewFe
           <div className="divide-y divide-border sm:hidden">
             {smes.map((sme) => (
               <div key={sme.review_id} className="p-4">
-                <p className="mb-2 text-sm font-semibold text-foreground">{smeHeading(sme)}</p>
+                <p className="mb-2 t-label font-semibold text-foreground">{smeHeading(sme)}</p>
                 <ul className="space-y-2">
                   {rows.map((row) => (
-                    <li key={row.key} className="border border-destructive-border bg-destructive-muted p-3 text-sm">
-                      <span className="block text-[11px] text-foreground-subtle">{row.kind}</span>
+                    <li key={row.key} className="border border-destructive-border bg-destructive-muted p-3 t-label">
+                      <span className="block t-caption-2 text-foreground-subtle">{row.kind}</span>
                       <span className="block font-medium text-foreground">{row.name}</span>
                       <span className="block text-foreground-muted">{row.byReview[sme.review_id] || '판단 없음'}</span>
                       <ReasonChip text={SIGNAL_LABELS.suitabilityMismatch} tone="destructive" />
@@ -469,7 +469,7 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
       />
 
       {comparison.topTaskMismatch && (
-        <p className="flex items-start gap-2 border-b border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning">
+        <p className="flex items-start gap-2 border-b border-warning-border bg-warning-muted px-4 py-3 t-label text-warning">
           <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>1위 과업 불일치 — SME마다 비중 1위 과업이 다릅니다. 각 열의 「1위」 표시를 확인해 주세요.</span>
         </p>
@@ -478,11 +478,11 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
       {rows.length > 0 && (
         <>
           <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[640px] text-left t-label">
               <caption className="sr-only">과업별 SME 투입 비중 비교</caption>
               <thead>
-                <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                  <th scope="col" className="sticky left-0 z-10 bg-muted px-4 py-3 font-medium">
+                <tr className="border-b border-border bg-muted t-caption text-foreground-muted">
+                  <th scope="col" className="sticky left-0 z-[1] bg-muted px-4 py-3 font-medium">
                     과업
                   </th>
                   {smes.map((sme) => (
@@ -503,13 +503,13 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
                     >
                       <th
                         scope="row"
-                        className={`sticky left-0 z-10 px-4 py-3 text-left font-normal ${
+                        className={`sticky left-0 z-[1] px-4 py-3 text-left font-normal ${
                           flagged ? 'bg-warning-muted' : 'bg-card'
                         }`}
                       >
                         <span className="block font-medium text-foreground">{row.name}</span>
                         {row.targetType === 'SUGGESTED' && (
-                          <span className="text-[11px] text-foreground-subtle">신규 제안</span>
+                          <span className="t-caption-2 text-foreground-subtle">신규 제안</span>
                         )}
                         {(suggestedNames.get(row.key) ?? []).map((name) => (
                           <span key={name} className="block t-caption font-medium text-primary">
@@ -537,21 +537,21 @@ function FteSection({ comparison, smes }: { comparison: JobComparison; smes: Sme
           <div className="divide-y divide-border sm:hidden">
             {smes.map((sme) => (
               <div key={sme.review_id} className="p-4">
-                <p className="mb-2 text-sm font-semibold text-foreground">{smeHeading(sme)}</p>
+                <p className="mb-2 t-label font-semibold text-foreground">{smeHeading(sme)}</p>
                 <ul className="space-y-2">
                   {rows.map((row) => {
                     const reason = fteReason(row);
                     return (
                       <li
                         key={row.key}
-                        className={`flex flex-wrap items-center justify-between gap-2 border p-3 text-sm ${
+                        className={`flex flex-wrap items-center justify-between gap-2 border p-3 t-label ${
                           reason ? 'border-warning-border bg-warning-muted' : 'border-border'
                         }`}
                       >
                         <span className="min-w-0">
                           <span className="block font-medium text-foreground">{row.name}</span>
                           {row.targetType === 'SUGGESTED' && (
-                            <span className="text-[11px] text-foreground-subtle">신규 제안</span>
+                            <span className="t-caption-2 text-foreground-subtle">신규 제안</span>
                           )}
                           {(suggestedNames.get(row.key) ?? []).map((name) => (
                             <span key={name} className="block t-caption font-medium text-primary">
@@ -589,7 +589,7 @@ function PctCell({ value, top, emptyLabel }: { value: number | null; top: boolea
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
       <span className="font-medium text-foreground">{fmtNum(value)}%</span>
       {top && (
-        <span className="rounded border border-primary-border bg-primary-subtle px-1.5 py-0.5 text-[10px] font-medium text-primary">
+        <span className="rounded border border-primary-border bg-primary-subtle px-1.5 py-0.5 t-caption-2 font-medium text-primary">
           1위
         </span>
       )}
@@ -608,16 +608,16 @@ function SuggestionSection({ smes }: { smes: SmeReviewFeedback[] }) {
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         {smes.map((sme) => (
           <div key={sme.review_id}>
-            <p className="mb-2 text-sm font-semibold text-foreground">{smeHeading(sme)}</p>
+            <p className="mb-2 t-label font-semibold text-foreground">{smeHeading(sme)}</p>
             {sme.feedback.newTasks.length === 0 ? (
-              <p className="text-sm text-foreground-subtle">제안 없음</p>
+              <p className="t-label text-foreground-subtle">제안 없음</p>
             ) : (
               <ul className="space-y-2">
                 {sme.feedback.newTasks.map((t, i) => (
-                  <li key={`${t.name}-${i}`} className="bg-muted px-3 py-2 text-sm">
+                  <li key={`${t.name}-${i}`} className="bg-muted px-3 py-2 t-label">
                     <span className="block font-medium text-foreground">{t.name}</span>
                     {t.description && <span className="block text-foreground-muted">{t.description}</span>}
-                    {t.reason && <span className="block text-xs text-foreground-subtle">사유: {t.reason}</span>}
+                    {t.reason && <span className="block t-caption text-foreground-subtle">사유: {t.reason}</span>}
                   </li>
                 ))}
               </ul>
@@ -671,22 +671,22 @@ function DecisionSection({
           return (
             <article key={sme.review_id} className="flex flex-col gap-2 border border-border p-4">
               <header className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-foreground">{sme.sme_name || '이름 미등록'}</span>
-                <span className="text-xs text-foreground-subtle">{sme.organization || '조직 미등록'}</span>
+                <span className="t-label font-semibold text-foreground">{sme.sme_name || '이름 미등록'}</span>
+                <span className="t-caption text-foreground-subtle">{sme.organization || '조직 미등록'}</span>
                 <StatusBadge status={mapReviewStatus(status)} />
               </header>
-              <p className="text-xs text-foreground-subtle">
+              <p className="t-caption text-foreground-subtle">
                 「{jobName}」 검토 1건 · {sme.submitted_at ? `제출 ${fullDate(sme.submitted_at)}` : '제출 전'}
               </p>
 
               {approvedAt && (
-                <p className="flex items-center gap-1.5 border border-success-border bg-success-muted px-3 py-2 text-xs text-success">
+                <p className="flex items-center gap-1.5 border border-success-border bg-success-muted px-3 py-2 t-caption text-success">
                   <CheckCircle2 size={14} className="shrink-0" aria-hidden="true" />
                   승인 완료 {fullDate(approvedAt)}
                 </p>
               )}
               {rejectedReason && (
-                <p className="border border-destructive-border bg-destructive-muted px-3 py-2 text-xs text-destructive">
+                <p className="border border-destructive-border bg-destructive-muted px-3 py-2 t-caption text-destructive">
                   반려 사유: {rejectedReason}
                 </p>
               )}
@@ -701,7 +701,7 @@ function DecisionSection({
                   </Button>
                 </div>
               ) : (
-                <p className="text-xs text-foreground-subtle">
+                <p className="t-caption text-foreground-subtle">
                   {status === 'REVIEW_REQUESTED'
                     ? '반려된 검토입니다. SME가 다시 제출하면 판정할 수 있습니다.'
                     : '아직 제출 전이라 판정할 수 없습니다.'}
@@ -746,11 +746,14 @@ function RejectModal({
     <ModalShell
       title="검토 반려"
       description={`${target.sme_name || 'SME'} 님의 「${jobName}」 검토 1건을 반려합니다.`}
-      size="md"
+      // 반려 사유 textarea를 담는 폼이라 large(480px)를 쓴다.
+      size="lg"
       dirty={reason.trim().length > 0}
       closeDisabled={busy}
       icon={<AlertTriangle size={20} className="mt-0.5 shrink-0 text-destructive" aria-hidden="true" />}
       onClose={onClose}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -785,8 +788,8 @@ function RejectModal({
 function SectionHead({ title, note }: { title: string; note: string }) {
   return (
     <div className="border-b border-border p-4">
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
-      <p className="mt-1 text-xs leading-5 text-foreground-muted">{note}</p>
+      <h3 className="t-body font-semibold text-foreground">{title}</h3>
+      <p className="mt-1 t-caption leading-5 text-foreground-muted">{note}</p>
     </div>
   );
 }
@@ -798,7 +801,7 @@ function ReasonChip({ text, tone }: { text: string; tone: 'warning' | 'destructi
       ? 'border-warning-border bg-warning-muted text-warning'
       : 'border-destructive-border bg-destructive-muted text-destructive';
   return (
-    <span className={`mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>
+    <span className={`mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-0.5 t-caption-2 font-medium ${cls}`}>
       <AlertTriangle size={11} className="shrink-0" aria-hidden="true" />
       {text}
     </span>

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { newSuggestion, type SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback, Suitability } from '@/types';
 import { NOTE_REQUIRED_HINT, REQUIRED_MARK_SR } from './copy';
+import { BP, useMediaQuery } from '@/lib/useMediaQuery';
 
 type Choice = Exclude<Suitability, ''>;
 
@@ -126,7 +127,7 @@ export function SuitabilityControl({
               onChange(o.value);
               advance();
             }}
-            className={`inline-flex min-h-11 items-center gap-1.5 rounded-element border px-3 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selected ? o.on : OFF}`}
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-element border px-3 t-caption font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selected ? o.on : OFF}`}
           >
             <o.Icon size={15} aria-hidden="true" className={selected ? '' : 'opacity-50'} />
             {o.value}
@@ -169,14 +170,24 @@ export function AutoTextarea({
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
+  /*
+   * 모바일에서는 최대 높이를 5줄로 묶는다(v3 T5 · montage).
+   *
+   * 키보드가 함께 뜨는 화면에서 칸이 계속 자라면 지금 입력하는 줄이 키보드에 가려진다.
+   * 화면 절반이 키보드인 상태에서 10줄까지 자란 칸은 커서가 어디 있는지 알 수 없다.
+   * sm(640px) 이상에서는 원래 상한(호출부가 준 maxRows)을 그대로 쓴다.
+   */
+  const narrow = !useMediaQuery(BP.sm);
+  const rowCap = narrow ? Math.min(maxRows, 5) : maxRows;
+
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
     const LINE = 24; // leading-6
     const PAD = 22; // py-2.5 + 테두리
-    el.style.height = `${Math.min(el.scrollHeight, maxRows * LINE + PAD)}px`;
-  }, [value, maxRows]);
+    el.style.height = `${Math.min(el.scrollHeight, rowCap * LINE + PAD)}px`;
+  }, [value, rowCap]);
 
   return (
     <textarea
@@ -238,7 +249,7 @@ export function FeedbackNotes({
       {needsComment && (
         // col-span-full — 이 조각은 카드형(3열)·섹션형(2열) 두 격자 안에 들어간다.
         // 열 수를 가정하지 않고 마지막 줄 전체를 쓰게 해야 두 화면 모두에서 두 칸 아래에 놓인다.
-        <p id={hintId} className="col-span-full text-xs leading-5 text-foreground-muted">
+        <p id={hintId} className="col-span-full t-caption leading-5 text-foreground-muted">
           {NOTE_REQUIRED_HINT}
         </p>
       )}
@@ -296,10 +307,10 @@ export function ReviewItemCard({
         className="flex w-full min-h-11 items-center gap-3 rounded-element border border-border bg-muted px-4 py-3 text-left transition hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <Icon size={16} aria-hidden="true" className={`shrink-0 ${TONE_TEXT[choice]}`} />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
-        <span className={`shrink-0 text-xs font-medium ${TONE_TEXT[choice]}`}>{choice}</span>
+        <span className="min-w-0 flex-1 truncate t-label font-medium text-foreground">{title}</span>
+        <span className={`shrink-0 t-caption font-medium ${TONE_TEXT[choice]}`}>{choice}</span>
         {notes && (
-          <span className="hidden shrink-0 items-center gap-1 text-xs text-foreground-muted sm:inline-flex">
+          <span className="hidden shrink-0 items-center gap-1 t-caption text-foreground-muted sm:inline-flex">
             <MessageSquareText size={13} aria-hidden="true" />
             {notes}
           </span>
@@ -314,11 +325,11 @@ export function ReviewItemCard({
     <div className="rounded-element border border-border p-4 lg:p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <span className="text-[11px] font-semibold text-primary">{eyebrow}</span>
+          <span className="t-caption-2 font-semibold text-primary">{eyebrow}</span>
           <h4 className="mt-1 font-semibold text-foreground">{title}</h4>
         </div>
         {counter && (
-          <span className="shrink-0 rounded-inner bg-muted px-2 py-1 text-[11px] text-foreground-muted">{counter}</span>
+          <span className="shrink-0 rounded-inner bg-muted px-2 py-1 t-caption-2 text-foreground-muted">{counter}</span>
         )}
       </div>
       {details}
@@ -333,7 +344,7 @@ export function ReviewItemCard({
             label={`${title} 적합성 평가`}
           />
           {removeLabel && (
-            <label className="mt-3 flex min-h-11 items-center gap-2 text-xs text-foreground-muted">
+            <label className="mt-3 flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
               <input
                 type="checkbox"
                 checked={!!feedback.remove}
@@ -354,9 +365,9 @@ export function ReviewItemCard({
 export function SectionHeading({ title, done, total }: { title: string; done: number; total: number }) {
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      <h3 className="t-headline text-foreground">{title}</h3>
       {total > 0 && (
-        <span className={`text-xs ${done === total ? 'text-success' : 'text-foreground-muted'}`}>
+        <span className={`t-caption ${done === total ? 'text-success' : 'text-foreground-muted'}`}>
           {total}개 중 {done}개 평가함
         </span>
       )}
@@ -380,7 +391,7 @@ export function ListControls({
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-element bg-muted px-4 py-2">
-      <label className="flex min-h-11 items-center gap-2 text-xs text-foreground-muted">
+      <label className="flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
         <input
           type="checkbox"
           checked={onlyUnrated}
@@ -389,7 +400,7 @@ export function ListControls({
         />
         미평가만 보기
       </label>
-      <label className="flex min-h-11 items-center gap-2 text-xs text-foreground-muted">
+      <label className="flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
         <input
           type="checkbox"
           checked={collapseDone}
@@ -399,7 +410,7 @@ export function ListControls({
         평가 완료 항목 접기
       </label>
       {onlyUnrated && hiddenCount > 0 && (
-        <span className="text-xs text-foreground-subtle">평가한 {hiddenCount}개는 숨겨져 있어요.</span>
+        <span className="t-caption text-foreground-subtle">평가한 {hiddenCount}개는 숨겨져 있어요.</span>
       )}
     </div>
   );
@@ -432,7 +443,7 @@ export function SuggestionEditor({
           {items.map((item, i) => (
             <li key={i} className="rounded-element border border-dashed border-primary-border bg-primary-subtle p-4">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-primary">
+                <span className="t-caption-2 font-semibold text-primary">
                   신규 {kind} 제안 {i + 1}
                 </span>
                 <button
@@ -477,7 +488,7 @@ export function SuggestionEditor({
                 </label>
               </div>
               {!item.name.trim() && (
-                <p id={warnId(i)} className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-warning">
+                <p id={warnId(i)} className="mt-2 flex items-start gap-1.5 t-caption leading-5 text-warning">
                   {/* 색(주황)만으로 경고를 알리지 않도록 아이콘을 함께 둔다. */}
                   <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>

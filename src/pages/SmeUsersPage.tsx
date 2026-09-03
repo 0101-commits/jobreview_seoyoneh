@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchCompaniesResult } from '@/lib/jobApi';
 import { Button } from '@/components/ui/Button';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { DataTable } from '@/components/ui/DataTable';
 import { FallbackView } from '@/components/ui/FallbackView';
@@ -66,6 +67,8 @@ export function UsersPage({
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'name', asc: true });
   const [page, setPage] = useState(1);
   const { toast, showToast, dismiss } = useToast();
+  // 닫기가 필요한 알림은 Snackbar로 낸다 — Toast에는 닫기 버튼이 없다(v3 T3).
+  const { snackbar, showSnackbar, dismiss: dismissSnackbar } = useSnackbar();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const loadCompanies = useCallback(async () => {
@@ -161,10 +164,10 @@ export function UsersPage({
     <>
       <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             총 {smeList.length}명{query && ` · 검색 결과 ${visible.length}명`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">SME 계정 관리</h2>
+          <h2 className="t-title text-foreground">SME 계정 관리</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
@@ -196,7 +199,7 @@ export function UsersPage({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-1 w-56 rounded-element border border-border bg-card py-1 shadow-2"
+                className="absolute right-0 z-popover mt-1 w-56 rounded-element border border-border bg-elevated py-1 shadow-2"
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
                     setMenuOpen(false);
@@ -212,7 +215,7 @@ export function UsersPage({
                     setMenuOpen(false);
                     setShowBulkDelete(true);
                   }}
-                  className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-sm text-destructive transition hover:bg-destructive-muted disabled:cursor-not-allowed disabled:text-foreground-subtle disabled:hover:bg-transparent"
+                  className="flex min-h-11 w-full items-center gap-2 px-3 text-left t-label text-destructive transition hover:bg-destructive-muted disabled:cursor-not-allowed disabled:text-foreground-subtle disabled:hover:bg-transparent"
                 >
                   <Trash2 size={15} aria-hidden="true" /> SME 계정 전체 삭제
                 </button>
@@ -223,6 +226,7 @@ export function UsersPage({
       </div>
 
       <Toast toast={toast} onDismiss={dismiss} />
+      <Snackbar snackbar={snackbar} onDismiss={dismissSnackbar} />
 
       {companyError && (
         <SectionMessage variant="cautionary" className="mb-4">
@@ -230,7 +234,7 @@ export function UsersPage({
         </SectionMessage>
       )}
 
-      <div className="mb-4 rounded-element border border-border bg-muted px-4 py-3 text-xs text-foreground-muted">
+      <div className="mb-4 rounded-element border border-border bg-muted px-4 py-3 t-caption text-foreground-muted">
         개별 추가는 1명씩 등록할 때, 수정은 각 행의 '관리' 버튼을 이용할 때, Excel 전체 업로드는 여러 SME 계정을 한 번에
         등록할 때 사용합니다.
       </div>
@@ -242,7 +246,7 @@ export function UsersPage({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="input pl-9"
+              className="input pl-10"
               placeholder="이름, 이메일, 소속조직, 사번 검색"
               aria-label="SME 계정 검색"
             />
@@ -360,7 +364,7 @@ export function UsersPage({
             />
 
             {visible.length > PAGE_SIZE && (
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 t-label">
                 <p className="text-foreground-muted">
                   {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, visible.length)} / 총{' '}
                   {visible.length}명
@@ -411,13 +415,13 @@ export function UsersPage({
           onClose={() => setShowBulkUpload(false)}
           onCompleted={({ created, failed, aborted }) => {
             if (created > 0) fetchSmes();
-            showToast({
+            showSnackbar({
               type: failed === 0 && !aborted ? 'success' : 'warning',
               msg:
                 failed === 0 && !aborted
                   ? `SME ${created}명을 등록했어요.`
                   : `SME ${created}명 등록, ${failed}명 실패${aborted ? ' (중단됨)' : ''} — 실패 목록은 모달에서 확인해 주세요.`,
-              duration: 8000,
+              duration: 'long',
             });
           }}
         />
@@ -431,13 +435,13 @@ export function UsersPage({
           onClose={() => setShowBulkDelete(false)}
           onCompleted={({ deleted, failed, aborted }) => {
             if (deleted > 0) fetchSmes();
-            showToast({
+            showSnackbar({
               type: failed === 0 && !aborted ? 'success' : 'warning',
               msg:
                 failed === 0 && !aborted
                   ? `SME ${deleted}명을 삭제했어요.`
                   : `SME ${deleted}명 삭제, ${failed}명 실패${aborted ? ' (중단됨)' : ''} — 실패 목록은 모달에서 확인해 주세요.`,
-              duration: 8000,
+              duration: 'long',
             });
           }}
         />

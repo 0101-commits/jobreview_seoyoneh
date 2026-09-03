@@ -64,21 +64,21 @@ function KpiCard({
       to={to}
       className="flex min-h-11 flex-col rounded-container border border-border bg-card p-4 shadow-1 transition hover:border-primary"
     >
-      <p className="flex items-center gap-1.5 text-xs text-foreground-muted">
+      <p className="flex items-center gap-1.5 t-caption text-foreground-muted">
         <Icon size={13} className="shrink-0" aria-hidden="true" />
         {label}
       </p>
       <p
-        className={`mt-3 font-semibold ${value.length > 5 ? 'text-lg' : 'text-2xl'} ${
+        className={`mt-3 font-semibold ${value.length > 5 ? 't-headline' : 't-title'} ${
           state === 'ready' ? tone : 'text-foreground-subtle'
         }`}
       >
         {state === 'ready' ? value : '–'}
       </p>
-      <p className="mt-1 text-[11px] text-foreground-subtle">
+      <p className="mt-1 t-caption-2 text-foreground-subtle">
         {state === 'loading' ? '불러오는 중…' : state === 'error' ? '조회 실패' : sub}
       </p>
-      <p className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+      <p className="mt-3 inline-flex items-center gap-1 t-caption-2 font-medium text-primary">
         {linkLabel}
         <ArrowRight size={11} aria-hidden="true" />
       </p>
@@ -110,7 +110,7 @@ function DurationCard({
   if (!stats) {
     if (!error) return null;
     return (
-      <section className="mt-7 rounded-container border border-border bg-card p-5 text-sm text-foreground-subtle shadow-1">
+      <section className="mt-8 rounded-container border border-border bg-card p-5 t-label text-foreground-subtle shadow-1">
         소요 실측을 불러오지 못했어요. {error}
       </section>
     );
@@ -123,13 +123,13 @@ function DurationCard({
   const diff = hasMedian && expectedMinutes !== null ? Math.round((medianMinutes - expectedMinutes) * 10) / 10 : null;
 
   return (
-    <section className="mt-7 rounded-container border border-border bg-card p-5 shadow-1">
+    <section className="mt-8 rounded-container border border-border bg-card p-5 shadow-1">
       <div className="flex items-start gap-2">
         <Timer size={15} className="mt-0.5 shrink-0 text-foreground-muted" aria-hidden="true" />
         <div>
           <h3 className="font-semibold text-foreground">직무당 소요 중앙값(실측)</h3>
           {/* 이 화면이 무엇의 근거인지 한 줄로 남긴다(§6-1 · R4). */}
-          <p className="mt-1 text-xs text-foreground-subtle">
+          <p className="mt-1 t-caption text-foreground-subtle">
             착수보고 11면 「현업 SME 1인당 예상 소요: 직무당 약 ○○분(착수 후 확정)」을 채우는 실측 근거입니다.
             SME가 검토 화면에 머문 구간의 합이며, 제출을 마친 검토만 셉니다. SME 화면에는 표시되지 않습니다.
           </p>
@@ -140,20 +140,20 @@ function DurationCard({
         <div className="border border-border bg-muted p-4">
           {hasMedian ? (
             <>
-              <p className="text-2xl font-semibold text-primary">{minuteText(medianMinutes)}</p>
-              <p className="mt-1 text-xs text-foreground-muted">표본 {sampleSize}건(제출 완료 검토 기준)</p>
+              <p className="t-title text-primary">{minuteText(medianMinutes)}</p>
+              <p className="mt-1 t-caption text-foreground-muted">표본 {sampleSize}건(제출 완료 검토 기준)</p>
             </>
           ) : (
             <>
               {/* 표본이 적을 때 숫자를 단정하지 않는다 — 그 수가 그대로 계약 문구가 되기 때문이다. */}
-              <p className="text-lg font-semibold text-foreground-muted">표본 부족</p>
-              <p className="mt-1 text-xs text-foreground-muted">
+              <p className="t-headline text-foreground-muted">표본 부족</p>
+              <p className="mt-1 t-caption text-foreground-muted">
                 기록된 완료 검토 {sampleSize}건. {MIN_SAMPLE}건 이상 모이면 중앙값을 표시합니다.
               </p>
             </>
           )}
           {missingRecordCount > 0 && (
-            <p className="mt-2 text-[11px] text-foreground-subtle">
+            <p className="mt-2 t-caption-2 text-foreground-subtle">
               완료 검토 {missingRecordCount}건은 소요 기록이 없어 분모에서 제외했습니다(창을 닫아 구간이 열린 채 끝난
               경우).
             </p>
@@ -161,8 +161,8 @@ function DurationCard({
         </div>
 
         <div className="border border-dashed border-border p-4">
-          <p className="text-xs font-medium text-foreground">운영 설정 「예상 소요」 반영</p>
-          <p className="mt-1.5 text-xs leading-relaxed text-foreground-muted">
+          <p className="t-caption font-medium text-foreground">운영 설정 「예상 소요」 반영</p>
+          <p className="mt-1.5 t-caption leading-relaxed text-foreground-muted">
             {/*
               세 상태를 각각 다르게 말한다. 특히 조회 실패(FAILED)를 「비어 있습니다」로 적으면,
               값을 이미 넣어 둔 관리자에게 앱이 "안 넣으셨습니다"라고 되돌려 말하게 된다.
@@ -181,7 +181,7 @@ function DurationCard({
           </p>
           <Link
             to="/settings"
-            className="mt-3 inline-flex min-h-11 items-center gap-1 text-[11px] font-medium text-primary"
+            className="mt-3 inline-flex min-h-11 items-center gap-1 t-caption-2 font-medium text-primary"
           >
             운영 설정 열기
             <ArrowRight size={11} aria-hidden="true" />
@@ -191,13 +191,13 @@ function DurationCard({
 
       {stepRows.length > 0 && (
         <div className="mt-5">
-          <p className="text-xs font-medium text-foreground">단계별 중앙값</p>
-          <p className="mt-1 text-[11px] text-foreground-subtle">
+          <p className="t-caption font-medium text-foreground">단계별 중앙값</p>
+          <p className="mt-1 t-caption-2 text-foreground-subtle">
             어느 단계가 오래 걸리는지가 부담을 줄일 자리입니다. 단계마다 표본 수가 다릅니다.
           </p>
           <ul className="mt-3 space-y-1.5">
             {stepRows.map((s) => (
-              <li key={s.step} className="flex items-center gap-3 text-xs">
+              <li key={s.step} className="flex items-center gap-3 t-caption">
                 <span className="w-44 shrink-0 truncate text-foreground-muted">{s.label}</span>
                 <span className="h-2 min-w-[2px] bg-primary" style={{ width: `${((s.medianMinutes ?? 0) / stepMax) * 55}%` }} aria-hidden="true" />
                 <span className="text-foreground">{s.medianMinutes === null ? '–' : minuteText(s.medianMinutes)}</span>
@@ -443,16 +443,16 @@ export function Dashboard({
 
   return (
     <>
-      <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             {loading
               ? '검토 현황을 불러오는 중이에요.'
               : loadedAt
                 ? `${loadedAt.toLocaleString('ko-KR', timeFormat)} 조회 기준`
                 : '조회 시각을 확인할 수 없어요.'}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">검토 현황을 확인하세요.</h2>
+          <h2 className="t-title text-foreground">검토 현황을 확인하세요.</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={filter} onChange={setFilter} />
@@ -463,7 +463,7 @@ export function Dashboard({
       </div>
 
       {statsError && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>상단 지표를 불러오지 못했어요. {statsError} 잠시 후 다시 시도해 주세요.</span>
@@ -474,14 +474,14 @@ export function Dashboard({
         </div>
       )}
 
-      <div className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
       </div>
 
       {error && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>검토 현황을 불러오지 못했어요. {error} 잠시 후 다시 시도해 주세요.</span>
@@ -494,12 +494,12 @@ export function Dashboard({
 
       <DurationCard stats={duration} error={durationError} />
 
-      <div className="mt-7 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+      <div className="mt-8 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
         <section className="rounded-container border border-border bg-card p-5 shadow-1">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold text-foreground">SME별 검토 현황</h3>
-              <p className="mt-1 text-xs text-foreground-subtle">SME별 제출 완료 · 작성 중 · 미실시 건수</p>
+              <p className="mt-1 t-caption text-foreground-subtle">SME별 제출 완료 · 작성 중 · 미실시 건수</p>
             </div>
             <Button variant="ghost" size="sm" onClick={() => openReviews('ALL')}>
               전체보기
@@ -586,7 +586,7 @@ export function Dashboard({
                 : `배정 ${distTotal}건 기준 · SME ${stats?.smeCount ?? 0}명 · 응답률 ${distRate}%`}
           </p>
           {statsState === 'ready' && distTotal > 0 ? (
-            <div className="mt-7 flex flex-col items-center gap-7 sm:flex-row">
+            <div className="mt-8 flex flex-col items-center gap-8 sm:flex-row">
               <div
                 role="img"
                 aria-label={donutLabel}
@@ -594,13 +594,13 @@ export function Dashboard({
                 style={{ background: `conic-gradient(${conic})` }}
               >
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-card text-center">
-                  <span className="text-xl font-semibold text-foreground">
+                  <span className="t-heading text-foreground">
                     {distRate}
                     <small className="t-caption">%</small>
                   </span>
                 </div>
               </div>
-              <ul className="w-full space-y-1 text-xs">
+              <ul className="w-full space-y-1 t-caption">
                 {dist.map(({ label, n, color, status }) => (
                   <li key={label}>
                     <button
@@ -629,7 +629,7 @@ export function Dashboard({
             <FallbackView
               compact
               kind={statsState === 'error' ? 'error' : 'empty'}
-              className="mt-7 rounded-element border border-dashed border-border"
+              className="mt-8 rounded-element border border-dashed border-border"
               description={
                 statsState === 'loading'
                   ? '검토 현황을 불러오는 중이에요.'

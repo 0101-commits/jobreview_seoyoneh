@@ -6,18 +6,97 @@
 @tailwind utilities;
 
 /*
-  디자인 토큰. Tailwind v3이므로 @theme(v4 문법)은 쓸 수 없고,
+  ── 원시 색(atomic) ────────────────────────────────────────────────────────────
+  v3 T1. montage 규약: 원시 색은 "색상군 + 명도(0~100)"로만 부르고 숫자가 클수록 밝다.
+  회색은 촘촘히(montage 21단), 유채색은 성기게 둔다.
+
+  왜 만들었나 — v2까지는 역할 토큰에 hex를 직접 박았다(`--primary: 36 125 124`).
+  그래서 hover·pressed·다크 값이 필요할 때마다 "조금 어두운 값"을 사람이 눈으로 골랐고,
+  다크 쌍 40여 값에 승급 규칙이 없었다. 이제 명도 숫자가 그 근거를 대신한다.
+
+  두 계열만 원시화한 이유: teal(브랜드)과 cool(중립)만 hover·pressed·다크 파생 상태를 갖는다.
+  상태색(success/warning/destructive)은 파생 상태가 없어 역할 토큰 한 층으로 남긴다 —
+  층을 늘려도 고를 값이 생기지 않는다.
+
+  값은 v2에서 쓰던 것을 명도순으로 재배열한 것뿐이며 새 색을 만들지 않았다.
+  따라서 이 커밋 전후로 화면에 나오는 색은 완전히 같다(차트 5·6만 신규).
+  화면 코드는 원시 색을 직접 쓰지 않는다 — 역할 토큰만 참조한다.
+*/
+:root {
+  /* teal — 브랜드 계열 */
+  --teal-10: 10 26 26;      /* #0a1a1a */
+  --teal-22: 22 61 61;      /* #163d3d */
+  --teal-30: 24 82 81;      /* #185251 */
+  --teal-35: 36 95 93;      /* #245f5d */
+  --teal-38: 31 104 103;    /* #1f6867 */
+  --teal-45: 36 125 124;    /* #247d7c */
+  --teal-56: 46 155 154;    /* #2e9b9a */
+  --teal-75: 115 208 197;   /* #73d0c5 */
+  --teal-82: 143 219 210;   /* #8fdbd2 */
+  --teal-88: 168 230 222;   /* #a8e6de */
+  --teal-90: 184 229 226;   /* #b8e5e2 */
+  --teal-98: 237 248 247;   /* #edf8f7 */
+
+  /* cool — 중립 계열 */
+  --cool-6:  2 6 12;        /* #02060c */
+  --cool-10: 15 23 35;      /* #0f1723 */
+  --cool-12: 15 23 42;      /* #0f172a */
+  --cool-18: 24 38 53;      /* #182635 */
+  --cool-20: 30 41 59;      /* #1e293b */
+  --cool-22: 30 45 62;      /* #1e2d3e */
+  --cool-25: 36 52 70;      /* #243446 */
+  --cool-30: 45 62 82;      /* #2d3e52 */
+  --cool-40: 71 85 105;     /* #475569 */
+  --cool-45: 91 103 121;    /* #5b6779 */
+  --cool-48: 102 112 127;   /* #66707f */
+  --cool-50: 100 116 139;   /* #64748b */
+  --cool-55: 118 134 156;   /* #76869c */
+  --cool-58: 124 139 161;   /* #7c8ba1 */
+  --cool-65: 148 163 184;   /* #94a3b8 */
+  --cool-70: 155 168 186;   /* #9ba8ba */
+  --cool-75: 176 188 204;   /* #b0bccc */
+  --cool-80: 203 213 225;   /* #cbd5e1 */
+  --cool-88: 226 232 240;   /* #e2e8f0 */
+  --cool-92: 236 240 245;   /* #ecf0f5 */
+  --cool-95: 241 245 249;   /* #f1f5f9 */
+  --cool-96: 245 246 248;   /* #f5f6f8 */
+  --cool-98: 248 250 252;   /* #f8fafc */
+
+  --common-100: 255 255 255;
+
+  /*
+    차트 전용 유채색(v3 T1). 상태색을 데이터 구분에 쓰지 않는다는 montage 규약("semantic ≠ chart")
+    때문에 계열이 5개를 넘으면 쓸 색이 없었다. teal·cool 밖의 두 색상군을 여기서만 추가한다.
+  */
+  --blue-38: 51 96 143;     /* #33608f */
+  --blue-45: 61 111 168;    /* #3d6fa8 */
+  --blue-70: 126 168 216;   /* #7ea8d8 */
+  --violet-38: 92 79 143;   /* #5c4f8f */
+  --violet-45: 107 92 165;  /* #6b5ca5 */
+  --violet-70: 163 150 216; /* #a396d8 */
+}
+
+/*
+  ── 역할 토큰(semantic) ────────────────────────────────────────────────────────
+  Tailwind v3이므로 @theme(v4 문법)은 쓸 수 없고,
   :root CSS 변수 + tailwind.config.js의 theme.extend 참조가 유일한 경로입니다.
-  색상 값은 반드시 "공백 구분 RGB 채널"로 적습니다.
-  hex로 적으면 bg-white/95, bg-slate-900/40 같은 투명도 유틸이 전부 깨집니다.
+  색상 값은 반드시 "공백 구분 RGB 채널"입니다 — hex로 적으면
+  bg-white/95, bg-slate-900/40 같은 투명도 유틸이 전부 깨집니다.
   토큰명에 명도를 넣지 않습니다(역할 기반). 배경 토큰은 전경 토큰과 쌍으로만 추가합니다.
 */
 :root {
   /* 표면 */
-  --background: 245 246 248;   /* #f5f6f8 현행 캔버스 */
-  --card: 255 255 255;         /* #ffffff */
-  --muted: 248 250 252;        /* #f8fafc */
-  --border: 226 232 240;       /* #e2e8f0 — 구분선 전용. card 위 1.23:1이라 '보이는 경계'가 아니다 */
+  --background: var(--cool-96);   /* 현행 캔버스 */
+  --card: var(--common-100);
+  /*
+    떠 있는 면(v3 T1). 라이트에서는 card와 같은 값이지만 다크에서 한 단 갈라진다 —
+    montage는 background를 normal·elevated·transparent·status 네 갈래로 나누고,
+    다크에서만 normal 15 / elevated 17로 벌린다. 모달·드롭다운·토스트가 카드와
+    같은 면 색을 쓰면 다크에서 층위가 사라진다.
+  */
+  --elevated: var(--common-100);
+  --muted: var(--cool-98);
+  --border: var(--cool-88);       /* 구분선 전용. card 위 1.23:1이라 '보이는 경계'가 아니다 */
 
   /*
     입력 칸·폼 컨트롤 테두리 전용. WCAG 1.4.11 비텍스트 대비는 사용자 인터페이스 구성요소의
@@ -28,11 +107,11 @@
     구분선까지 전 화면에서 쓰인다. 그 값을 3:1로 올리면 경계선이 전부 진해져 화면이 무거워진다.
     "보여야 하는 것은 컨트롤의 경계"이므로 컨트롤에만 이 토큰을 쓴다.
 
-    #7c8ba1 대비비 — card #ffffff 3.46:1 · background #f5f6f8 3.20:1 · muted #f8fafc 3.31:1 ·
+    cool-58(#7c8ba1) 대비비 — card #ffffff 3.46:1 · background #f5f6f8 3.20:1 · muted #f8fafc 3.31:1 ·
     primary-subtle #edf8f7 3.19:1. 이 파일의 밝은 표면 전부에서 3:1을 넘는다.
     값을 다시 밝히려면 위 네 조합의 대비비를 먼저 계산해 3:1 이상인지 확인하세요.
   */
-  --border-input: 124 139 161; /* #7c8ba1 */
+  --border-input: var(--cool-58);
 
   /*
     텍스트 — 대비비는 WCAG 2.2 AA 본문 기준 4.5:1로 맞춥니다(§8 S8).
@@ -41,29 +120,33 @@
     전부에 대해 계산한 것이고, 괄호 안은 그중 가장 나쁜 조합입니다.
 
     Phase 5 조정(2026-09-01) — 보조 텍스트 두 토큰이 AA에 미달해 값을 낮췄습니다.
-      · foreground-muted  #64748b → #5b6779
+      · foreground-muted  #64748b → #5b6779 (cool-45)
         변경 전 4.33~4.76 (최악: destructive-muted 위 4.33 — 문의 모달 오류 상자의 보조 문장)
         변경 후 5.22~5.74
-      · foreground-subtle #94a3b8 → #66707f
+      · foreground-subtle #94a3b8 → #66707f (cool-48)
         변경 전 2.33~2.56 (최악: destructive-muted 위 2.33 — 입력 칸 placeholder·"미입력" 표기 등 전부 미달)
         변경 후 4.56~5.01
     두 토큰의 명도 차가 좁아진 것은 의도한 결과입니다. 4.5:1을 넘기려면 흰 배경에서 5:1 언저리보다
     밝을 수 없어, AA를 지키면서 "본문 > 보조 > 흐린 보조"의 순서만 유지할 수 있는 폭이 이만큼입니다
     (foreground 13.5:1 > muted 5.74:1 > subtle 5.01:1, 흰 배경 기준).
     값을 다시 밝히려면 그 조합의 대비비를 먼저 계산해 4.5:1 이상인지 확인하세요.
+
+    v3 T1 판정 — montage의 label 6단 중 assistive(28% 알파) 자리는 만들지 않는다.
+    subtle이 이미 최악 조합 4.56:1이라 그 아래로 한 단을 더 두면 본문 대비가 AA 미달이 된다.
+    보조 텍스트가 더 필요하면 색을 흐리는 대신 크기·굵기(.t-caption / regular)로 위계를 낸다.
   */
-  --foreground: 30 41 59;          /* #1e293b — 14.63:1 (background 위 13.53:1) */
-  --foreground-muted: 91 103 121;  /* #5b6779 — 5.74:1 (destructive-muted 위 5.22:1) */
-  --foreground-subtle: 102 112 127;/* #66707f — 5.01:1 (destructive-muted 위 4.56:1) */
+  --foreground: var(--cool-20);          /* 14.63:1 (background 위 13.53:1) */
+  --foreground-muted: var(--cool-45);    /* 5.74:1 (destructive-muted 위 5.22:1) */
+  --foreground-subtle: var(--cool-48);   /* 5.01:1 (destructive-muted 위 4.56:1) */
 
   /* 브랜드 */
-  --primary: 36 125 124;         /* #247d7c */
-  --primary-hover: 31 104 103;   /* #1f6867 (#1d6867 혼용을 이 값으로 통일) */
-  --primary-subtle: 237 248 247; /* #edf8f7 */
-  --primary-border: 184 229 226; /* #b8e5e2 */
-  --primary-foreground: 255 255 255;
+  --primary: var(--teal-45);
+  --primary-hover: var(--teal-38);
+  --primary-subtle: var(--teal-98);
+  --primary-border: var(--teal-90);
+  --primary-foreground: var(--common-100);
 
-  /* 상태 — rose/red 혼용을 destructive 하나로 통일 */
+  /* 상태 — rose/red 혼용을 destructive 하나로 통일. 파생 상태가 없어 원시 층을 두지 않는다. */
   --success: 4 120 87;             /* #047857 */
   --success-muted: 236 253 245;    /* #ecfdf5 */
   --success-border: 167 243 208;   /* #a7f3d0 */
@@ -84,32 +167,56 @@
     label.disable / primary.heavy / fill.* / interaction.disable / material.dimmer /
     inverse.* / elevation.shadow / accent(차트) 자리를 채운다.
   */
-  --foreground-disabled: 148 163 184; /* #94a3b8 — 비활성 텍스트 전용(본문 대비 규칙 밖) */
-  --primary-heavy: 24 82 81;          /* #185251 pressed */
+  --foreground-disabled: var(--cool-65); /* 비활성 텍스트 전용(본문 대비 규칙 밖) */
+  --primary-heavy: var(--teal-30);       /* pressed */
 
   /* fill — 표 헤더·칩 배경·hover가 각자 muted/card를 쓰던 것을 정리 */
-  --fill-strong: 241 245 249;  /* #f1f5f9 hover */
-  --fill-alt: 236 240 245;     /* #ecf0f5 표 헤더·칩 */
+  --fill-strong: var(--cool-95);  /* hover */
+  --fill-alt: var(--cool-92);     /* 표 헤더·칩 */
 
-  --interaction-disabled: 226 232 240; /* #e2e8f0 비활성 컨트롤 배경 */
-  --dimmer: 15 23 42;                  /* #0f172a — 모달 배경막(투명도는 사용처에서) */
+  --interaction-disabled: var(--cool-88); /* 비활성 컨트롤 배경 */
+
+  /*
+    배경막. v3 T1 — 세기를 사용처에서 정하지 않는다(montage: "dimmer는 값 1개로 고정").
+    v2까지는 ModalShell이 bg-dimmer/40, 모바일 사이드바 dialog가 backdrop:bg-dimmer/50이라
+    같은 성격의 막이 두 세기로 떴다. 이제 .scrim / .scrim-backdrop 유틸이 이 알파를 함께 쓴다.
+  */
+  --dimmer: var(--cool-12);
+  --dimmer-alpha: 0.45;
 
   /* 반전 표면(사이드바·로그인 좌측) — 이전에는 hex 14곳으로 흩어져 있었다 */
-  --inverse-bg: 24 38 53;          /* #182635 */
-  --inverse-label: 255 255 255;
-  --inverse-label-muted: 148 163 184; /* #94a3b8 — #182635 위 5.99:1 */
-  --inverse-accent: 115 208 197;   /* #73d0c5 */
-  --brand: 46 155 154;             /* #2e9b9a 로고 타일 */
+  --inverse-bg: var(--cool-18);
+  --inverse-label: var(--common-100);
+  --inverse-label-muted: var(--cool-65); /* #182635 위 5.99:1 */
+  --inverse-accent: var(--teal-75);
+  --brand: var(--teal-56);               /* 로고 타일 */
 
-  /* 그림자 2단(montage elevation 3단 중 앱이 쓰는 2단만) */
+  /* 그림자 2단(montage elevation 3계열 5단 중 앱이 쓰는 2단만) */
   --shadow-1: 0 1px 2px 0 rgb(15 23 42 / 0.05);
   --shadow-2: 0 10px 24px -12px rgb(15 23 42 / 0.25);
 
-  /* 차트 팔레트 — 상태색(success/warning)은 상태에만 쓴다(montage "semantic ≠ chart") */
-  --chart-1: 36 125 124;   /* #247d7c */
-  --chart-2: 115 208 197;  /* #73d0c5 */
-  --chart-3: 148 163 184;  /* #94a3b8 */
-  --chart-4: 203 213 225;  /* #cbd5e1 */
+  /*
+    차트 팔레트 — 상태색(success/warning)은 상태에만 쓴다(montage "semantic ≠ chart").
+    v3 T1에서 4색 → 6색. 계열이 6을 넘으면 색을 늘리지 않고 「기타」로 묶는다 —
+    색으로 구분할 수 없는 계열 수를 만들지 않는 것이 규약이다.
+
+    각 색에 -fg 짝을 둔 이유(montage): 같은 색이라도 면에 깔 때와 글자로 쓸 때 명도가 달라야 한다.
+    background는 눈에 잘 띄는 명도로, foreground는 흰 배경 대비 4.5:1을 넘는 명도로 내린다.
+    범례 글자·배지 텍스트는 반드시 -fg를 쓴다.
+  */
+  --chart-1: var(--teal-45);
+  --chart-2: var(--teal-75);
+  --chart-3: var(--cool-65);
+  --chart-4: var(--cool-80);
+  --chart-5: var(--blue-45);
+  --chart-6: var(--violet-45);
+
+  --chart-1-fg: var(--teal-38);    /* 6.0:1 */
+  --chart-2-fg: var(--teal-38);
+  --chart-3-fg: var(--cool-45);    /* 5.74:1 */
+  --chart-4-fg: var(--cool-48);    /* 5.01:1 */
+  --chart-5-fg: var(--blue-38);    /* 5.6:1 */
+  --chart-6-fg: var(--violet-38);  /* 6.4:1 */
 
   /* 반경 */
   --radius-inner: 4px;
@@ -121,30 +228,71 @@
   --control-sm: 32px;
   --control-md: 40px;
   --control-lg: 48px;
+
+  /*
+    ── 겹침 층(v3 T1) ─────────────────────────────────────────────────────────
+    v2까지는 z-10~z-50이 화면 20곳에 흩어져 있었고, 성격이 다른 것들이 같은 층에 있었다 —
+    사이드바와 마법사 하단 바가 둘 다 z-30, 토스트·모달·유휴 경고가 둘 다 z-50이었다.
+    그래서 모달 안에서 저장이 실패하면 토스트가 모달 뒤로 숨을 수 있었다(DOM 순서에 달려 있었다).
+
+    montage는 전역 토큰을 modal 하나만 두고 나머지는 부품이 지역적으로 정하되,
+    알림 영역만 모달보다 한참 위(5500)에 둔다. 그 배치를 그대로 가져오고
+    이 앱에 실제로 있는 층(상단 헤더·모바일 드로어)만 사이에 끼웠다.
+
+    부품 내부 겹침(표 sticky 헤더·고정 열 같은 것)은 전역 층을 쓰지 않는다 — z-[1]을 쓴다.
+  */
+  --z-popover: 10;    /* 드롭다운·팝오버·메뉴 */
+  --z-sticky: 100;    /* 상단 헤더·표 sticky 헤더 컨테이너 */
+  --z-drawer: 1200;   /* 사이드바·모바일 드로어·화면 하단 고정 바 */
+  --z-modal: 1300;    /* 모달·확인창 */
+  --z-toast: 5500;    /* 알림 영역 — 모달 위에서 읽혀야 한다 */
+
+  /*
+    ── 모션(v3 T1) ────────────────────────────────────────────────────────────
+    montage에는 모션 토큰 파일이 없고 세 값이 부품 구현에 직접 박혀 반복된다.
+    그 세 값과 이징 세 곡선을 여기서 이름으로 고정한다.
+
+    Tailwind의 맨 `transition` 유틸이 이미 150ms + cubic-bezier(0.4,0,0.2,1)이라
+    상태 피드백(hover·press) 18곳은 손대지 않아도 fast 규격과 같다.
+    duration-base / duration-slow와 ease-* 유틸은 새로 붙이는 전이에 쓴다.
+  */
+  --motion-fast: 150ms;   /* hover·press 상태 피드백 */
+  --motion-base: 200ms;   /* 오버레이·토스트·툴팁 진입/퇴장 */
+  --motion-slow: 300ms;   /* 높이가 변하는 펼침 */
+  --motion-exit-hold: 250ms; /* 닫기 요청 후 DOM을 유지하는 시간 */
+
+  --ease-overlay: cubic-bezier(0.25, 0.1, 0.25, 1); /* 오버레이 페이드 */
+  --ease-toggle: cubic-bezier(0.4, 0, 0.2, 1);      /* 스위치·체크 상태 토글 */
+  --ease-expand: cubic-bezier(0.25, 0.1, 0.25, 1);  /* 높이·펼침 */
 }
 
 /*
   다크 값(기획안 D8). 토글 UI는 아직 없고, .dark 클래스가 붙으면 곧바로 작동하도록 쌍만 정의한다.
   반전 표면(--inverse-*)은 두 모드에서 같다 — 사이드바는 원래 어두운 면이다.
+
+  v3 T1 — 값을 개별로 정하지 않고 montage 승급 규칙을 따른다:
+  다크는 라이트를 뒤집는 것이 아니라 같은 색상군에서 한두 단계 밝은 명도를 고른다
+  (teal 45/38/30 → 75/82/88).
 */
 .dark {
-  --background: 15 23 35;
-  --card: 24 38 53;
-  --muted: 30 45 62;
-  --border: 45 62 82;
-  --border-input: 118 134 156;
+  --background: var(--cool-10);
+  --card: var(--cool-18);
+  --elevated: var(--cool-22);   /* 카드보다 한 단 밝다 — 모달·드롭다운이 카드에 묻히지 않게 */
+  --muted: var(--cool-22);
+  --border: var(--cool-30);
+  --border-input: var(--cool-55);
 
-  --foreground: 226 232 240;
-  --foreground-muted: 176 188 204;
-  --foreground-subtle: 155 168 186;
-  --foreground-disabled: 100 116 139;
+  --foreground: var(--cool-88);
+  --foreground-muted: var(--cool-75);
+  --foreground-subtle: var(--cool-70);
+  --foreground-disabled: var(--cool-50);
 
-  --primary: 115 208 197;
-  --primary-hover: 143 219 210;
-  --primary-heavy: 168 230 222;
-  --primary-subtle: 22 61 61;
-  --primary-border: 36 95 93;
-  --primary-foreground: 10 26 26;
+  --primary: var(--teal-75);
+  --primary-hover: var(--teal-82);
+  --primary-heavy: var(--teal-88);
+  --primary-subtle: var(--teal-22);
+  --primary-border: var(--teal-35);
+  --primary-foreground: var(--teal-10);
 
   --success: 52 211 153;
   --success-muted: 6 46 36;
@@ -161,18 +309,36 @@
   --destructive-border: 120 40 55;
   --destructive-foreground: 26 6 10;
 
-  --fill-strong: 36 52 70;
-  --fill-alt: 30 45 62;
-  --interaction-disabled: 45 62 82;
-  --dimmer: 2 6 12;
+  --fill-strong: var(--cool-25);
+  --fill-alt: var(--cool-22);
+  --interaction-disabled: var(--cool-30);
 
-  --shadow-1: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --shadow-2: 0 10px 24px -12px rgb(0 0 0 / 0.7);
+  --dimmer: var(--cool-6);
+  --dimmer-alpha: 0.6;
 
-  --chart-1: 115 208 197;
-  --chart-2: 36 125 124;
-  --chart-3: 148 163 184;
-  --chart-4: 71 85 105;
+  /*
+    v3 T1 — 그림자를 라이트보다 진하게 만들지 않는다.
+    montage의 .dark elevation.shadow는 라이트와 문자 그대로 같다(neutral10에 알파 0.03~0.16).
+    v2는 여기서 rgb(0 0 0 / 0.4)·0.7로 바꿔 두어 규약과 반대였다 — 다크에서 그림자를 키우는 대신
+    면 색 한 단(--elevated)으로 층위를 낸다. 그래서 그림자 값을 라이트와 통일한다.
+  */
+  --shadow-1: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-2: 0 10px 24px -12px rgb(15 23 42 / 0.25);
+
+  --chart-1: var(--teal-75);
+  --chart-2: var(--teal-45);
+  --chart-3: var(--cool-65);
+  --chart-4: var(--cool-40);
+  --chart-5: var(--blue-70);
+  --chart-6: var(--violet-70);
+
+  /* 다크에서는 -fg가 배경보다 밝아야 읽힌다 — 라이트와 방향이 반대다. */
+  --chart-1-fg: var(--teal-82);
+  --chart-2-fg: var(--teal-75);
+  --chart-3-fg: var(--cool-75);
+  --chart-4-fg: var(--cool-70);
+  --chart-5-fg: var(--blue-70);
+  --chart-6-fg: var(--violet-70);
 }
 
 @layer base {
@@ -197,37 +363,87 @@
 
 @layer components {
   /*
-    타이포 스케일(기획안 §6-3) — montage 17단계 중 이 앱이 쓰는 8단계.
-    자간은 montage 값(title3 −0.023em … caption1 +0.0252em)을 그대로 옮긴다.
-    크기·행간을 화면마다 정하지 않게 하려고 클래스로 고정한다.
+    타이포 스케일(기획안 §6-3 · v3 T2) — montage 19단 중 이 앱이 쓰는 11단.
+    크기·행간·자간을 화면마다 정하지 않게 하려고 클래스로 고정한다.
+
+    v3 T2에서 세 가지를 바로잡았다.
+     ① 3단 추가 — .t-heading-2(22/30) · .t-headline-2(17/24) · .t-caption-2(11/14).
+        없어서 화면이 text-[11px] 같은 임의값을 쓰고 있었다.
+     ② 어긋난 두 값 정정 — .t-body 행간 26→24(montage body1), .t-body-2 자간 .0091→.0096em.
+     ③ reading 쌍 3개 신설 — 크기는 같고 행간만 2px 넓다.
+        여러 줄 문단에는 -reading, 한 줄 라벨에는 기본을 쓴다(montage 규약).
+        v2의 .t-body가 이미 reading 행간이었던 탓에 한 줄 라벨도 26px로 벌어져 있었다.
+
+    자간은 크기에 반비례한다(montage: 56px −0.0319em → 17px 0em → 11px +0.0311em).
+    새 단계를 만들거나 크기를 바꿀 때 자간도 함께 옮긴다.
+
+    굵기는 3단만 쓴다 — regular 400 / medium 500 / bold.
+    bold의 실제 값은 단계별로 갈린다: title 계열만 700, heading 이하는 600.
   */
-  .t-title    { font-size: 24px; line-height: 32px; letter-spacing: -0.023em; font-weight: 600; }
-  .t-heading  { font-size: 20px; line-height: 28px; letter-spacing: -0.012em; font-weight: 600; }
-  .t-headline { font-size: 18px; line-height: 26px; letter-spacing: -0.002em; font-weight: 600; }
-  .t-body     { font-size: 16px; line-height: 26px; letter-spacing: 0.0057em; }
-  .t-body-2   { font-size: 15px; line-height: 22px; letter-spacing: 0.0091em; }
-  .t-label    { font-size: 14px; line-height: 20px; letter-spacing: 0.0145em; }
-  .t-label-2  { font-size: 13px; line-height: 18px; letter-spacing: 0.0194em; }
-  .t-caption  { font-size: 12px; line-height: 16px; letter-spacing: 0.0252em; }
+  /* display3 — 로그인 좌측 히어로 문장 한 곳에만 쓴다. 화면 제목은 .t-title이다. */
+  .t-display    { font-size: 36px; line-height: 48px; letter-spacing: -0.027em; font-weight: 700; }
+  .t-title      { font-size: 24px; line-height: 32px; letter-spacing: -0.023em; font-weight: 700; }
+  .t-heading    { font-size: 20px; line-height: 28px; letter-spacing: -0.012em; font-weight: 600; }
+  .t-heading-2  { font-size: 22px; line-height: 30px; letter-spacing: -0.0194em; font-weight: 600; }
+  .t-headline   { font-size: 18px; line-height: 26px; letter-spacing: -0.002em; font-weight: 600; }
+  .t-headline-2 { font-size: 17px; line-height: 24px; letter-spacing: 0; font-weight: 600; }
+  .t-body       { font-size: 16px; line-height: 24px; letter-spacing: 0.0057em; }
+  .t-body-2     { font-size: 15px; line-height: 22px; letter-spacing: 0.0096em; }
+  .t-label      { font-size: 14px; line-height: 20px; letter-spacing: 0.0145em; }
+  .t-label-2    { font-size: 13px; line-height: 18px; letter-spacing: 0.0194em; }
+  .t-caption    { font-size: 12px; line-height: 16px; letter-spacing: 0.0252em; }
+  .t-caption-2  { font-size: 11px; line-height: 14px; letter-spacing: 0.0311em; }
+
+  /* 여러 줄 문단용 — 크기는 같고 행간만 2px 넓다. */
+  .t-body-reading    { font-size: 16px; line-height: 26px; letter-spacing: 0.0057em; }
+  .t-body-2-reading  { font-size: 15px; line-height: 24px; letter-spacing: 0.0096em; }
+  .t-label-reading   { font-size: 14px; line-height: 22px; letter-spacing: 0.0145em; }
 
   .label { @apply mb-2 block text-xs font-medium text-foreground-muted; }
   /* 좁은 화면에서는 손가락이 닿는 높이(44px)를 보장한다 — sm 이상에서는 표 밀도를 위해 그대로 둔다. */
-  .input { @apply w-full min-h-control-lg rounded-element border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; border-color: rgb(var(--border-input)); }
-  .textarea { @apply w-full resize-y rounded-element border bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; border-color: rgb(var(--border-input)); }
+  .input { @apply w-full min-h-control-lg rounded-element border border-input bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10 sm:min-h-0; }
+  .textarea { @apply w-full resize-y rounded-element border border-input bg-card px-3 py-2.5 text-sm leading-6 text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:ring-2 focus:ring-primary/10; }
+
 
   /*
-    .input/.textarea를 쓰지 않고 border-border 유틸을 직접 붙인 입력 칸이 아직 11곳 남아 있다
-    (JobDetailPage 9곳 · MailSendPanel textarea 1곳 · FteAnalyticsPage select 1곳). 그쪽도 같은 1.23:1
-    문제라, 파일마다 클래스를 고치는 대신 여기서 한 번에 받는다. 요소 선택자를 붙여 특이도가
-    .border-border(0,1,0)보다 높고(0,1,1), focus 변형(.focus\:border-primary:focus = 0,2,0)보다는
-    낮아 포커스 테두리는 그대로 primary로 뜬다.
-    ponytail: 특이도로 덮는 임시 조치다. 위 6곳이 .input/.textarea로 옮겨지면 이 블록은 지운다.
+    배경막(v3 T1). 세기를 사용처에서 정하지 않기 위한 유틸 두 개.
+    .scrim은 일반 요소, .scrim-backdrop은 <dialog>의 ::backdrop에 쓴다.
+    둘이 같은 --dimmer-alpha를 읽으므로 세기가 갈라지지 않는다.
   */
-  input.border-border,
-  select.border-border,
-  textarea.border-border { border-color: rgb(var(--border-input)); }
+  .scrim { background-color: rgb(var(--dimmer) / var(--dimmer-alpha)); }
+  .scrim-backdrop::backdrop { background-color: rgb(var(--dimmer) / var(--dimmer-alpha)); }
+
+  /*
+    떠오르는 면의 진입 전이(v3 T4).
+
+    v2까지 모달·드로어는 전이 없이 즉시 나타나고 사라졌다 — 어디서 왔는지 알 수 없어
+    화면이 바뀐 사실을 눈이 놓쳤다. montage는 오버레이 진입/퇴장을 base(200ms)로 잡는다.
+
+    퇴장은 넣지 않았다. 퇴장을 그리려면 닫기 요청 뒤 250ms 동안 DOM을 살려 두는 상태가
+    필요한데(montage animation-presence), 그 상태를 ModalShell·MobileDrawer 양쪽에 넣는 값이
+    지금 얻는 것보다 크다. 진입만으로 "새로 떴다"는 신호는 충분히 전달된다.
+
+    감소 모션에서는 이 파일 맨 아래 블록이 animation-duration을 0.01ms로 덮는다.
+  */
+  @keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes panel-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes drawer-in {
+    from { transform: translateX(-100%); }
+    to   { transform: none; }
+  }
+
+  .anim-scrim  { animation: scrim-in var(--motion-base) var(--ease-overlay) both; }
+  .anim-panel  { animation: panel-in var(--motion-base) var(--ease-overlay) both; }
+  .anim-drawer { animation: drawer-in var(--motion-base) var(--ease-overlay) both; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /*
+    montage 원천에는 prefers-reduced-motion이 한 건도 없다 — 이 블록은 이 앱의 자산이다.
+    T4에서 새로 붙이는 전이(모달·드로어·펼침)도 여기서 함께 꺼진다.
+  */
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

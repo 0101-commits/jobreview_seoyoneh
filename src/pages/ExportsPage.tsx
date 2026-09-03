@@ -253,17 +253,17 @@ export function ExportsPage({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             스키마 버전 {EXPORT_SCHEMA_VERSION} · 대상 회사 {companyLabel}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">산출물 내보내기</h2>
+          <h2 className="t-title text-foreground">산출물 내보내기</h2>
         </div>
         <div className="flex items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
         </div>
       </div>
 
-      <div className="mb-5 border border-border bg-muted p-4 text-sm text-foreground-muted">
+      <div className="mb-5 border border-border bg-muted p-4 t-label text-foreground-muted">
         <p className="flex items-start gap-2">
           <Info size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>
@@ -288,29 +288,29 @@ export function ExportsPage({
               aria-labelledby={`export-${definition.id}-title`}
             >
               <div className="mb-2 flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 rounded-element border border-primary-border bg-primary-subtle px-2 py-0.5 text-xs font-semibold text-primary">
+                <span className="mt-0.5 shrink-0 rounded-element border border-primary-border bg-primary-subtle px-2 py-0.5 t-caption font-semibold text-primary">
                   {definition.id}
                 </span>
-                <h3 id={`export-${definition.id}-title`} className="text-base font-semibold text-foreground">
+                <h3 id={`export-${definition.id}-title`} className="t-body font-semibold text-foreground">
                   {definition.name}
                 </h3>
               </div>
 
-              <p className="mb-3 text-sm leading-relaxed text-foreground-muted">{definition.description}</p>
+              <p className="mb-3 t-label leading-relaxed text-foreground-muted">{definition.description}</p>
 
               {/* §9 표의 '산출물 매핑' 열 문언 그대로. 이 칩이 검수 증빙의 연결고리다. */}
               <div className="mb-3 flex flex-wrap gap-1.5">
                 {definition.deliverables.map((label) => (
                   <span
                     key={label}
-                    className="rounded-element border border-border bg-muted px-2 py-0.5 text-xs text-foreground-subtle"
+                    className="rounded-element border border-border bg-muted px-2 py-0.5 t-caption text-foreground-subtle"
                   >
                     {label}
                   </span>
                 ))}
               </div>
 
-              <ul className="mb-3 space-y-1 text-xs text-foreground-subtle">
+              <ul className="mb-3 space-y-1 t-caption text-foreground-subtle">
                 {definition.sheets.map((sheet) => (
                   <li key={sheet.name} className="flex items-start gap-1.5">
                     <FileSpreadsheet size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -324,7 +324,7 @@ export function ExportsPage({
               {/* E2만. 같은 데이터라도 어느 응답까지 세느냐로 수치가 달라진다(§9 E2). */}
               {definition.hasBasisToggle && (
                 <div className="mb-3 border border-border bg-muted p-3">
-                  <p className="mb-2 text-xs font-medium text-foreground-muted">집계 기준</p>
+                  <p className="mb-2 t-caption font-medium text-foreground-muted">집계 기준</p>
                   <div className="flex flex-wrap gap-2" role="group" aria-label="집계 기준 선택">
                     {BASIS_OPTIONS.map((option) => {
                       const on = basis === option;
@@ -334,7 +334,7 @@ export function ExportsPage({
                           type="button"
                           aria-pressed={on}
                           onClick={() => setBasis(option)}
-                          className={`min-h-11 rounded-element border px-3 text-xs font-medium transition sm:min-h-control-sm ${
+                          className={`min-h-11 rounded-element border px-3 t-caption font-medium transition sm:min-h-control-sm ${
                             on
                               ? 'border-primary bg-primary-subtle text-primary'
                               : 'border-border bg-card text-foreground-muted hover:border-primary hover:text-primary'
@@ -345,7 +345,7 @@ export function ExportsPage({
                       );
                     })}
                   </div>
-                  <p className="mt-2 text-xs text-foreground-subtle">
+                  <p className="mt-2 t-caption text-foreground-subtle">
                     선택한 기준은 파일의 「내보내기 정보」에 함께 기록됩니다.
                   </p>
                 </div>
@@ -353,7 +353,7 @@ export function ExportsPage({
 
               {/* 계열사 필터가 그대로 걸리지 않는 시트가 있는 Export(E5 감사 로그). 파일에도 같은 문구가 실린다. */}
               {definition.scopeNote && (
-                <p className="mb-3 flex items-start gap-1.5 text-xs text-foreground-subtle">
+                <p className="mb-3 flex items-start gap-1.5 t-caption text-foreground-subtle">
                   <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>{definition.scopeNote}</span>
                 </p>
@@ -380,13 +380,13 @@ export function ExportsPage({
                 '여러 파일 다운로드' 권한으로 묻고, 막히면 코드에서는 알 수 없다(exportFile.saveBlob).
                 그래서 누르기 전에 몇 개가 내려가는지 미리 알린다.
               */}
-              <p className="mt-2 text-xs text-foreground-subtle">
+              <p className="mt-2 t-caption text-foreground-subtle">
                 CSV는 시트마다 파일 1개씩 모두 {expectedFileCount(definition, 'CSV')}개를 따로 내려받습니다. 브라우저가
                 &lsquo;여러 파일 다운로드&rsquo;를 물으면 허용해 주세요.
               </p>
 
               {/* 진행·결과는 카드 안에서만 알린다. aria-live로 스크린리더에도 전달한다. */}
-              <div aria-live="polite" className="mt-3 min-h-[1.25rem] text-xs">
+              <div aria-live="polite" className="mt-3 min-h-[1.25rem] t-caption">
                 {state.kind === 'RUNNING' && (
                   <p className="text-foreground-muted">{state.format} 생성 중… 데이터를 모으고 있어요.</p>
                 )}
@@ -438,15 +438,15 @@ export function ExportsPage({
       <section className="mt-6 rounded-container border border-border bg-card p-4 shadow-1" aria-labelledby="snapshot-title">
         <div className="mb-2 flex items-start gap-2">
           <DatabaseBackup size={18} className="mt-0.5 shrink-0 text-foreground-muted" aria-hidden="true" />
-          <h3 id="snapshot-title" className="text-base font-semibold text-foreground">
+          <h3 id="snapshot-title" className="t-body font-semibold text-foreground">
             수동 스냅샷 (백업)
           </h3>
         </div>
-        <p className="mb-3 text-sm leading-relaxed text-foreground-muted">
+        <p className="mb-3 t-label leading-relaxed text-foreground-muted">
           주요 테이블 {SNAPSHOT_TABLES.length}종을 JSON 한 파일로 내려받습니다. 계약 산출물이 아니라 복원용 백업이라
           계열사 필터가 걸리지 않고 전사 데이터가 담깁니다. 한 표라도 조회에 실패하면 파일을 만들지 않습니다.
         </p>
-        <p className="mb-3 flex items-start gap-2 border border-warning-border bg-warning-muted p-3 text-xs leading-5 text-warning">
+        <p className="mb-3 flex items-start gap-2 border border-warning-border bg-warning-muted p-3 t-caption leading-5 text-warning">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span>{PERSONAL_DATA_WARNING}</span>
         </p>
@@ -459,7 +459,7 @@ export function ExportsPage({
         >
           {snapshot.kind !== 'RUNNING' && <Download size={14} aria-hidden="true" />} 스냅샷 내려받기
         </Button>
-        <div aria-live="polite" className="mt-3 min-h-[1.25rem] text-xs">
+        <div aria-live="polite" className="mt-3 min-h-[1.25rem] t-caption">
           {snapshot.kind === 'RUNNING' && <p className="text-foreground-muted">표를 하나씩 읽고 있어요…</p>}
           {snapshot.kind === 'DONE' && (
             <p className="flex items-start gap-1.5 text-success">
@@ -485,7 +485,7 @@ export function ExportsPage({
       </section>
 
       {/* §2 하단·§6-3 ⓒ 범위 종료선. 산출물을 뽑는 자리에도 같은 경계를 붙여 둔다. */}
-      <p className="mt-6 border-t border-border pt-4 text-xs leading-relaxed text-foreground-subtle">
+      <p className="mt-6 border-t border-border pt-4 t-caption leading-relaxed text-foreground-subtle">
         {FTE_SCOPE_NOTICE}
       </p>
     </>

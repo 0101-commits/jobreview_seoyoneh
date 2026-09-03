@@ -364,7 +364,10 @@ export const fteInputLabel = (taskName: string) => `${taskName} 투입 비중`;
  * 비중 입력 칸의 단위·범위 안내(aria-describedby로 모든 입력 칸이 함께 참조한다).
  * 화살표 키 조작은 화면에 단서가 없어 이 문장이 유일한 안내다.
  */
-export const FTE_INPUT_HINT = `단위는 %이고 0에서 100 사이 정수만 입력할 수 있어요. 위·아래 화살표 키로 ${FTE_STEP_PCT}%씩 조절할 수 있어요.`;
+export const FTE_INPUT_HINT =
+  `단위는 %이고 0에서 100 사이 정수만 입력할 수 있어요. 위·아래 화살표 키로 ${FTE_STEP_PCT}%씩, ` +
+  `Shift와 함께 누르거나 Page Up·Page Down으로 ${FTE_STEP_PCT * 10}%씩 조절할 수 있어요. ` +
+  'Home은 0%, End는 100%예요.';
 
 /** 합계 100% 도달 안내. 색(초록)만으로 알리지 않도록 문구·아이콘을 함께 둔다. */
 export const FTE_DONE_LINE = '배분을 마쳤어요';

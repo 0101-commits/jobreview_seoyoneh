@@ -66,7 +66,7 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
       showToast({
         type: 'success',
         msg: "문의를 남겼습니다. 답변이 등록되면 '내 문의' 화면에서 확인하실 수 있어요.",
-        duration: 6000,
+        duration: 'long',
       });
     } catch (e) {
       // 삼키지 않는다. 사유를 그대로 보여 주고, 본문을 남긴 채 같은 버튼으로 다시 시도하게 한다.
@@ -88,11 +88,11 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
          · 폭 구간별로 값을 나누지 않는다. 하단 바는 sm~lg에서도 그대로 떠 있어서, 예전처럼
            sm 이상을 1.5rem으로 고정하면 태블릿 폭에서 버튼이 다시 게이지를 덮는다.
          · env(safe-area-inset-bottom) — iOS 홈 인디케이터 영역에 버튼이 걸리지 않게 더한다.
-         · z-40 — 본문 위, ModalShell(z-50) 아래. 모달이 열리면 버튼이 그 아래로 덮인다.
+         · z-drawer — 본문 위, 모달(z-modal) 아래. 모달이 열리면 버튼이 그 아래로 덮인다.
          · pointer-events-none — 토스트가 없을 때 빈 컨테이너가 본문 클릭을 가로채지 않게 한다.
       */}
       <div
-        className="pointer-events-none fixed right-4 z-40 flex w-[min(20rem,calc(100vw-2rem))] flex-col items-end gap-0 bottom-[calc(env(safe-area-inset-bottom,0px)+var(--sme-bottom-bar-h,1.5rem))] sm:right-6"
+        className="pointer-events-none fixed right-4 z-drawer flex w-[min(20rem,calc(100vw-2rem))] flex-col items-end gap-0 bottom-[calc(env(safe-area-inset-bottom,0px)+var(--sme-bottom-bar-h,1.5rem))] sm:right-6"
       >
         <Toast toast={toast} onDismiss={dismiss} className="pointer-events-auto w-full" />
         <Button
@@ -115,6 +115,10 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
           description="막히는 부분을 적어 주시면 담당자가 확인 후 답변드립니다."
           icon={<MessageSquarePlus size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
           onClose={() => setOpen(false)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
+          // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
+          size="lg"
           closeDisabled={saving}
           footer={
             <>
@@ -131,7 +135,7 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
             무엇이 함께 전달되는지 먼저 보여 준다. 모르는 채로 쓰면 본문에 같은 정보를 다시 적거나,
             반대로 알려지길 원치 않는 맥락이 붙는다 — 개인정보 최소 수집과 같은 결의 문제다.
           */}
-          <p className="rounded-element border border-border bg-muted px-3 py-2.5 text-xs leading-5 text-foreground-muted">
+          <p className="rounded-element border border-border bg-muted px-3 py-2.5 t-caption leading-5 text-foreground-muted">
             {jobName && (
               <>
                 직무: <span className="font-medium text-foreground">{jobName}</span> ·{' '}
@@ -147,7 +151,7 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
           )}
 
           {!reviewId && (
-            <p className="mt-2 text-xs leading-5 text-foreground-subtle">
+            <p className="mt-2 t-caption leading-5 text-foreground-subtle">
               아직 검토를 시작하지 않아 직무는 함께 전달되지 않습니다. 문의 내용에 직무명을 적어 주시면 확인이 빠릅니다.
             </p>
           )}
@@ -167,7 +171,7 @@ export function InquiryButton({ reviewId, step, jobName, inquiryContact }: Inqui
           {/* 오류는 폼 안에 남긴다 — 모달이 닫히면 사유도 본문도 함께 사라진다. */}
           <div aria-live="polite" role="status">
             {error && (
-              <div className="mt-3 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 text-xs leading-5 text-destructive">
+              <div className="mt-3 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 t-caption leading-5 text-destructive">
                 {error}
                 <span className="mt-1 block text-foreground-muted">
                   작성하신 내용은 그대로 남아 있습니다. 네트워크를 확인한 뒤 다시 보내 주세요.

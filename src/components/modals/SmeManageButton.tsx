@@ -108,6 +108,8 @@ export function SmeManageButton({
           description="기존 SME 계정 정보를 수정합니다."
           icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
           onClose={() => setShow(false)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           dirty={dirty && !saving && !deleting}
           closeDisabled={saving || deleting}
           footer={
@@ -154,7 +156,7 @@ export function SmeManageButton({
             {error && (
               <div
                 role="alert"
-                className="flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 text-sm text-destructive"
+                className="flex items-start gap-2 rounded-element border border-destructive-border bg-destructive-muted px-3 py-2.5 t-label text-destructive"
               >
                 <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
@@ -171,8 +173,8 @@ export function SmeManageButton({
                   <div className="flex items-start gap-2">
                     <AlertTriangle size={16} className="mt-0.5 shrink-0 text-destructive" aria-hidden="true" />
                     <div>
-                      <p className="text-sm font-medium text-destructive">{sme.name} 계정을 삭제할까요?</p>
-                      <p className="mt-1 text-xs leading-5 text-destructive">
+                      <p className="t-label font-medium text-destructive">{sme.name} 계정을 삭제할까요?</p>
+                      <p className="mt-1 t-caption leading-5 text-destructive">
                         삭제하면 해당 SME는 더 이상 로그인할 수 없고, 계정 복구가 어려울 수 있어요.
                       </p>
                     </div>

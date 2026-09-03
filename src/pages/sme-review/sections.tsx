@@ -46,7 +46,7 @@ function ItemList({
 
   if (visible.length === 0) {
     return (
-      <p className="rounded-element bg-muted px-4 py-6 text-center text-sm text-foreground-muted">
+      <p className="rounded-element bg-muted px-4 py-6 text-center t-label text-foreground-muted">
         {items.length === 0
           ? '등록된 항목이 없습니다.'
           : '미평가 항목이 없어요. 「미평가만 보기」를 꺼서 전체를 확인할 수 있어요.'}
@@ -106,8 +106,8 @@ export function FeedbackSection({
     <div>
       <SectionHeading title={title} done={done} total={total} />
       <div className="mb-6 rounded-element border border-border bg-muted p-4">
-        <p className="mb-2 text-xs font-medium text-foreground-muted">현재 등록 내용</p>
-        <p className={`text-sm leading-7 text-foreground ${large ? 'min-h-20' : ''}`}>
+        <p className="mb-2 t-caption font-medium text-foreground-muted">현재 등록 내용</p>
+        <p className={`t-label-reading text-foreground ${large ? 'min-h-20' : ''}`}>
           {current || <em className="not-italic text-foreground-subtle">미입력</em>}
         </p>
       </div>
@@ -157,7 +157,7 @@ export function TaskActivityFeedback({
       task.task_activities.length > 0 ? (
         <ul className="mt-3 space-y-1.5 pl-1">
           {task.task_activities.map((act) => (
-            <li key={act.id} className="flex items-start gap-2 text-sm leading-6 text-foreground-muted">
+            <li key={act.id} className="flex items-start gap-2 t-label-reading text-foreground-muted">
               <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-foreground-subtle" aria-hidden="true" />
               {act.activity_name}
             </li>
@@ -254,7 +254,7 @@ export function RequirementFeedback({
     eyebrow: label,
     title: label,
     details: (
-      <p className="mt-2 text-sm leading-7 text-foreground">
+      <p className="mt-2 t-label-reading text-foreground">
         {values[key] || <em className="not-italic text-foreground-subtle">미입력</em>}
       </p>
     ),

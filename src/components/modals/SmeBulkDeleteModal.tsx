@@ -1,10 +1,11 @@
 // SME 계정 전체 삭제 확인 모달 — 관리자(ADMIN) 'SME 계정 관리' 화면의 ⋯ 메뉴에서 연다.
 // 부분 실패를 성공으로 보고하지 않는다: 결과와 실패 목록을 모달 안에 남긴다.
 import { useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
+import { ProgressIndicator } from '@/components/ui/ProgressIndicator';
 import type { SmeListItem } from '@/types';
 import { callAdminFn, errorMessage, getAccessToken } from './edgeApi';
 
@@ -94,6 +95,8 @@ export function SmeBulkDeleteModal({
       description="현재 선택 범위의 SME 계정을 모두 삭제합니다."
       icon={<AlertTriangle size={18} className="mt-0.5 text-destructive" aria-hidden="true" />}
       onClose={onClose}
+      // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+      hideClose
       dirty={Boolean(confirmText) && !result && !deleting}
       closeDisabled={deleting}
       footer={
@@ -116,17 +119,17 @@ export function SmeBulkDeleteModal({
       }
     >
       <div className="rounded-element border border-destructive-border bg-destructive-muted p-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-4 t-label">
           <div>
-            <p className="text-xs text-destructive">삭제 범위</p>
+            <p className="t-caption text-destructive">삭제 범위</p>
             <p className="mt-1 font-semibold text-destructive">{scopeName}</p>
           </div>
           <div>
-            <p className="text-xs text-destructive">삭제 대상</p>
+            <p className="t-caption text-destructive">삭제 대상</p>
             <p className="mt-1 font-semibold text-destructive">{smeList.length}명</p>
           </div>
         </div>
-        <p className="mt-4 text-xs leading-5 text-destructive">
+        <p className="mt-4 t-caption leading-5 text-destructive">
           삭제된 SME는 더 이상 로그인할 수 없어요. 검토 관련 연결 데이터에도 영향을 줄 수 있으니, 실제 삭제가 필요할
           때만 사용해 주세요.
         </p>
@@ -146,37 +149,22 @@ export function SmeBulkDeleteModal({
         </div>
       )}
 
+      {/* 진행률을 알 수 있는 작업 — 공용 선형 막대를 쓴다(v3 T3·T4). */}
       {deleting && (
-        <div className="mt-6" aria-live="polite">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 text-foreground-muted">
-              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-              {progress.done}/{progress.total}명 삭제 중
-            </span>
-            <span className="font-medium text-foreground">
-              {progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%
-            </span>
-          </div>
-          <div
-            className="h-2 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-valuenow={progress.done}
-            aria-valuemin={0}
-            aria-valuemax={progress.total}
-            aria-label="삭제 진행률"
-          >
-            <div
-              className="h-full rounded-full bg-destructive transition-all"
-              style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }}
-            />
-          </div>
-        </div>
+        <ProgressIndicator
+          className="mt-6"
+          label="SME 계정 삭제 진행률"
+          tone="destructive"
+          value={progress.done}
+          max={progress.total}
+          showValue
+        />
       )}
 
       {result && (
         <div className="mt-5 space-y-3" aria-live="polite">
           <div
-            className={`flex items-start gap-2 rounded-element border px-3 py-2.5 text-sm ${
+            className={`flex items-start gap-2 rounded-element border px-3 py-2.5 t-label ${
               result.failed === 0 && !result.aborted
                 ? 'border-success-border bg-success-muted text-success'
                 : 'border-warning-border bg-warning-muted text-warning'
@@ -195,10 +183,10 @@ export function SmeBulkDeleteModal({
 
           {result.errors.length > 0 && (
             <div className="max-h-56 overflow-y-auto rounded-element border border-destructive-border bg-destructive-muted p-3">
-              <p className="mb-2 text-xs font-medium text-destructive">실패 목록 ({result.errors.length}건)</p>
+              <p className="mb-2 t-caption font-medium text-destructive">실패 목록 ({result.errors.length}건)</p>
               <ul className="space-y-1">
                 {result.errors.map((e, i) => (
-                  <li key={i} className="text-xs text-destructive">
+                  <li key={i} className="t-caption text-destructive">
                     {e}
                   </li>
                 ))}

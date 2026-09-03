@@ -63,7 +63,7 @@ export function Login({
         </div>
         <div className="max-w-xl pb-20">
           <p className="mb-4 t-label font-medium tracking-widest text-inverse-accent">JOB ARCHITECTURE REVIEW</p>
-          <h1 className="text-4xl font-semibold leading-tight text-inverse-label">
+          <h1 className="t-display text-inverse-label">
             현업의 전문성을 기반으로
             <br />
             직무체계를 검증합니다.
@@ -83,7 +83,7 @@ export function Login({
             </div>
             <h1 className="t-title text-foreground">Job Review Architecture</h1>
           </div>
-          <div className="rounded-container border border-border bg-card p-7 shadow-1 sm:p-9">
+          <div className="rounded-container border border-border bg-card p-6 shadow-1 sm:p-8">
             {mode === 'login' ? (
               <>
                 <h2 className="t-title text-foreground">로그인</h2>
@@ -207,7 +207,7 @@ function ForgotPasswordForm({ initialEmail, onBack }: { initialEmail: string; on
     return (
       <div>
         <h2 className="t-title text-foreground">메일을 보냈어요</h2>
-        <p className="mt-3 t-label leading-6 text-foreground-muted">
+        <p className="mt-3 t-label-reading text-foreground-muted">
           {email.trim().toLowerCase()} 으로 재설정 링크를 보냈어요. 메일의 링크를 열면 새 비밀번호를 정할 수 있어요.
           <br />
           메일이 보이지 않으면 스팸함을 확인해 주세요.

@@ -84,8 +84,8 @@ export function MyInquiriesPage({ user }: { user: User }) {
   return (
     <>
       <div className="mb-6">
-        <p className="mb-1 text-sm text-foreground-subtle">검토 중 남긴 문의와 답변</p>
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">내 문의</h2>
+        <p className="mb-1 t-label text-foreground-subtle">검토 중 남긴 문의와 답변</p>
+        <h2 className="t-title text-foreground">내 문의</h2>
       </div>
 
       {/*
@@ -118,15 +118,15 @@ export function MyInquiriesPage({ user }: { user: User }) {
       ) : rows.length === 0 ? (
         <div className="rounded-container border border-border bg-card p-10 text-center">
           <Inbox size={22} className="mx-auto mb-2 text-foreground-subtle" aria-hidden="true" />
-          <p className="text-sm font-medium text-foreground">아직 남긴 문의가 없어요</p>
-          <p className="mt-1 text-xs leading-5 text-foreground-muted">
+          <p className="t-label font-medium text-foreground">아직 남긴 문의가 없어요</p>
+          <p className="mt-1 t-caption leading-5 text-foreground-muted">
             검토 중 막히는 부분은 화면 우측 하단 &lsquo;문의하기&rsquo;로 남겨 주세요.
             <br />
             직무와 지금 보고 있는 단계가 함께 전달되어, 따로 설명하지 않으셔도 됩니다.
           </p>
           <Link
             to="/assignments"
-            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-element border border-border px-4 text-xs font-medium text-foreground-muted transition hover:border-primary hover:text-primary sm:min-h-control-sm"
+            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-element border border-border px-4 t-caption font-medium text-foreground-muted transition hover:border-primary hover:text-primary sm:min-h-control-sm"
           >
             내 검토 목록으로 가기
           </Link>
@@ -134,7 +134,7 @@ export function MyInquiriesPage({ user }: { user: User }) {
       ) : (
         <div className="space-y-3">
           {jobNameError && (
-            <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 text-xs text-warning">
+            <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 t-caption text-warning">
               {jobNameError}
             </p>
           )}
@@ -145,28 +145,28 @@ export function MyInquiriesPage({ user }: { user: User }) {
               <article key={q.id} className="rounded-container border border-border bg-card p-5 shadow-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <InquiryStatusBadge status={q.status} />
-                  <span className="text-xs text-foreground-subtle">{formatAt(q.created_at)}</span>
+                  <span className="t-caption text-foreground-subtle">{formatAt(q.created_at)}</span>
                 </div>
 
                 {(jobName || step) && (
-                  <p className="mt-2 text-sm text-foreground-muted">
+                  <p className="mt-2 t-label text-foreground-muted">
                     {[jobName, step].filter(Boolean).join(' · ')}
                   </p>
                 )}
 
-                <p className="mt-2 whitespace-pre-line text-sm leading-6 text-foreground">{q.body}</p>
+                <p className="mt-2 whitespace-pre-line t-label-reading text-foreground">{q.body}</p>
 
                 {q.answer ? (
                   <div className="mt-4 rounded-element border border-primary-border bg-primary-subtle p-4">
-                    <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                    <p className="flex items-center gap-1.5 t-caption font-medium text-primary">
                       <MessageSquareText size={13} aria-hidden="true" />
                       담당자 답변
                       <span className="font-normal text-foreground-muted">{formatAt(q.answered_at)}</span>
                     </p>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-foreground">{q.answer}</p>
+                    <p className="mt-2 whitespace-pre-line t-label-reading text-foreground">{q.answer}</p>
                   </div>
                 ) : (
-                  <p className="mt-4 border-t border-border pt-3 text-xs text-foreground-subtle">
+                  <p className="mt-4 border-t border-border pt-3 t-caption text-foreground-subtle">
                     담당자가 확인 중입니다. 답변이 등록되면 이 화면에 함께 표시됩니다.
                   </p>
                 )}

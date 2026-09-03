@@ -387,14 +387,14 @@ export function ProgressMatrixPage({
     <>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <p className="mb-1 text-sm text-foreground-subtle">
+          <p className="mb-1 t-label text-foreground-subtle">
             {loading
               ? '불러오는 중…'
               : error
                 ? '조회 실패'
                 : `조직 ${visibleRows.length}개 · 직무 ${visibleJobs.length}개`}
           </p>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">진행 현황</h2>
+          <h2 className="t-title text-foreground">진행 현황</h2>
         </div>
         <div className="flex items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
@@ -402,7 +402,7 @@ export function ProgressMatrixPage({
       </div>
 
       {error && (
-        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-5 flex flex-col gap-3 border border-destructive-border bg-destructive-muted p-4 t-label text-destructive sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>진행 현황을 불러오지 못했어요. {error} 잠시 후 다시 시도해 주세요.</span>
@@ -414,7 +414,7 @@ export function ProgressMatrixPage({
       )}
 
       {ready && r6Violations.length > 0 && (
-        <div className="mb-5 border border-warning-border bg-warning-muted p-4 text-sm text-warning">
+        <div className="mb-5 border border-warning-border bg-warning-muted p-4 t-label text-warning">
           <p className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>
@@ -437,7 +437,7 @@ export function ProgressMatrixPage({
             onChange={setFilter}
             options={FILTERS.map(({ key, label }) => ({ value: key, label, count: filterCount(key) }))}
           />
-          <label className="inline-flex min-h-11 items-center gap-2 text-xs text-foreground-muted">
+          <label className="inline-flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
             <input
               type="checkbox"
               className="h-4 w-4"
@@ -450,7 +450,7 @@ export function ProgressMatrixPage({
 
         {/* 리마인더 — 대상 선택까지만 만든다. 실제 발송은 운영 설정에서 메일을 연결한 뒤에 열린다. */}
         <div className="flex flex-col gap-3 border-b border-border bg-muted p-4 lg:flex-row lg:items-center lg:justify-between">
-          <label className="inline-flex min-h-11 items-center gap-2 text-sm text-foreground-muted">
+          <label className="inline-flex min-h-11 items-center gap-2 t-label text-foreground-muted">
             <input
               type="checkbox"
               className="h-4 w-4"
@@ -461,7 +461,7 @@ export function ProgressMatrixPage({
             미시작·미제출 전체 선택
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-foreground-muted">
+            <p className="t-label text-foreground-muted">
               선택 <b className="font-semibold text-foreground">{selection.reviews}건</b> · SME{' '}
               <b className="font-semibold text-foreground">{selection.smes}명</b>
             </p>
@@ -478,7 +478,7 @@ export function ProgressMatrixPage({
               <Mail size={14} aria-hidden="true" /> 리마인더 발송
             </Button>
             {recipients.length === 0 && (
-              <p className="text-xs text-foreground-subtle">보낼 대상을 먼저 선택해 주세요</p>
+              <p className="t-caption text-foreground-subtle">보낼 대상을 먼저 선택해 주세요</p>
             )}
           </div>
         </div>
@@ -494,7 +494,7 @@ export function ProgressMatrixPage({
             {settingsError && (
               <p
                 role="alert"
-                className="mb-3 flex items-start gap-2 border border-destructive-border bg-destructive-muted p-3 text-xs leading-5 text-destructive"
+                className="mb-3 flex items-start gap-2 border border-destructive-border bg-destructive-muted p-3 t-caption leading-5 text-destructive"
               >
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span>
@@ -504,7 +504,7 @@ export function ProgressMatrixPage({
               </p>
             )}
             {companyFilter === 'all' && (
-              <p className="mb-3 flex items-start gap-2 border border-border bg-muted p-3 text-xs leading-5 text-foreground-muted">
+              <p className="mb-3 flex items-start gap-2 border border-border bg-muted p-3 t-caption leading-5 text-foreground-muted">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <span>
                   계열사가 &lsquo;전체&rsquo;라 마감일·예상 소요·문의 담당을 어느 회사 설정에서 가져올지 정할 수
@@ -525,15 +525,22 @@ export function ProgressMatrixPage({
 
         {/* 표 컨테이너 안에서만 가로로 스크롤한다. 첫 열(조직명)은 고정. */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-max text-left text-sm">
+          <table className="w-full min-w-max text-left t-label">
             <caption className="sr-only">
               조직별 · 직무별 검토 진행 현황. 행은 조직, 열은 직무이며 각 칸은 배정된 SME의 검토 상태입니다.
             </caption>
+            {/*
+              표 머리를 화면 상단에 고정한다(v3 T3 · montage "표 헤더 항상 표시").
+              조직·직무가 수십 개면 아래로 스크롤한 순간 각 칸이 무슨 뜻인지 알 수 없었다.
+              top-20은 앱 헤더 높이(h-20 = 80px)다. 겹침은 전역 층을 쓰지 않고 표 안에서만
+              정한다 — 모서리 칸이 z-[2], 나머지 머리 칸이 z-[1], 본문 첫 열이 z-[1]이다.
+              sticky 칸은 자기 배경을 가져야 뒤 내용이 비쳐 보이지 않는다.
+            */}
             <thead>
-              <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
+              <tr className="border-b border-border bg-muted t-caption text-foreground-muted">
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-muted px-4 py-3 font-medium"
+                  className="sticky left-0 top-20 z-[2] w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-muted px-4 py-3 font-medium"
                 >
                   조직
                 </th>
@@ -541,9 +548,9 @@ export function ProgressMatrixPage({
                   const count = smeCountByJob.get(job.id) ?? 0;
                   const r6 = r6Of(count);
                   return (
-                    <th key={job.id} scope="col" className="w-44 min-w-[11rem] px-3 py-3 font-medium align-top">
+                    <th key={job.id} scope="col" className="sticky top-20 z-[1] w-44 min-w-[11rem] bg-muted px-3 py-3 font-medium align-top">
                       <span className="block text-foreground">{job.name}</span>
-                      <span className={`mt-1 flex items-center gap-1 text-[11px] font-normal ${r6.tone}`}>
+                      <span className={`mt-1 flex items-center gap-1 t-caption-2 font-normal ${r6.tone}`}>
                         {r6.violation && <AlertTriangle size={11} className="shrink-0" aria-hidden="true" />}
                         SME {count}명{r6.note ? ` · ${r6.note}` : ''}
                       </span>
@@ -588,7 +595,7 @@ export function ProgressMatrixPage({
                     <tr key={row.orgUnitId ?? "unassigned"} className="border-b border-border last:border-0">
                       <th
                         scope="row"
-                        className="sticky left-0 z-10 w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-card px-2 py-2 text-left font-normal align-top"
+                        className="sticky left-0 z-[1] w-56 min-w-[11rem] max-w-[14rem] border-r border-border bg-card px-2 py-2 text-left font-normal align-top"
                       >
                         <div
                           className="flex items-start gap-1"
@@ -613,10 +620,10 @@ export function ProgressMatrixPage({
                           ) : (
                             <span className="w-6 shrink-0" aria-hidden="true" />
                           )}
-                          <span className="min-h-11 py-2.5 text-sm font-medium text-foreground">
+                          <span className="min-h-11 py-2.5 t-label font-medium text-foreground">
                             {row.orgName}
                             {isCollapsed && (
-                              <span className="ml-1 text-[11px] font-normal text-foreground-subtle">
+                              <span className="ml-1 t-caption-2 font-normal text-foreground-subtle">
                                 (하위 {meta?.childCount ?? 0}개 접힘)
                               </span>
                             )}
@@ -666,7 +673,7 @@ export function ProgressMatrixPage({
                                     return (
                                       <span
                                         key={s}
-                                        className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium ${chip}`}
+                                        className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 t-caption-2 font-medium ${chip}`}
                                       >
                                         <Icon size={11} className="shrink-0" aria-hidden="true" />
                                         {CELL_STATUS_LABELS[s]} {cell.counts[s]}
@@ -677,7 +684,7 @@ export function ProgressMatrixPage({
                                 {/* R6(직무별 SME 1~2명)은 직무 단위 규칙이라 칸이 아니라 열 머리에서만 판정한다.
                                     칸은 조직×직무라 한 직무가 여러 조직에 나뉘면 칸마다 2명이어도 직무 합계는
                                     초과일 수 있다 — 칸에 같은 배지를 달면 두 곳이 다른 말을 한다. */}
-                                <span className="flex items-center gap-1 text-[11px] text-foreground-subtle">
+                                <span className="flex items-center gap-1 t-caption-2 text-foreground-subtle">
                                   SME {cell.assignedSme}명
                                 </span>
                                 <span className="sr-only">
@@ -696,7 +703,7 @@ export function ProgressMatrixPage({
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-border p-4 text-[11px] text-foreground-muted">
+        <div className="flex flex-wrap items-center gap-3 border-t border-border p-4 t-caption-2 text-foreground-muted">
           <span className="text-foreground-subtle">상태 표시</span>
           {STATUS_ORDER.map((s) => {
             const { chip, Icon } = STATUS_STYLE[s];

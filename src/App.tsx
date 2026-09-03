@@ -35,6 +35,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { isResetPasswordPath, supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { UploadPage } from '@/components/UploadPage';
 import { AdminUsersPage } from '@/components/AdminUsersPage';
@@ -63,7 +64,17 @@ import type { Role, User } from '@/types';
 
 // ── 라우트 정의 ─────────────────────────────────────────────────────
 // 사이드바 메뉴 = 이 목록. 목록에 없는 화면(직무 상세·직무 검토)은 title에서만 이름을 찾는다.
-type NavItem = { to: string; label: string; sub: string; Icon: typeof LayoutDashboard };
+type NavItem = {
+  to: string;
+  label: string;
+  sub: string;
+  Icon: typeof LayoutDashboard;
+  /**
+   * 하단 내비에 쓰는 짧은 라벨(v3 T5). montage는 하단 내비 라벨을 6자 이하로 제한한다 —
+   * 4개 항목이 좁은 화면 폭을 나눠 쓰므로 긴 라벨은 잘린다.
+   */
+  short?: string;
+};
 /**
  * 사이드바 묶음(v2 §6-5). 13개 평면 메뉴를 준비 → 운영 → 검토 → 산출 → 설정 다섯 그룹으로 나눈다.
  * 순서가 관리자 흐름(§5-2)과 같다 — 첫 사용에서 무엇부터 해야 하는지가 순서로 읽혀야 한다.
@@ -115,16 +126,16 @@ const smeNav: NavGroup[] = [
   {
     title: '검토',
     items: [
-      { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList },
-      { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3 },
+      { to: '/assignments', label: '내 검토 목록', sub: '배정된 직무를 검토해 주세요', Icon: ClipboardList, short: '검토' },
+      { to: '/history', label: '검토 이력', sub: '내 검토 이력을 확인하세요', Icon: Clock3, short: '이력' },
     ],
   },
   {
     title: '도움',
     items: [
-      { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText },
+      { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText, short: '문의' },
       // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
-      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen },
+      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen, short: '가이드' },
     ],
   },
 ];
@@ -371,7 +382,7 @@ function App() {
 
   if (booting)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-foreground-subtle">
+      <div className="flex min-h-screen items-center justify-center bg-background t-label text-foreground-subtle">
         불러오는 중…
       </div>
     );
@@ -419,7 +430,7 @@ function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-3"
+          className="fixed inset-x-0 top-0 z-toast flex justify-center px-4 pt-3"
         >
           <p className="rounded-element border border-warning-border bg-warning-muted px-4 py-2 t-label text-warning shadow-2">
             {idleLeft}초 후 자동 로그아웃돼요. 계속하시려면 화면을 클릭해 주세요.
@@ -452,12 +463,53 @@ function Shell({
   setCompanyFilter: (v: string) => void;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   const [dirty, setDirty] = useState(false);
   const { pathname } = useLocation();
   const isAdmin = user.role === 'admin';
   const navGroups = isAdmin ? adminNav : smeNav;
   const home = isAdmin ? adminHome : smeHome;
   const closeDrawer = useCallback(() => setMobileOpen(false), []);
+  const pageTitle = titleOf(pathname);
+
+  /*
+   * SME 하단 내비(v3 T5).
+   *
+   * SME 메뉴는 「내 검토 목록 · 검토 이력 · 내 문의 · 가이드」 네 개뿐인데, v2는 1024px 미만에서
+   * 관리자와 같은 햄버거 드로어를 썼다 — 네 항목을 보려고 서랍을 여는 셈이었다.
+   * montage는 항목이 3~5개면 하단 내비를 쓴다. 관리자는 13메뉴 5그룹이라 대상이 아니다.
+   *
+   * 마법사에서는 감춘다. STEP 3의 합계 게이지가 같은 자리에 고정 바로 뜨고, 마법사 셸도
+   * 하단에 이전/다음을 그린다 — 세 겹이 겹치면 아무것도 누를 수 없다.
+   */
+  const smeBottomNav = !isAdmin && !pathname.startsWith('/review/');
+  const bottomNavItems = smeBottomNav ? navGroups.flatMap((g) => g.items) : [];
+
+  /*
+   * 브라우저 탭 제목(v3 T6).
+   * v2까지 document.title을 한 번도 쓰지 않아 라우트 21개가 index.html의 한 제목을 공유했다.
+   * 관리자는 워크벤치·진행 현황·Export를 탭 여럿에 띄우고 오가는데 제목이 전부 같아
+   * 구분이 불가능했고, 뒤로/앞으로 이력에도 같은 이름만 쌓였다.
+   * 화면 이름은 헤더가 쓰는 titleOf를 그대로 쓴다 — 두 곳이 다른 말을 하지 않게.
+   */
+  useEffect(() => {
+    document.title = `${pageTitle} · 직무정보 검토 시스템`;
+  }, [pageTitle]);
+
+  /*
+   * 화면을 옮길 때 스크롤과 포커스를 본문 맨 위로 되돌린다(v3 T6).
+   *
+   * v2는 이 처리가 없어서, 진행 매트릭스를 아래까지 스크롤한 뒤 워크벤치로 가면 새 화면이
+   * 중간부터 보였다. 낭독기에는 화면이 바뀐 사실 자체가 전달되지 않았다.
+   * preventScroll — 포커스 때문에 화면이 다시 튀지 않게 한다(montage 포커스 규약).
+   *
+   * step 쿼리스트링만 바뀌는 마법사 단계 이동은 pathname이 그대로라 여기 걸리지 않는다.
+   * 그쪽 스크롤은 SmeReviewPage가 따로 맞춘다.
+   */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    mainRef.current?.focus({ preventScroll: true });
+  }, [pathname]);
 
   /** 확인을 기다리는 이탈 동작. null이면 확인창이 닫힌 상태다. */
   const [pendingLeave, setPendingLeave] = useState<{ run: () => void } | null>(null);
@@ -485,7 +537,18 @@ function Shell({
   return (
     <DirtyContext.Provider value={guard}>
       <div className="min-h-screen bg-background text-foreground">
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
+        {/*
+          본문으로 건너뛰기(WCAG 2.2 · 2.4.1 블록 건너뛰기 · v3 T6).
+          관리자 사이드바는 5그룹 13링크다. 이게 없으면 키보드 사용자는 화면을 옮길 때마다
+          그 13개를 통과해야 본문에 닿았다. 평소에는 화면 밖에 있고 포커스를 받으면 나타난다.
+        */}
+        <a
+          href="#content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-toast focus:rounded-element focus:bg-primary focus:px-4 focus:py-2 focus:t-label focus:font-medium focus:text-primary-foreground focus:shadow-2"
+        >
+          본문으로 건너뛰기
+        </a>
+        <aside className="fixed inset-y-0 left-0 z-drawer hidden w-64 border-r border-border bg-inverse text-inverse-label lg:block">
           <SidebarBody groups={navGroups} onNavigate={closeDrawer} onLogout={onLogout} />
         </aside>
 
@@ -511,35 +574,60 @@ function Shell({
         )}
 
         <div className="lg:pl-64">
-          <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
+          <header className="sticky top-0 z-sticky flex h-20 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(true)}
-                aria-label="메뉴 열기"
-                aria-expanded={mobileOpen}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-element text-foreground-muted hover:bg-muted lg:hidden"
-              >
-                <Menu size={20} aria-hidden="true" />
-              </button>
+              {/*
+                하단 내비를 쓰는 SME 화면에서는 햄버거를 감춘다 — 같은 네 항목을 두 경로로
+                열어 둘 이유가 없다. 대신 서랍에만 있던 로그아웃을 헤더로 올린다.
+              */}
+              {smeBottomNav ? (
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  aria-label="로그아웃"
+                  onClick={onLogout}
+                  className="lg:hidden"
+                >
+                  <LogOut size={19} aria-hidden="true" />
+                </Button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(true)}
+                  aria-label="메뉴 열기"
+                  aria-expanded={mobileOpen}
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-element text-foreground-muted hover:bg-muted lg:hidden"
+                >
+                  <Menu size={20} aria-hidden="true" />
+                </button>
+              )}
               <div>
-                <p className="text-xs text-foreground-subtle">{isAdmin ? '관리자 포털' : 'SME 검토 포털'}</p>
-                <h1 className="text-lg font-semibold text-foreground">{titleOf(pathname)}</h1>
+                <p className="t-caption text-foreground-subtle">{isAdmin ? '관리자 포털' : 'SME 검토 포털'}</p>
+                <h1 className="t-headline text-foreground">{pageTitle}</h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden text-right sm:block">
-                <p className="text-sm font-medium text-foreground">{user.name}</p>
-                <p className="text-xs text-foreground-subtle">
+                <p className="t-label font-medium text-foreground">{user.name}</p>
+                <p className="t-caption text-foreground-subtle">
                   {user.organization} · {user.title}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-subtle text-sm font-semibold text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-subtle t-label font-semibold text-primary">
                 {user.name.slice(0, 1)}
               </div>
             </div>
           </header>
-          <main className="mx-auto max-w-[1500px] p-5 lg:p-8">
+          {/* tabIndex={-1} — 건너뛰기 링크와 라우트 전환이 여기로 포커스를 옮긴다(v3 T6). */}
+          <main
+            ref={mainRef}
+            id="content"
+            tabIndex={-1}
+            className={`mx-auto max-w-[1500px] p-5 outline-none lg:p-8 ${
+              // 하단 내비(56px)가 본문 마지막 줄을 덮지 않게 띄운다.
+              smeBottomNav ? 'pb-24 lg:pb-8' : ''
+            }`}
+          >
             <Routes>
               {isAdmin ? (
                 <>
@@ -626,8 +714,59 @@ function Shell({
             </Routes>
           </main>
         </div>
+
+        {smeBottomNav && <BottomNav items={bottomNavItems} />}
       </div>
     </DirtyContext.Provider>
+  );
+}
+
+/*
+ * 하단 내비(v3 T5 · montage Bottom navigation 규약).
+ *
+ * 규격 — 항목 3~5개 · 라벨 6자 이하 · 높이 56px · 활성은 primary, 비활성은 흐린 색으로만 구분한다
+ * (항목마다 다른 색을 주지 않는다). lg 이상에서는 사이드바가 상주하므로 감춘다.
+ *
+ * 이동 전에 requestLeave를 거치는 것은 사이드바와 같다 — 마법사에서 작성 중인 내용이 있으면
+ * 확인 창이 먼저 뜬다. 여기서 그 가드를 빼면 하단 내비만 유일하게 저장 안 한 입력을 날린다.
+ */
+function BottomNav({ items }: { items: NavItem[] }) {
+  const { requestLeave } = React.useContext(DirtyContext);
+  const navigate = useNavigate();
+
+  return (
+    <nav
+      aria-label="주요 메뉴"
+      className="fixed inset-x-0 bottom-0 z-drawer border-t border-border bg-elevated pb-[env(safe-area-inset-bottom)] lg:hidden"
+    >
+      <ul className="flex h-14">
+        {items.map(({ to, label, short, Icon }) => (
+          <li key={to} className="flex-1">
+            <NavLink
+              to={to}
+              onClick={(e) => {
+                e.preventDefault();
+                requestLeave(() => navigate(to));
+              }}
+              className={({ isActive }) =>
+                `flex h-full flex-col items-center justify-center gap-0.5 t-caption-2 font-medium transition ${
+                  isActive ? 'text-primary' : 'text-foreground-subtle'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon size={21} strokeWidth={isActive ? 2.2 : 1.7} aria-hidden="true" />
+                  {/* 화면에는 짧은 라벨, 낭독기에는 원래 이름을 읽힌다. */}
+                  <span aria-hidden="true">{short ?? label}</span>
+                  <span className="sr-only">{label}</span>
+                </>
+              )}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -645,11 +784,11 @@ function SidebarBody({
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-20 shrink-0 items-center gap-3 border-b border-inverse-label/10 px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand">
           <ClipboardCheck size={19} aria-hidden="true" />
         </div>
         <div>
-          <p className="text-[15px] font-semibold tracking-tight">Job Review Architecture</p>
+          <p className="t-body-2 font-semibold tracking-tight">Job Review Architecture</p>
           <p className="t-caption uppercase tracking-[0.18em] text-inverse-label-muted">Workforce platform</p>
         </div>
       </div>
@@ -675,7 +814,7 @@ function SidebarBody({
               });
             }}
             className={({ isActive }) =>
-              `flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-3 text-left text-sm transition ${
+              `flex min-h-11 w-full items-center gap-3 rounded-element px-3 py-3 text-left t-label transition ${
                 isActive
                   ? 'bg-inverse-label/10 text-inverse-label'
                   : 'text-inverse-label-muted hover:bg-inverse-label/5 hover:text-inverse-label'
@@ -686,7 +825,7 @@ function SidebarBody({
               <>
                 <Icon size={17} className="shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <span className="block text-sm">{label}</span>
+                  <span className="block t-label">{label}</span>
                   {/*
                     반전 표면(--inverse-bg #182635)의 보조설명. 대비는 이 토큰 쌍으로 고정된다:
                     --inverse-label-muted(#94a3b8)가 #182635 위 5.99:1로 §8 S8의 4.5:1을 넘는다.
@@ -747,7 +886,7 @@ function MobileDrawer({ open, onClose, children }: { open: boolean; onClose: () 
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose(); // ::backdrop 클릭은 dialog로 전달된다.
       }}
-      className="m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label backdrop:bg-dimmer/50 lg:hidden"
+      className="anim-drawer m-0 h-[100dvh] max-h-none w-64 max-w-[85vw] bg-inverse p-0 text-inverse-label scrim-backdrop lg:hidden"
     >
       {children}
     </dialog>

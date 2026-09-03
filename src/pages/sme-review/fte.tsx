@@ -206,12 +206,12 @@ function TotalGauge({
   // 진행 막대는 값을 들고만 있고(aria-valuenow·valuetext), 변화를 말하는 일은 이 영역이 맡는다.
   const readout = (
     <div aria-live="polite" className={layout === 'side' ? 'mt-3 text-center' : 'min-w-0'}>
-      <p className="text-sm font-semibold text-foreground">
+      <p className="t-label font-semibold text-foreground">
         {total}% <span className="font-normal text-foreground-subtle">/ 100%</span>
       </p>
       {status.text && (
         <p
-          className={`mt-1 flex items-start gap-1.5 text-xs ${status.tone} ${
+          className={`mt-1 flex items-start gap-1.5 t-caption ${status.tone} ${
             layout === 'side' ? 'justify-center' : ''
           }`}
         >
@@ -237,8 +237,8 @@ function TotalGauge({
   if (layout === 'bar') {
     return (
       // lg 이상에서는 좌측에 고정 사이드바(w-64)가 있다. inset-x-0으로 두면 바가 그 위를 덮어
-      // 사이드바 하단의 로그아웃 버튼을 가린다(같은 z-30이라 나중에 그려지는 바가 이긴다).
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card px-4 py-3 lg:left-64 xl:hidden">
+      // 사이드바 하단의 로그아웃 버튼을 가린다(같은 z-drawer라 나중에 그려지는 바가 이긴다).
+      <div className="fixed bottom-0 left-0 right-0 z-drawer border-t border-border bg-elevated px-4 py-3 lg:left-64 xl:hidden">
         {/* aria-valuenow는 filled(0~100)로 자른다 — 105%처럼 max를 넘는 값은 ARIA가 정의하지 않은
             상태라 낭독기마다 다르게(또는 아예 읽지 않고) 처리한다. 실제 합계와 사유는 valuetext가 말한다. */}
         <div
@@ -262,7 +262,7 @@ function TotalGauge({
 
   return (
     <div className="hidden xl:sticky xl:top-4 xl:block xl:rounded-container xl:border xl:border-border xl:bg-card xl:p-5">
-      <p className="text-sm font-semibold text-foreground">{FTE_TOTAL_LABEL}</p>
+      <p className="t-label font-semibold text-foreground">{FTE_TOTAL_LABEL}</p>
       <div
         role="progressbar"
         aria-label={FTE_TOTAL_LABEL}
@@ -279,7 +279,7 @@ function TotalGauge({
       >
         <span
           aria-hidden="true"
-          className="grid h-20 w-20 place-items-center rounded-full bg-card text-lg font-semibold text-foreground"
+          className="grid h-20 w-20 place-items-center rounded-full bg-card t-headline text-foreground"
         >
           {total}%
         </span>
@@ -424,11 +424,34 @@ export function FteStep({
     onDirty();
   };
 
+  /*
+   * 키보드 조작(v3 T6). montage Slider 키보드 규약을 이 스텝퍼에 옮긴 것이다 —
+   * 방향키 ±step, Shift·PageUp/PageDown ±step×10, Home은 최소, End는 최대.
+   *
+   * v2는 위·아래 화살표 두 키만 받았다. 과업이 스무 개인 직무를 키보드만으로 배분하려면
+   * 5%씩 스무 번을 눌러야 했다. 안내 문구(FTE_INPUT_HINT)도 함께 고쳤다.
+   */
   const onInputKeyDown = (e: KeyboardEvent<HTMLInputElement>, key: string) => {
-    const step = e.key === 'ArrowUp' ? FTE_STEP_PCT : e.key === 'ArrowDown' ? -FTE_STEP_PCT : 0;
-    if (!step) return;
+    const big = FTE_STEP_PCT * 10;
+    const current = pcts.get(key) ?? 0;
+
+    if (e.key === 'Home') {
+      e.preventDefault();
+      setPct(key, 0);
+      return;
+    }
+    if (e.key === 'End') {
+      e.preventDefault();
+      setPct(key, 100);
+      return;
+    }
+
+    const dir =
+      e.key === 'ArrowUp' || e.key === 'PageUp' ? 1 : e.key === 'ArrowDown' || e.key === 'PageDown' ? -1 : 0;
+    if (!dir) return;
+    const jump = e.key === 'PageUp' || e.key === 'PageDown' || e.shiftKey;
     e.preventDefault();
-    bump(key, step);
+    setPct(key, current + dir * (jump ? big : FTE_STEP_PCT));
   };
 
   return (
@@ -441,11 +464,11 @@ export function FteStep({
 
       {/* 겸직·비중 인식 지원(§6-2) — 기간 기준과 겸직 안내는 접지 않고 항상 보이게 둔다. */}
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-element bg-muted px-4 py-3">
-        <span className="rounded-inner bg-card px-2 py-1 text-xs font-semibold text-primary">{FTE_PERIOD_BASIS}</span>
-        <span className="text-xs leading-5 text-foreground-muted">{FTE_MOONLIGHTING_NOTE}</span>
+        <span className="rounded-inner bg-card px-2 py-1 t-caption font-semibold text-primary">{FTE_PERIOD_BASIS}</span>
+        <span className="t-caption leading-5 text-foreground-muted">{FTE_MOONLIGHTING_NOTE}</span>
       </div>
 
-      <p className="mb-5 text-sm leading-6 text-foreground-muted">{FTE_INTRO}</p>
+      <p className="mb-5 t-label-reading text-foreground-muted">{FTE_INTRO}</p>
 
       {/* 입력 칸 공통 안내. 그림 6-A에 이 문장을 놓을 자리가 없어 화면에는 감추고 보조기기에만 읽힌다
           (모든 입력 칸이 aria-describedby로 이 한 문장을 가리킨다). */}
@@ -457,7 +480,7 @@ export function FteStep({
         <div>
           {targets.length === 0 ? (
             // 배분할 과업이 하나도 없는 경우 — 문구는 기획안에 없어 새로 씀.
-            <p className="rounded-element bg-muted px-4 py-6 text-center text-sm text-foreground-muted">
+            <p className="rounded-element bg-muted px-4 py-6 text-center t-label text-foreground-muted">
               배분할 과업이 없어요.{' '}
               <button
                 type="button"
@@ -480,16 +503,16 @@ export function FteStep({
                       {/* STEP 2 판정을 배분 행에서도 읽을 수 있게 한다(v2 §5-3 "행 머리에 STEP 2 결과"). */}
                       {t.suitability && <SuitabilityChip value={t.suitability} />}
                       {t.isNew && (
-                        <span className="shrink-0 rounded-inner bg-primary-subtle px-2 py-0.5 text-[11px] font-semibold text-primary">
+                        <span className="shrink-0 rounded-inner bg-primary-subtle px-2 py-0.5 t-caption-2 font-semibold text-primary">
                           {FTE_SUGGESTED_BADGE}
                         </span>
                       )}
                     </div>
                     {/* 수정 제안명 — 관리자 비교 뷰와 같은 문언으로 붙인다. */}
                     {t.suggestedName && (
-                      <p className="mt-1 text-xs font-medium text-primary">{fteSuggestedNameChip(t.suggestedName)}</p>
+                      <p className="mt-1 t-caption font-medium text-primary">{fteSuggestedNameChip(t.suggestedName)}</p>
                     )}
-                    {t.description && <p className="mt-1 text-xs leading-5 text-foreground-muted">{t.description}</p>}
+                    {t.description && <p className="mt-1 t-caption leading-5 text-foreground-muted">{t.description}</p>}
 
                     {/* 좁은 폭·큰 글꼴에서는 줄을 바꿔 넘치지 않게 한다(막대가 flex-1이라 스스로 다음 줄을 채운다). */}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -517,6 +540,16 @@ export function FteStep({
                         // 25개 행마다 같은 문장을 되풀이하지 않으려고 한 문장을 모두가 참조한다.
                         aria-label={fteInputLabel(t.name)}
                         aria-describedby={PCT_HINT_ID}
+                        /*
+                          숫자를 올리고 내리는 칸이라는 사실과 값의 범위를 보조기기에 알린다(v3 T6).
+                          v2는 aria-label만 있어 "지금 몇 %인지 · 어디까지 갈 수 있는지"가
+                          낭독기에 전달되지 않았다. 막대는 aria-hidden이라 그 정보를 대신하지 못한다.
+                        */
+                        role="spinbutton"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuetext={`${pct}%`}
                         // 완전 제어 입력이라 칸이 비지 않는다("0"). 캐럿이 숫자 앞이나 사이에 있으면
                         // 25%를 치는 도중 "250"이 만들어지는데, 그대로 정규화하면 말없이 100%가 된다.
                         // 100을 넘는 입력은 무시해 직전 값을 그대로 둔다(React가 DOM 값을 되돌린다).
@@ -531,7 +564,7 @@ export function FteStep({
                         onKeyDown={(e) => onInputKeyDown(e, t.key)}
                         className="input w-16 shrink-0 px-2 text-center tabular-nums disabled:opacity-60"
                       />
-                      <span className="shrink-0 text-sm font-semibold text-foreground">%</span>
+                      <span className="shrink-0 t-label font-semibold text-foreground">%</span>
                       <button
                         type="button"
                         onClick={() => bump(t.key, FTE_STEP_PCT)}
@@ -555,7 +588,7 @@ export function FteStep({
                         type="button"
                         onClick={() => toggleOpen(t.key)}
                         aria-expanded={open}
-                        className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-element px-2 text-xs font-medium text-primary transition hover:bg-primary-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-element px-2 t-caption font-medium text-primary transition hover:bg-primary-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
                         {open ? FTE_REOPEN_CLOSE_BUTTON : FTE_REOPEN_BUTTON}
                         {open ? (
@@ -601,7 +634,7 @@ export function FteStep({
           {/* 삭제 제안 제외 안내 · 되살리기 · 균등 배분으로 시작 */}
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
             {excluded.length > 0 && (
-              <span className="text-xs text-foreground-muted">
+              <span className="t-caption text-foreground-muted">
                 {fteExcludedRestoreLine(excluded.length, parkedPct)}
                 {excluded.map((ex) => (
                   <button
@@ -624,24 +657,21 @@ export function FteStep({
             </Button>
           </div>
 
-          {/* 품질 가드 ⓑ·ⓒ — 막지 않고 알리기만 한다(§6-2 "허용은 하되 인지시킴"). */}
-          <div className="mt-4 space-y-2">
-            {zeroCount > 0 && total > 0 && (
-              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 text-xs leading-5 text-foreground-muted">
-                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
-                <span>{fteZeroPctNote(zeroCount)}</span>
-              </p>
-            )}
-            {/* 5% 미만이 3건 이상이면 "다수 분산"으로 본다(임계값은 §12에서 확정). */}
-            {smallCount >= 3 && (
-              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 text-xs leading-5 text-foreground-muted">
-                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
-                <span>{fteTooManySmallNote(smallCount)}</span>
-              </p>
-            )}
-            {/* 이름이 빈 신규 제안은 저장되지 않아 배분 대상에서도 빠진다 — STEP 2로 돌아갈 길을 준다. */}
-            {unnamedCount > 0 && (
-              <p className="flex items-start gap-2 rounded-element bg-warning-muted px-4 py-3 text-xs leading-5 text-warning">
+          {/*
+            품질 가드 ⓑ·ⓒ — 막지 않고 알리기만 한다(§6-2 "허용은 하되 인지시킴").
+
+            v3 T6: 한 번에 한 건만 띄운다. v2는 세 안내가 동시에 뜰 수 있었고(0% 과업 ·
+            5% 미만 다수 분산 · 이름 빈 신규 제안), 상자 셋이 겹치면 무엇을 먼저 손대야
+            하는지가 흐려졌다. montage 규약 — 한 화면에 여러 건이면 우선순위 하나만 남긴다.
+
+            순서는 "손대야 하는 정도"다.
+             ① 이름 빈 신규 제안 — 저장되지 않아 배분 대상에서 빠진다. 고치지 않으면 값이 사라진다.
+             ② 0% 과업        — 허용되지만 제출 요약에 목록으로 남는다.
+             ③ 5% 미만 다수     — 알려만 준다.
+          */}
+          <div className="mt-4">
+            {unnamedCount > 0 ? (
+              <p className="flex items-start gap-2 rounded-element bg-warning-muted px-4 py-3 t-caption leading-5 text-warning">
                 <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
                 <span>
                   {GATE_STEP2_NEW_TASK_NAME}{' '}
@@ -654,7 +684,18 @@ export function FteStep({
                   </button>
                 </span>
               </p>
-            )}
+            ) : zeroCount > 0 && total > 0 ? (
+              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
+                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+                <span>{fteZeroPctNote(zeroCount)}</span>
+              </p>
+            ) : smallCount >= 3 ? (
+              // 5% 미만이 3건 이상이면 "다수 분산"으로 본다(임계값은 §12에서 확정).
+              <p className="flex items-start gap-2 rounded-element bg-muted px-4 py-3 t-caption leading-5 text-foreground-muted">
+                <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+                <span>{fteTooManySmallNote(smallCount)}</span>
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -669,6 +710,8 @@ export function FteStep({
         <ModalShell
           title={FTE_SINGLE_100_MODAL.title}
           onClose={() => setRevertTo(null)}
+          // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
+          hideClose
           size="sm"
           footer={
             <>
@@ -686,7 +729,7 @@ export function FteStep({
             </>
           }
         >
-          <p className="text-sm leading-6 text-foreground-muted">{FTE_SINGLE_100_MODAL.body}</p>
+          <p className="t-label-reading text-foreground-muted">{FTE_SINGLE_100_MODAL.body}</p>
         </ModalShell>
       )}
     </section>
