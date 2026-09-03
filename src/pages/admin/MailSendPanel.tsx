@@ -32,6 +32,9 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { DataTable } from '@/components/ui/DataTable';
+import { FallbackView } from '@/components/ui/FallbackView';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 const KINDS: MailKind[] = ['REMINDER', 'INVITE'];
 
@@ -401,60 +404,68 @@ export function MailSendPanel({
           </div>
 
           {logsError ? (
-            <p className="flex items-start gap-2 px-3 py-3 text-xs text-destructive">
-              <XCircle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-              {logsError}
-            </p>
+            <FallbackView kind="error" compact description={logsError} />
           ) : logsLoading ? (
-            <p className="px-3 py-3 text-xs text-foreground-subtle">발송 이력을 불러오는 중입니다…</p>
-          ) : logs.length === 0 ? (
-            <p className="px-3 py-3 text-xs text-foreground-subtle">아직 발송한 메일이 없습니다.</p>
-          ) : (
-            // 표는 컨테이너 안에서만 가로로 스크롤한다.
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-max text-left text-xs">
-                <caption className="sr-only">최근 메일 발송 이력. 발송 시각, 종류, 수신자, 제목, 결과 순입니다.</caption>
-                <thead>
-                  <tr className="border-b border-border bg-muted text-foreground-muted">
-                    <th scope="col" className="px-3 py-2 font-medium">발송 시각</th>
-                    <th scope="col" className="px-3 py-2 font-medium">종류</th>
-                    <th scope="col" className="px-3 py-2 font-medium">수신자</th>
-                    <th scope="col" className="px-3 py-2 font-medium">제목</th>
-                    <th scope="col" className="px-3 py-2 font-medium">결과</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {logs.map((log) => (
-                    <tr key={log.id}>
-                      <td className="whitespace-nowrap px-3 py-2 text-foreground-muted">
-                        {log.sentAt ? new Date(log.sentAt).toLocaleString('ko-KR') : ''}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-foreground-muted">{MAIL_KIND_LABELS[log.kind]}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-foreground">
-                        {log.recipientName}
-                        {log.jobName && <span className="text-foreground-subtle"> · {log.jobName}</span>}
-                      </td>
-                      <td className="px-3 py-2 text-foreground-muted">{log.subject}</td>
-                      <td className="whitespace-nowrap px-3 py-2">
-                        {log.succeeded === false ? (
-                          <span className="inline-flex items-center gap-1 text-destructive">
-                            <XCircle size={12} aria-hidden="true" /> 실패
-                          </span>
-                        ) : log.simulated ? (
-                          <span className="inline-flex items-center gap-1 text-warning">
-                            <FlaskConical size={12} aria-hidden="true" /> 시뮬레이션
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-success">
-                            <CheckCircle2 size={12} aria-hidden="true" /> 발송
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-3">
+              <Skeleton.Table rows={3} cols={4} />
             </div>
+          ) : (
+            // v2 §6-5: 공용 DataTable — 좁은 화면에서는 줄 목록으로 쌓인다.
+            <DataTable
+              caption="최근 메일 발송 이력. 발송 시각, 종류, 수신자, 제목, 결과 순입니다."
+              minWidth="720px"
+              className="border-0"
+              rows={logs}
+              rowKey={(log) => log.id}
+              empty={<FallbackView compact description="아직 발송한 메일이 없어요." />}
+              columns={[
+                {
+                  key: 'sentAt',
+                  header: '발송 시각',
+                  className: 'whitespace-nowrap',
+                  cell: (log) => (log.sentAt ? new Date(log.sentAt).toLocaleString('ko-KR') : ''),
+                },
+                {
+                  key: 'kind',
+                  header: '종류',
+                  className: 'whitespace-nowrap',
+                  cell: (log) => MAIL_KIND_LABELS[log.kind],
+                },
+                {
+                  key: 'recipient',
+                  header: '수신자',
+                  mobile: 'title',
+                  className: 'whitespace-nowrap',
+                  cell: (log) => (
+                    <span className="text-foreground">
+                      {log.recipientName}
+                      {log.jobName && <span className="text-foreground-subtle"> · {log.jobName}</span>}
+                    </span>
+                  ),
+                },
+                { key: 'subject', header: '제목', cell: (log) => log.subject },
+                {
+                  key: 'result',
+                  header: '결과',
+                  mobile: 'trailing',
+                  className: 'whitespace-nowrap',
+                  cell: (log) =>
+                    log.succeeded === false ? (
+                      <span className="inline-flex items-center gap-1 text-destructive">
+                        <XCircle size={12} aria-hidden="true" /> 실패
+                      </span>
+                    ) : log.simulated ? (
+                      <span className="inline-flex items-center gap-1 text-warning">
+                        <FlaskConical size={12} aria-hidden="true" /> 시뮬레이션
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-success">
+                        <CheckCircle2 size={12} aria-hidden="true" /> 발송
+                      </span>
+                    ),
+                },
+              ]}
+            />
           )}
         </div>
       </div>

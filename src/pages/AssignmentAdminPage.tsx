@@ -35,6 +35,7 @@ import { CELL_STATUS_LABELS, type CellStatus } from '@/lib/adminApi';
 import { r6Of } from '@/pages/ProgressMatrixPage';
 import { fetchCompaniesResult } from '@/lib/jobApi';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { FilterChips } from '@/components/ui/FilterChips';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -329,7 +330,9 @@ export function AssignmentAdminPage({
         </div>
 
         {loading ? (
-          <p className="px-4 py-12 text-center text-sm text-foreground-subtle">불러오는 중…</p>
+          <div className="p-4">
+            <Skeleton.Table rows={5} cols={4} />
+          </div>
         ) : error ? (
           <p className="px-4 py-12 text-center text-sm text-destructive">
             배정 현황을 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요.

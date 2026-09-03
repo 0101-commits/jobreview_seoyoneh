@@ -488,3 +488,32 @@ select action, entity, entity_id, actor_id, created_at
 5. **`SectionMessage`·`FallbackView`·`Skeleton` 전면 적용** — 부품은 만들었고 SME 홈·대시보드 도넛 등
    일부만 적용했다. 나머지 화면의 인라인 alert/빈 상태/「불러오는 중…」은 그대로다.
 6. **결정 D6(배정 상한 강제)·D5(신규 제안 승격)** — 기획안 9절의 결정 사항이라 구현하지 않았다.
+
+
+### 적용 런북 (2026-09-02)
+
+SQL 4벌·Auth 설정·확인 쿼리를 순서대로 담은 실행 문서를 따로 만들었다 —
+**아티팩트 `86f4c2cf`** (claude.ai/code/artifact/86f4c2cf-7338-4f59-bc36-ee5beedcfefc).
+각 단계의 SQL 전문이 페이지에 담겨 있어 복사해 SQL Editor에 붙이면 되고, 단계별 확인 쿼리와
+되돌리기 방법이 함께 있다. 오프라인용 사본은 바탕화면 `JobReview_v2_Supabase적용런북.html`.
+
+이 문서(OPEN_ISSUES)가 "무엇이 왜 바뀌었나"이고, 런북이 "지금 무엇을 어떤 순서로 하나"다.
+
+### 2026-09-02 추가 구현 — 미실행 항목 정리
+
+기획안의 "남은 것" 중 계정 없이 할 수 있는 것을 모두 했다(커밋 `0a769d3`·`7949015`).
+
+- **vitest 4종 29케이스** — `buildFteTargets` 6 · `evaluateStep` 9 · `computeJobSignals` 10 ·
+  `assignmentGuardOf` 4. `npm test`로 돈다.
+- **표 8곳 DataTable 교체** — 관리자 계정·직무정보 관리·SME 계정·검토 현황·제출 큐·대시보드 SME별·
+  FTE 과업 순위·메일 발송 이력. 좁은 화면에서 줄 목록(ListCell)으로 쌓인다.
+  피벗 표 2곳(진행 현황 조직×직무, FTE 조직 피벗)은 열이 조직 수만큼 늘어 스택이 성립하지 않아 예외다.
+- **상태 부품 전면 적용** — 블록 단위 로딩은 Skeleton, 목록 오류·빈 상태는 FallbackView,
+  페이지 경고는 SectionMessage로.
+- **대형 파일 5개 분해** — exportApi 1,518→61(배럴)+6파일 · adminApi 1,409→35(배럴)+10파일 ·
+  UploadPage 1,217→432 · JobDetailPage 1,379→982 · SmeReviewPage 1,182→980. 호출부는 무변경.
+
+남은 것은 둘이다.
+1. **PILOT 251항목 실측** — 운영 계정이 필요하다(런북의 「배포 직후 확인」이 그 첫 묶음이다).
+2. **Playwright 스모크** — 계정과 브라우저 설치가 전제라 파일럿과 함께 한다.
+   결정 D5(신규 제안 승격)·D6(배정 상한 강제)는 PM 결정 사항이라 그대로 남겼다.

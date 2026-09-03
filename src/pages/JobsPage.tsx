@@ -3,7 +3,6 @@
 // 실제 검토 진행 상태 열로 대체했다.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ChevronsUpDown,
@@ -22,8 +21,14 @@ import {
 import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { JobDetailPage } from '@/components/JobDetailPage';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
-import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
+import { DataTable } from '@/components/ui/DataTable';
+// shared/StatusBadge는 검토 상태(Status)로 타입이 좁혀져 있어 '미배정'이 들어가지 않는다.
+// 사전은 ui/StatusBadge 한 곳이므로 여기서는 그것을 직접 쓴다(색·라벨은 같다).
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { FallbackView } from '@/components/ui/FallbackView';
+import { SectionMessage } from '@/components/ui/SectionMessage';
+import { Skeleton } from '@/components/ui/Skeleton';
 import type { Status } from '@/types';
 
 type ReviewLabel = Status | '미배정';
@@ -206,108 +211,88 @@ export function JobsPage({
       </div>
 
       {statusWarning && (
-        <div
-          role="alert"
-          className="mb-4 flex items-start gap-2 rounded-element border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning"
-        >
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{statusWarning}</span>
-        </div>
+        <SectionMessage variant="cautionary" className="mb-4">
+          {statusWarning}
+        </SectionMessage>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-sm text-foreground-subtle">
-          직무 목록을 불러오는 중…
-        </div>
+        <Skeleton.Table rows={6} cols={4} />
       ) : loadError ? (
-        <div className="flex flex-col items-center gap-3 rounded-container border border-destructive-border bg-destructive-muted px-6 py-16 text-center">
-          <AlertTriangle size={24} className="text-destructive" aria-hidden="true" />
-          <p className="text-sm text-destructive">{loadError}</p>
-          <Button variant="secondary" size="sm" onClick={load}>
-            <RotateCw size={14} aria-hidden="true" /> 다시 불러오기
-          </Button>
-        </div>
+        <FallbackView
+          kind="error"
+          heading="직무 목록을 불러오지 못했어요"
+          description={loadError}
+          action={
+            <Button variant="secondary" size="sm" onClick={load}>
+              <RotateCw size={14} aria-hidden="true" /> 다시 불러오기
+            </Button>
+          }
+        />
       ) : (
-        <div className="rounded-container border border-border bg-card shadow-1">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-muted text-xs text-foreground-muted">
-                <tr>
-                  {SORT_COLUMNS.map((col) => {
-                    const activeSort = sort.key === col.key;
-                    const Icon = !activeSort ? ChevronsUpDown : sort.asc ? ArrowUp : ArrowDown;
-                    return (
-                      <th
-                        key={col.key}
-                        scope="col"
-                        className="px-5 py-3 font-medium"
-                        aria-sort={activeSort ? (sort.asc ? 'ascending' : 'descending') : 'none'}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleSort(col.key)}
-                          className="inline-flex items-center gap-1 rounded-inner transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        >
-                          {col.label}
-                          <Icon size={13} aria-hidden="true" className={activeSort ? 'text-primary' : 'opacity-50'} />
-                        </button>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-5 py-16 text-center">
-                      <FileSpreadsheet size={28} className="mx-auto mb-3 text-foreground-subtle" aria-hidden="true" />
-                      <p className="text-sm text-foreground-muted">
-                        {query ? '검색 조건에 맞는 직무가 없어요.' : '등록된 직무가 없어요.'}
-                      </p>
-                      {!query && (
-                        <p className="mt-1 text-xs text-foreground-subtle">
-                          관리자 메뉴의 '직무정보 업로드'에서 Excel 파일로 직무를 등록할 수 있어요.
-                        </p>
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  visible.map((j) => (
-                    <tr key={j.id} className="border-t border-border transition hover:bg-primary-subtle/60">
-                      <th scope="row" className="px-5 py-3 text-left font-medium">
-                        <button
-                          type="button"
-                          onClick={() => selectJob(j.id)}
-                          className="min-h-11 text-left text-[15px] font-semibold text-foreground transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        >
-                          {j.name}
-                        </button>
-                      </th>
-                      <td className="px-5 py-3 text-foreground-muted">{j.group_name}</td>
-                      <td className="px-5 py-3 text-foreground-muted">{j.series_name}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {j.reviewLabel === '미배정' ? (
-                            <span className="whitespace-nowrap rounded-inner bg-muted px-2 py-1 text-[11px] font-medium text-foreground-muted">
-                              미배정
-                            </span>
-                          ) : (
-                            <StatusBadge status={j.reviewLabel} />
-                          )}
-                          {j.assigned > 0 && (
-                            <span className="text-xs text-foreground-subtle">
-                              제출 {j.submitted}/{j.assigned}명
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        // v2 §6-5: 공용 DataTable — 좁은 화면에서는 줄 목록(ListCell)으로 쌓인다.
+        // 정렬은 이 화면의 사정이라 헤더에 버튼을 그대로 넣어 전달한다.
+        <DataTable
+          caption="등록된 직무 목록"
+          minWidth="760px"
+          rows={visible}
+          rowKey={(j) => j.id}
+          onRowClick={(j) => selectJob(j.id)}
+          empty={
+            <FallbackView
+              icon={<FileSpreadsheet size={28} aria-hidden="true" />}
+              heading={query ? '검색 조건에 맞는 직무가 없어요' : '등록된 직무가 없어요'}
+              description={
+                query
+                  ? '검색어를 바꾸거나 회사 필터를 확인해 주세요.'
+                  : "'직무정보 업로드'에서 Excel 파일로 직무를 등록할 수 있어요."
+              }
+            />
+          }
+          columns={SORT_COLUMNS.map((col) => {
+            const activeSort = sort.key === col.key;
+            const Icon = !activeSort ? ChevronsUpDown : sort.asc ? ArrowUp : ArrowDown;
+            const header = (
+              <button
+                type="button"
+                onClick={() => toggleSort(col.key)}
+                aria-label={`${col.label} 기준으로 정렬`}
+                className="inline-flex items-center gap-1 rounded-inner transition hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                {col.label}
+                <Icon size={13} aria-hidden="true" className={activeSort ? 'text-primary' : 'opacity-50'} />
+              </button>
+            );
+            if (col.key === 'name')
+              return {
+                key: col.key,
+                header,
+                mobile: 'title' as const,
+                cell: (j: JobRow) => <span className="font-semibold text-foreground">{j.name}</span>,
+              };
+            if (col.key === 'review')
+              return {
+                key: col.key,
+                header,
+                mobile: 'trailing' as const,
+                cell: (j: JobRow) => (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge status={j.reviewLabel} />
+                    {j.assigned > 0 && (
+                      <span className="t-caption text-foreground-subtle">
+                        제출 {j.submitted}/{j.assigned}명
+                      </span>
+                    )}
+                  </div>
+                ),
+              };
+            return {
+              key: col.key,
+              header,
+              cell: (j: JobRow) => (col.key === 'group_name' ? j.group_name : j.series_name),
+            };
+          })}
+        />
       )}
     </>
   );

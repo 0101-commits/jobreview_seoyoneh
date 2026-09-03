@@ -11,6 +11,9 @@ import {
 
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { FilterChips } from '@/components/ui/FilterChips';
+import { DataTable } from '@/components/ui/DataTable';
+import { FallbackView } from '@/components/ui/FallbackView';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/Button';
 
@@ -178,28 +181,23 @@ export function ReviewTable({
   }, []);
 
   // 컴포넌트가 아니라 함수로 호출한다(렌더마다 새 컴포넌트가 되면 정렬 버튼이 다시 마운트돼 포커스를 잃는다).
-  const sortHeader = (label: string, sortKey: SortKey, className = '') => (
-    <th
-      key={sortKey}
-      scope="col"
-      className={`px-5 py-3 font-medium ${className}`}
-      aria-sort={sort.key === sortKey ? (sort.asc ? 'ascending' : 'descending') : 'none'}
+  // DataTable이 <th>를 그리므로 이 헬퍼는 정렬 버튼만 돌려준다(v2 §6-5).
+  const sortHeader = (label: string, sortKey: SortKey) => (
+    <button
+      type="button"
+      onClick={() => toggleSort(sortKey)}
+      aria-label={`${label} 기준으로 정렬`}
+      className="inline-flex items-center gap-1 hover:text-primary"
     >
-      <button
-        type="button"
-        onClick={() => toggleSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-primary"
-      >
-        {label}
-        {sort.key === sortKey ? (
-          sort.asc ? (
-            <ArrowUp size={12} aria-hidden="true" />
-          ) : (
-            <ArrowDown size={12} aria-hidden="true" />
-          )
-        ) : null}
-      </button>
-    </th>
+      {label}
+      {sort.key === sortKey ? (
+        sort.asc ? (
+          <ArrowUp size={12} aria-hidden="true" />
+        ) : (
+          <ArrowDown size={12} aria-hidden="true" />
+        )
+      ) : null}
+    </button>
   );
 
   return (
@@ -258,102 +256,114 @@ export function ReviewTable({
           />
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                {sortHeader('SME', 'sme', 'sticky left-0 z-10 bg-muted')}
-                <th scope="col" className="px-5 py-3 font-medium">
-                  조직 / 직급
-                </th>
-                {sortHeader('담당 직무', 'job')}
-                {sortHeader('검토상태', 'status')}
-                {sortHeader('제출일', 'submitted')}
-                <th scope="col" className="px-5 py-3 font-medium">
-                  평가 결과
-                </th>
-                <th scope="col" className="px-5 py-3 font-medium">
-                  검토 내용
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-foreground-subtle">
-                    불러오는 중…
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-destructive">
-                    검토 현황을 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요.
-                  </td>
-                </tr>
-              ) : pageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-foreground-subtle">
-                    {reviewRows.length === 0
-                      ? '검토 대상이 없습니다. 직무정보를 업로드하고 SME에게 배정해 주세요.'
-                      : '조건에 맞는 검토가 없어요. 상태 필터나 검색어를 바꿔 보세요.'}
-                  </td>
-                </tr>
-              ) : (
-                pageRows.map((r) => (
-                  <tr
-                    className="group cursor-pointer border-b border-border last:border-0 hover:bg-primary-subtle"
-                    key={r.review_id || `${r.sme_id}-${r.job_id}`}
-                    onClick={() => onOpenReview?.(r.job_id, r.sme_id)}
+        {loading ? (
+          <div className="p-4">
+            <Skeleton.Table rows={6} cols={5} />
+          </div>
+        ) : error ? (
+          <FallbackView
+            kind="error"
+            heading="검토 현황을 불러오지 못했어요"
+            description="위의 「다시 시도」를 눌러 주세요. 계속 실패하면 네트워크 상태를 확인해 주세요."
+          />
+        ) : (
+          // v2 §6-5: 공용 DataTable — 좁은 화면에서는 줄 목록으로 쌓인다.
+          // 행을 열면 직무 상세의 SME 피드백 패널로 간다(상세 모달은 v2에서 없앴다).
+          <DataTable
+            caption="SME별 검토 현황"
+            minWidth="1040px"
+            className="border-0"
+            rows={pageRows}
+            rowKey={(r) => r.review_id || `${r.sme_id}-${r.job_id}`}
+            onRowClick={(r) => onOpenReview?.(r.job_id, r.sme_id)}
+            empty={
+              <FallbackView
+                heading={reviewRows.length === 0 ? '검토 대상이 없어요' : '조건에 맞는 검토가 없어요'}
+                description={
+                  reviewRows.length === 0
+                    ? '직무정보를 업로드하고 SME에게 배정하면 여기에 나타나요.'
+                    : '상태 필터나 검색어를 바꿔 보세요.'
+                }
+              />
+            }
+            columns={[
+              {
+                key: 'sme',
+                header: sortHeader('SME', 'sme'),
+                sticky: true,
+                mobile: 'title',
+                cell: (r) => (
+                  <>
+                    <p className="font-medium text-foreground">{r.sme_name}</p>
+                    <p className="mt-1 t-caption text-foreground-subtle">{r.sme_email}</p>
+                  </>
+                ),
+              },
+              {
+                key: 'org',
+                header: '조직 / 직급',
+                cell: (r) => (
+                  <>
+                    {r.organization}
+                    <br />
+                    <span className="t-caption text-foreground-subtle">{r.title}</span>
+                  </>
+                ),
+              },
+              {
+                key: 'job',
+                header: sortHeader('담당 직무', 'job'),
+                cell: (r) => (
+                  <>
+                    <p className="font-medium text-foreground">{r.job_name}</p>
+                    <p className="mt-1 t-caption text-foreground-subtle">
+                      {r.group_name} · {r.series_name}
+                    </p>
+                  </>
+                ),
+              },
+              {
+                key: 'status',
+                header: sortHeader('검토상태', 'status'),
+                mobile: 'trailing',
+                cell: (r) => <StatusBadge status={mapReviewStatus(r.review_status)} />,
+              },
+              {
+                key: 'submitted',
+                header: sortHeader('제출일', 'submitted'),
+                cell: (r) => (r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ko-KR') : '-'),
+              },
+              {
+                key: 'result',
+                header: '평가 결과',
+                cell: (r) => (
+                  <div className="flex gap-2 t-caption">
+                    <span className="text-success">적합 {r.suitable_count}</span>
+                    <span className="text-warning">수정 {r.needs_edit_count}</span>
+                    <span className="text-destructive">부적합 {r.unsuitable_count}</span>
+                  </div>
+                ),
+              },
+              {
+                key: 'open',
+                header: '검토 내용',
+                mobile: 'trailing',
+                cell: (r) => (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenReview?.(r.job_id, r.sme_id);
+                    }}
                   >
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-10 bg-card px-5 py-4 text-left font-normal group-hover:bg-primary-subtle"
-                    >
-                      <p className="font-medium text-foreground">{r.sme_name}</p>
-                      <p className="mt-1 text-xs text-foreground-subtle">{r.sme_email}</p>
-                    </th>
-                    <td className="px-5 py-4 text-foreground-muted">
-                      {r.organization}
-                      <br />
-                      <span className="text-xs text-foreground-subtle">{r.title}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="font-medium text-foreground">{r.job_name}</p>
-                      <p className="mt-1 text-xs text-foreground-subtle">
-                        {r.group_name} · {r.series_name}
-                      </p>
-                    </td>
-                    <td className="px-5 py-4">
-                      <StatusBadge status={mapReviewStatus(r.review_status)} />
-                    </td>
-                    <td className="px-5 py-4 text-foreground-muted">
-                      {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ko-KR') : '-'}
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex gap-2 text-xs">
-                        <span className="text-success">적합 {r.suitable_count}</span>
-                        <span className="text-warning">수정 {r.needs_edit_count}</span>
-                        <span className="text-destructive">부적합 {r.unsuitable_count}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenReview?.(r.job_id, r.sme_id);
-                        }}
-                      >
-                        보기
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    보기
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        )}
 
         {!loading && !error && filtered.length > PAGE_SIZE && (
           <nav

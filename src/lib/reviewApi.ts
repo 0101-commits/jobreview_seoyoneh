@@ -295,7 +295,9 @@ export async function fetchMyAssignments(smeId: string): Promise<MyAssignment[]>
         status: (review ? (review.status as ReviewStatus) : 'NOT_STARTED') || 'NOT_STARTED',
         last_saved_at: review ? str(review.last_saved_at) || null : null,
         submitted_at: review ? str(review.submitted_at) || null : null,
-        // 컬럼이 없는 DB(Phase D 마이그레이션 미적용)에서는 undefined로 와 null이 된다 — 이어하기만 꺼진다.
+        // 컬럼이 있는 DB에서만 값이 온다. 컬럼이 없으면 여기까지 오지 못한다 —
+        // PostgREST가 위 select를 400/42703으로 떨어뜨리고 fail()이 던진다(2026-09-03 실측 정정).
+        // 즉 Phase D 미적용은 "이어하기만 꺼짐"이 아니라 배정 목록 자체가 실패다.
         last_step: review && review.last_step != null ? Number(review.last_step) : null,
       };
     })

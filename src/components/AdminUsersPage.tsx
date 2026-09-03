@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { DataTable } from '@/components/ui/DataTable';
+import { FallbackView } from '@/components/ui/FallbackView';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { callAdminFn, errorMessage } from '@/components/modals/edgeApi';
 
 interface User {
@@ -129,101 +133,86 @@ export function AdminUsersPage({ currentUser }: Props) {
 
       <Toast toast={toast} onDismiss={dismiss} />
 
-      <div className="overflow-x-auto rounded-container border border-border bg-card shadow-1">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted">
-              <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-foreground-muted">
-                이름
-              </th>
-              <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-foreground-muted">
-                이메일
-              </th>
-              <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-foreground-muted">
-                상태
-              </th>
-              <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-foreground-muted">
-                등록일
-              </th>
-              <th scope="col" className="px-6 py-3.5 text-center text-xs font-semibold text-foreground-muted">
-                관리
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-foreground-subtle">
-                  불러오는 중…
-                </td>
-              </tr>
-            ) : loadError ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center">
-                  <AlertTriangle size={22} className="mx-auto mb-3 text-destructive" aria-hidden="true" />
-                  <p className="mb-3 text-sm text-destructive">{loadError}</p>
-                  <Button variant="secondary" size="sm" onClick={fetchAdmins}>
-                    <RotateCw size={14} aria-hidden="true" /> 다시 불러오기
-                  </Button>
-                </td>
-              </tr>
-            ) : admins.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-foreground-subtle">
-                  등록된 관리자 계정이 없어요.
-                </td>
-              </tr>
-            ) : (
-              admins.map((a) => (
-                <tr key={a.id} className="border-b border-border transition hover:bg-muted">
-                  <th scope="row" className="px-6 py-4 text-left">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{a.name}</span>
-                      {a.id === currentUser.id && (
-                        <span className="rounded-inner bg-primary-subtle px-2 py-0.5 text-[11px] font-medium text-primary">
-                          현재 로그인
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                  <td className="px-6 py-4 text-foreground-muted">{a.email}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <span
-                        className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${
-                          a.active ? 'bg-success-muted text-success' : 'bg-muted text-foreground-muted'
-                        }`}
-                      >
-                        {a.active ? '● 활성' : '○ 비활성'}
-                      </span>
-                      {/*
-                        로그인 계정(auth)만 없는 프로필. 화면에서 재생성하면 profile.id ≠ auth.uid인 계정이
-                        생겨 로그인 자체가 막혔다(v2 F3). 그래서 복구 경로는 문서화된 SQL 절차 하나로 둔다.
-                      */}
-                      {a.hasAuth === false && (
-                        <span
-                          title="supabase/BOOTSTRAP_2026-09-02_admin.sql 절차로 복구해 주세요."
-                          className="flex w-fit items-center gap-1 rounded-full bg-warning-muted px-2.5 py-1 text-xs font-medium text-warning"
-                        >
-                          <AlertTriangle size={12} aria-hidden="true" /> 로그인 계정 미생성 · SQL 복구 필요
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-foreground-muted">{formatDate(a.created_at)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <Button variant="secondary" size="sm" onClick={() => setShowManage(a)}>
-                        관리
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* v2 §6-5: 표를 공용 DataTable로 옮겼다 — 좁은 화면에서 가로 스크롤 대신 줄 목록(ListCell)이 된다. */}
+      {loading ? (
+        <Skeleton.Table rows={4} cols={5} />
+      ) : loadError ? (
+        <FallbackView
+          kind="error"
+          heading="관리자 목록을 불러오지 못했어요"
+          description={loadError}
+          action={
+            <Button variant="secondary" size="sm" onClick={fetchAdmins}>
+              <RotateCw size={14} aria-hidden="true" /> 다시 불러오기
+            </Button>
+          }
+        />
+      ) : (
+        <DataTable
+          caption="관리자 계정 목록"
+          minWidth="720px"
+          rows={admins}
+          rowKey={(a) => a.id}
+          empty={
+            <FallbackView
+              heading="등록된 관리자 계정이 없어요"
+              description="「관리자 계정 등록」으로 첫 계정을 만들어 주세요."
+            />
+          }
+          columns={[
+            {
+              key: 'name',
+              header: '이름',
+              mobile: 'title',
+              cell: (a) => (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-foreground">{a.name}</span>
+                  {a.id === currentUser.id && (
+                    <span className="rounded-inner bg-primary-subtle px-2 py-0.5 t-caption font-medium text-primary">
+                      현재 로그인
+                    </span>
+                  )}
+                </div>
+              ),
+            },
+            { key: 'email', header: '이메일', cell: (a) => a.email },
+            {
+              key: 'status',
+              header: '상태',
+              mobile: 'trailing',
+              cell: (a) => (
+                <div className="flex flex-col gap-1">
+                  <StatusBadge status={a.active ? '활성' : '비활성'} domain="account" size="sm" />
+                  {/*
+                    로그인 계정(auth)만 없는 프로필. 화면에서 재생성하면 profile.id ≠ auth.uid인 계정이
+                    생겨 로그인 자체가 막혔다(v2 F3). 그래서 복구 경로는 문서화된 SQL 절차 하나로 둔다.
+                  */}
+                  {a.hasAuth === false && (
+                    <span
+                      title="supabase/BOOTSTRAP_2026-09-02_admin.sql 절차로 복구해 주세요."
+                      className="flex w-fit items-center gap-1 rounded-inner bg-warning-muted px-2 py-0.5 t-caption font-medium text-warning"
+                    >
+                      <AlertTriangle size={12} aria-hidden="true" /> 로그인 계정 미생성 · SQL 복구 필요
+                    </span>
+                  )}
+                </div>
+              ),
+            },
+            { key: 'created', header: '등록일', cell: (a) => formatDate(a.created_at) },
+            {
+              key: 'manage',
+              header: '관리',
+              align: 'center',
+              mobile: 'trailing',
+              cell: (a) => (
+                <Button variant="secondary" size="sm" onClick={() => setShowManage(a)}>
+                  관리
+                </Button>
+              ),
+            },
+          ]}
+        />
+      )}
 
       {showRegister && (
         <RegisterModal

@@ -27,6 +27,9 @@ import { EXPORT_COLLECTORS } from '@/lib/exportApi';
 import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { FilterChips } from '@/components/ui/FilterChips';
+import { DataTable } from '@/components/ui/DataTable';
+import { FallbackView } from '@/components/ui/FallbackView';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 
 // ── 열 이름 ─────────────────────────────────────────────────────────
@@ -320,98 +323,105 @@ export function FteAnalyticsPage({
             {FTE_BASIS_LABELS[basis]}
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-max text-left text-sm">
-            <caption className="sr-only">
-              선택한 직무의 과업별 SME 평균 투입 비중과 순위. 응답이 1건인 과업은 표준편차 대신 「응답 1건」으로
-              표시됩니다.
-            </caption>
-            <thead>
-              <tr className="border-b border-border bg-muted text-xs text-foreground-muted">
-                <th scope="col" className="w-14 px-4 py-3 font-medium">
-                  {COL.rank}
-                </th>
-                <th scope="col" className="min-w-[14rem] px-3 py-3 font-medium">
-                  {COL.task}
-                </th>
-                <th scope="col" className="w-28 px-3 py-3 font-medium">
-                  {COL.taskKind}
-                </th>
-                <th scope="col" className="min-w-[16rem] px-3 py-3 font-medium">
-                  {COL.avg}
-                </th>
-                <th scope="col" className="w-32 px-3 py-3 font-medium">
-                  {COL.sd}
-                </th>
-                <th scope="col" className="w-20 px-3 py-3 font-medium">
-                  {COL.n}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-foreground-subtle">
-                    불러오는 중…
-                  </td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-destructive">
-                    투입 비중 분포를 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요.
-                  </td>
-                </tr>
-              ) : jobRows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-foreground-subtle">
-                    {FTE_BASIS_LABELS[basis]}으로 집계할 응답이 없습니다. 기준을 「
-                    {FTE_BASIS_LABELS[basis === 'APPROVED' ? 'ALL' : 'APPROVED']}」으로 바꿔 보세요.
-                  </td>
-                </tr>
-              ) : (
-                jobRows.map((row, i) => {
+        {loading ? (
+          <div className="p-4">
+            <Skeleton.Table rows={5} cols={5} />
+          </div>
+        ) : error ? (
+          <FallbackView
+            kind="error"
+            compact
+            description="투입 비중 분포를 불러오지 못했어요. 위의 「다시 시도」를 눌러 주세요."
+          />
+        ) : (
+          // v2 §6-5: 공용 DataTable — 좁은 화면에서는 줄 목록으로 쌓인다(피벗 표는 예외로 그대로 둔다).
+          <DataTable
+            caption="선택한 직무의 과업별 SME 평균 투입 비중과 순위. 응답이 1건인 과업은 표준편차 대신 「응답 1건」으로 표시됩니다."
+            minWidth="720px"
+            className="border-0"
+            rows={jobRows}
+            rowKey={(row) => `${text(row, COL.taskKind)}|${text(row, COL.task)}`}
+            empty={
+              <FallbackView
+                compact
+                heading={`${FTE_BASIS_LABELS[basis]}으로 집계할 응답이 없어요`}
+                description={`기준을 「${FTE_BASIS_LABELS[basis === 'APPROVED' ? 'ALL' : 'APPROVED']}」으로 바꿔 보세요.`}
+              />
+            }
+            columns={[
+              {
+                key: 'rank',
+                header: COL.rank,
+                className: 'w-14',
+                cell: (row) => <span className="text-foreground-subtle">{num(row, COL.rank) ?? ''}</span>,
+              },
+              {
+                key: 'task',
+                header: COL.task,
+                mobile: 'title',
+                className: 'min-w-[14rem]',
+                cell: (row) => <span className="text-foreground">{text(row, COL.task)}</span>,
+              },
+              {
+                key: 'kind',
+                header: COL.taskKind,
+                className: 'w-28',
+                cell: (row) => <span className="t-caption">{text(row, COL.taskKind)}</span>,
+              },
+              {
+                key: 'avg',
+                header: COL.avg,
+                mobile: 'trailing',
+                className: 'min-w-[16rem]',
+                cell: (row) => {
                   const avg = num(row, COL.avg);
-                  const sd = num(row, COL.sd);
-                  const n = num(row, COL.n);
                   const width = avg !== null && maxAvg > 0 ? (avg / maxAvg) * 100 : 0;
                   return (
-                    <tr key={`${text(row, COL.taskKind)}|${text(row, COL.task)}`} className="border-b border-border last:border-0">
-                      <td className="px-4 py-3 text-foreground-subtle">{num(row, COL.rank) ?? i + 1}</td>
-                      <th scope="row" className="px-3 py-3 text-left font-normal text-foreground">
-                        {text(row, COL.task)}
-                      </th>
-                      <td className="px-3 py-3 text-xs text-foreground-muted">{text(row, COL.taskKind)}</td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-16 shrink-0 tabular-nums text-foreground">{pctText(avg)}</span>
-                          <span aria-hidden="true" className="h-2 min-w-[3rem] flex-1 overflow-hidden rounded-inner bg-muted">
-                            <span className="block h-full rounded-inner bg-primary" style={{ width: `${width}%` }} />
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 tabular-nums">
-                        {/*
-                          응답이 1건이면 표준편차는 값이 없는 것이 아니라 "성립하지 않는" 것이다.
-                          '—'로 두면 읽는 사람이 이유를 알 수 없으므로 이유를 그대로 적는다(R6 — SME 1~2명).
-                        */}
-                        {n === 1 ? (
-                          <span className="rounded-element border border-warning-border bg-warning-muted px-2 py-0.5 text-xs text-warning">
-                            응답 1건
-                          </span>
-                        ) : sd === null ? (
-                          <span className="text-xs text-foreground-subtle">집계 없음</span>
-                        ) : (
-                          <span className="text-foreground">{sd.toFixed(2)}%p</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 tabular-nums text-foreground-muted">{n === null ? '' : `${n}명`}</td>
-                    </tr>
+                    <div className="flex items-center gap-2">
+                      <span className="w-16 shrink-0 tabular-nums text-foreground">{pctText(avg)}</span>
+                      <span
+                        aria-hidden="true"
+                        className="h-2 min-w-[3rem] flex-1 overflow-hidden rounded-inner bg-muted"
+                      >
+                        <span className="block h-full rounded-inner bg-primary" style={{ width: `${width}%` }} />
+                      </span>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                },
+              },
+              {
+                key: 'sd',
+                header: COL.sd,
+                className: 'w-32 tabular-nums',
+                cell: (row) => {
+                  const sd = num(row, COL.sd);
+                  const n = num(row, COL.n);
+                  /*
+                    응답이 1건이면 표준편차는 값이 없는 것이 아니라 "성립하지 않는" 것이다.
+                    '—'로 두면 읽는 사람이 이유를 알 수 없으므로 이유를 그대로 적는다(R6 — SME 1~2명).
+                  */
+                  if (n === 1)
+                    return (
+                      <span className="rounded-element border border-warning-border bg-warning-muted px-2 py-0.5 t-caption text-warning">
+                        응답 1건
+                      </span>
+                    );
+                  if (sd === null) return <span className="t-caption text-foreground-subtle">집계 없음</span>;
+                  return <span className="text-foreground">{sd.toFixed(2)}%p</span>;
+                },
+              },
+              {
+                key: 'n',
+                header: COL.n,
+                className: 'w-20 tabular-nums',
+                cell: (row) => {
+                  const n = num(row, COL.n);
+                  return n === null ? '' : `${n}명`;
+                },
+              },
+            ]}
+          />
+        )}
       </section>
 
       {/* ② 조직별 피벗 표 — R8(조직 단위 분석)의 축. 행=과업, 열=조직. */}

@@ -34,6 +34,7 @@ import { DEFAULT_TEMPLATES, type MailRecipient } from '@/lib/mailApi';
 import { MailSendPanel } from '@/pages/admin/MailSendPanel';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { FilterChips } from '@/components/ui/FilterChips';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 
 // ── 표시용 상수 ─────────────────────────────────────────────────────
@@ -553,11 +554,17 @@ export function ProgressMatrixPage({
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={colCount} className="px-4 py-12 text-center text-foreground-subtle">
-                    불러오는 중…
-                  </td>
-                </tr>
+                // 피벗 표는 열이 조직 수만큼 늘어나 줄 목록으로 바꿀 수 없다(v2 §6-5 예외).
+                // 표 골격을 지킨 채 셀만 자리표시로 채운다.
+                Array.from({ length: 4 }, (_, r) => (
+                  <tr key={`skeleton-${r}`}>
+                    {Array.from({ length: colCount }, (_, c) => (
+                      <td key={c} className="px-4 py-4">
+                        <Skeleton.Line />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : error ? (
                 <tr>
                   <td colSpan={colCount} className="px-4 py-12 text-center text-destructive">

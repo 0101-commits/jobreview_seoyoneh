@@ -297,6 +297,10 @@ BEGIN
 END;
 $fn$;
 
+-- DROP 후 새로 만든 함수는 PUBLIC 에 EXECUTE 가 기본 부여된다. 형제 마이그레이션들과 같이 거둔다
+-- (20260828010000:231 · 20260901030000:595 · 20260902020000:1110 · 20260902030000:317).
+REVOKE EXECUTE ON FUNCTION public.save_review_draft(uuid, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.save_review_draft(uuid, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb) FROM anon;
 GRANT EXECUTE ON FUNCTION public.save_review_draft(uuid, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb) TO authenticated;
 
 -- ── 4. submit_review — 인자만 넘긴다 ───────────────────────────────
@@ -333,12 +337,14 @@ DECLARE
   v_fte_sum numeric;
   v_fte_item jsonb;
   v_missing jsonb;
+  -- 배정이 아직 살아 있는지(review_assignments.active). 판정은 저장 뒤로 내린다.
+  v_assignment_active boolean;
 BEGIN
   PERFORM set_config('app.trusted_rpc', '1', true);
 
   -- ④ 호출자 = 배정 SME 본인.
-  SELECT a.sme_id, a.job_id, COALESCE(j.company_id, a.company_id)
-    INTO v_sme_id, v_job_id, v_company_id
+  SELECT a.sme_id, a.job_id, COALESCE(j.company_id, a.company_id), a.active
+    INTO v_sme_id, v_job_id, v_company_id, v_assignment_active
     FROM public.reviews r
     JOIN public.review_assignments a ON a.id = r.assignment_id
     JOIN public.jobs j ON j.id = a.job_id
@@ -357,6 +363,25 @@ BEGIN
   -- 배분까지 이 호출에 실려 오므로(v2 F5) 제출 직전 클라이언트 왕복이 하나 줄었다.
   PERFORM public.save_review_draft(
     p_review_id, p_job, p_tasks, p_skills, p_new_tasks, p_new_skills, p_fte, p_activities);
+
+  /*
+    ⑤ 배정이 살아 있어야 제출할 수 있다(20260902030000 · §6-3 ⓐ R6).
+    이 게이트는 20260902030000_assignment_deactivate_guard.sql 이 넣은 것인데, 이 파일이
+    submit_review 를 DROP 후 다시 만들면서 그보다 앞선 20260902020000 의 본문을 베껴 와
+    한 번 지워졌었다. 다시 넣는다 — 빠지면 관리자가 배정을 내린 뒤에도 SME 가 이미 열어 둔
+    마법사에서 제출을 눌러 버릴 수 있고, 그렇게 찍힌 제출은 진행 매트릭스·검토현황·워크벤치·
+    Export·SME 목록이 전부 active = true 로 걸러 어디에도 보이지 않는다
+    (관리자에게는 '미제출', SME 에게는 '제출 완료').
+    자리가 저장 뒤·전이 앞인 이유: 입력은 남기고 제출만 막기 위해서다.
+  */
+  IF v_assignment_active IS NOT TRUE THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'missing', jsonb_build_array(jsonb_build_object(
+        'step', 5,
+        'kind', 'ASSIGNMENT_INACTIVE',
+        'label', '이 직무의 배정이 해제되어 제출할 수 없습니다. 방금 입력한 내용은 저장됐습니다. 관리자에게 문의해 주세요.')));
+  END IF;
 
   -- ③ FTE 합계 = 100.00
   SELECT COALESCE(
@@ -484,6 +509,8 @@ BEGIN
 END;
 $fn$;
 
+REVOKE EXECUTE ON FUNCTION public.submit_review(uuid, jsonb, jsonb, jsonb, jsonb, jsonb, text, jsonb, jsonb) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.submit_review(uuid, jsonb, jsonb, jsonb, jsonb, jsonb, text, jsonb, jsonb) FROM anon;
 GRANT EXECUTE ON FUNCTION public.submit_review(uuid, jsonb, jsonb, jsonb, jsonb, jsonb, text, jsonb, jsonb) TO authenticated;
 
 -- ── 5. 진행 중 검토가 있는 직무의 구조 편집 잠금 (v2 F6 · 결정 D7) ──
@@ -518,6 +545,11 @@ $$;
 COMMENT ON FUNCTION public.job_has_open_review(uuid) IS
   '이 직무에 응답이 걸린 검토가 있는가(v2 F6). NOT_STARTED는 제외 — 아직 아무 응답도 참조하지 않는다.';
 
+-- SECURITY DEFINER 라 기본 부여된 PUBLIC EXECUTE 를 거둔다. 트리거는 소유자 권한으로 도니
+-- authenticated 에 줄 필요도 없다 — 화면에서 부르는 곳이 없다.
+REVOKE EXECUTE ON FUNCTION public.job_has_open_review(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.job_has_open_review(uuid) FROM anon;
+
 CREATE OR REPLACE FUNCTION public.guard_job_structure_lock()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -525,6 +557,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_job_id uuid;
+  v_task_id uuid;
   v_removing boolean;
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -534,22 +567,31 @@ BEGIN
     v_removing := (OLD.active IS TRUE AND NEW.active IS NOT TRUE);
   END IF;
 
+  -- 여기 오는 것은 UPDATE 뿐이다 — DELETE는 위에서 항상 v_removing = true다.
   IF NOT v_removing THEN
-    RETURN COALESCE(NEW, OLD);
+    RETURN NEW;
   END IF;
 
-  v_job_id := CASE TG_TABLE_NAME
-    WHEN 'job_tasks'  THEN COALESCE(NEW, OLD).job_id
-    WHEN 'job_skills' THEN COALESCE(NEW, OLD).job_id
-    WHEN 'task_activities' THEN (SELECT t.job_id FROM public.job_tasks t WHERE t.id = COALESCE(NEW, OLD).job_task_id)
-  END;
+  /*
+    NEW·OLD는 record라 COALESCE(NEW, OLD)로 묶을 수 없고, 함수 호출 결과에서 필드를 바로
+    뽑는 문법도 없다 — 처음 판은 COALESCE(NEW, OLD).job_id 라고 써서 CREATE FUNCTION 자체가
+    42601(syntax error at or near ".")로 실패했다. TG_OP로 갈라 각각 읽는다.
+  */
+  IF TG_TABLE_NAME = 'task_activities' THEN
+    IF TG_OP = 'DELETE' THEN v_task_id := OLD.job_task_id; ELSE v_task_id := NEW.job_task_id; END IF;
+    SELECT t.job_id INTO v_job_id FROM public.job_tasks t WHERE t.id = v_task_id;
+  ELSE
+    -- job_tasks · job_skills 는 job_id를 직접 들고 있다.
+    IF TG_OP = 'DELETE' THEN v_job_id := OLD.job_id; ELSE v_job_id := NEW.job_id; END IF;
+  END IF;
 
   IF v_job_id IS NOT NULL AND public.job_has_open_review(v_job_id) THEN
     RAISE EXCEPTION '이 직무는 검토가 진행 중이라 과업·Skill 구조를 바꿀 수 없습니다. 문구·정의 수정은 가능하며, 구조 변경은 검토가 끝난 뒤 재업로드로 해 주세요.'
       USING ERRCODE = '42501';
   END IF;
 
-  RETURN COALESCE(NEW, OLD);
+  -- BEFORE 트리거라 DELETE에서 NEW(=NULL)를 돌려주면 삭제가 취소된다. 반드시 갈라 돌려준다.
+  IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END;
 $$;
 

@@ -8,6 +8,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Building2, CalendarClock, RotateCw, ShieldAlert } from 'lucide-react';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { FallbackView } from '@/components/ui/FallbackView';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Toast, useToast } from '@/components/ui/Toast';
@@ -86,13 +88,12 @@ function formatAt(value: string | null) {
 // 운영 정보가 그대로 노출된다. 값을 아예 불러오지 않도록 폼 자체를 렌더링하지 않는다.
 function AdminOnlyNotice() {
   return (
-    <div role="alert" className="rounded-container border border-border bg-card p-10 text-center">
-      <ShieldAlert size={22} className="mx-auto mb-2 text-foreground-subtle" aria-hidden="true" />
-      <p className="text-sm font-medium text-foreground">운영 설정은 관리자만 열 수 있습니다</p>
-      <p className="mt-1 text-xs leading-5 text-foreground-muted">
-        접근 권한이 필요하면 조사 담당자에게 문의해 주세요.
-      </p>
-    </div>
+    <FallbackView
+      kind="forbidden"
+      icon={<ShieldAlert size={26} aria-hidden="true" />}
+      heading="운영 설정은 관리자만 열 수 있어요"
+      description="접근 권한이 필요하면 조사 담당자에게 문의해 주세요."
+    />
   );
 }
 
@@ -312,19 +313,18 @@ function SettingsForm({
           </p>
         </div>
       ) : loading ? (
-        <div className="py-12 text-center text-foreground-subtle">불러오는 중…</div>
+        <Skeleton.Card count={3} />
       ) : loadError ? (
-        <div role="alert" className="rounded-container border border-destructive-border bg-destructive-muted p-6 text-center">
-          <AlertTriangle size={20} className="mx-auto mb-2 text-destructive" aria-hidden="true" />
-          <p className="text-sm font-medium text-destructive">{loadError}</p>
-          <p className="mt-1 text-xs text-foreground-muted">
-            설정이 없는 것이 아니라 불러오지 못한 상태입니다. 이대로 저장하면 기존 값을 덮어쓰게 되므로 먼저 다시
-            시도해 주세요.
-          </p>
-          <Button variant="secondary" size="sm" className="mt-4" onClick={() => setReloadKey((k) => k + 1)}>
-            <RotateCw size={14} aria-hidden="true" /> 다시 시도
-          </Button>
-        </div>
+        <FallbackView
+          kind="error"
+          heading={loadError}
+          description="설정이 없는 것이 아니라 불러오지 못한 상태예요. 이대로 저장하면 기존 값을 덮어쓰게 되니 먼저 다시 시도해 주세요."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+              <RotateCw size={14} aria-hidden="true" /> 다시 시도
+            </Button>
+          }
+        />
       ) : (
         <div className="space-y-4">
           {!saved && (

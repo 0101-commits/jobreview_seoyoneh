@@ -5,9 +5,11 @@
 // 두면 문구가 갈라져서, 검토 화면(SmeReviewPage) 배너들과 같은 파일에 모아 두고 여기서는 지웠다.
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, Clock, Inbox, MessageSquareText } from 'lucide-react';
+import { CheckCircle2, Clock, Inbox, MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge as Base } from '@/components/ui/StatusBadge';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { FallbackView } from '@/components/ui/FallbackView';
 import { fetchReviewStatusResult } from '@/lib/jobApi';
 import { fetchMyInquiries, type Inquiry, type InquiryStatus } from '@/lib/surveyApi';
 import { STEP_TITLES } from '@/pages/sme-review/copy';
@@ -101,25 +103,22 @@ export function MyInquiriesPage({ user }: { user: User }) {
       </p>
 
       {loading ? (
-        <div className="py-12 text-center text-foreground-subtle">불러오는 중…</div>
+        <Skeleton.Card count={2} />
       ) : error ? (
-        <div
-          role="alert"
-          className="rounded-container border border-destructive-border bg-destructive-muted p-6 text-center"
-        >
-          <AlertTriangle size={20} className="mx-auto mb-2 text-destructive" aria-hidden="true" />
-          <p className="text-sm font-medium text-destructive">{error}</p>
-          <p className="mt-1 text-xs text-foreground-muted">
-            네트워크 상태를 확인한 뒤 다시 시도해 주세요. 계속 실패하면 관리자에게 문의해 주세요.
-          </p>
-          <Button variant="secondary" size="sm" className="mt-4" onClick={() => void load()}>
-            다시 시도
-          </Button>
-        </div>
+        <FallbackView
+          kind="error"
+          heading={error}
+          description="네트워크 상태를 확인한 뒤 다시 시도해 주세요. 계속 실패하면 관리자에게 문의해 주세요."
+          action={
+            <Button variant="secondary" size="sm" onClick={() => void load()}>
+              다시 시도
+            </Button>
+          }
+        />
       ) : rows.length === 0 ? (
         <div className="rounded-container border border-border bg-card p-10 text-center">
           <Inbox size={22} className="mx-auto mb-2 text-foreground-subtle" aria-hidden="true" />
-          <p className="text-sm font-medium text-foreground">아직 남긴 문의가 없습니다</p>
+          <p className="text-sm font-medium text-foreground">아직 남긴 문의가 없어요</p>
           <p className="mt-1 text-xs leading-5 text-foreground-muted">
             검토 중 막히는 부분은 화면 우측 하단 &lsquo;문의하기&rsquo;로 남겨 주세요.
             <br />
