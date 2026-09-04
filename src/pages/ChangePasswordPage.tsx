@@ -12,6 +12,7 @@ import { Field } from '@/components/ui/Field';
 import { Toast, useToast } from '@/components/ui/Toast';
 import type { User } from '@/types';
 import { PASSWORD_MIN_LENGTH, passwordPolicyError } from '@/lib/passwordPolicy';
+import { callAdminFn, errorMessage } from '@/components/modals/edgeApi';
 
 export function ChangePasswordPage({
   user,
@@ -63,33 +64,31 @@ export function ChangePasswordPage({
 
     setSaving(true);
     try {
+      /*
+       * 예전에는 여기서 supabase.auth.updateUser 로 GoTrue 에 직접 쏘고, must_change_password 는
+       * 화면이 따로 갱신했다. 그 경로만 서버를 지나지 않아 관리자 화면의 비밀번호 열람이
+       * 첫 로그인 직후부터 거짓이 됐다(기획서 §2). 이제 두 가지를 서버가 한 번에 한다.
+       * 대상은 언제나 호출자 자신이고, 서버는 body 의 id 를 쓰지 않는다.
+       */
       if (changedPassword.current !== password) {
-        const { error: authError } = await supabase.auth.updateUser({ password });
-        if (authError) {
-          showToast({ type: 'error', msg: `비밀번호를 변경하지 못했습니다. ${authError.message}` });
+        const res = await callAdminFn<{ flagApplied?: boolean }>({ mode: 'set-own-password', password });
+        changedPassword.current = password;
+        if (res.flagApplied === false) {
+          // 비밀번호는 이미 바뀌었다. 실패를 뭉뚱그리면 사용자가 옛 비밀번호로 다시 로그인하려 든다.
+          showToast({
+            type: 'error',
+            msg: '새 비밀번호는 저장됐지만 변경 완료 표시를 기록하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          });
           return;
         }
-        changedPassword.current = password;
-      }
-
-      // 본인 행만 갱신한다. 클라이언트가 id를 정하지만 서버 RLS가 같은 조건을 다시 확인한다.
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ must_change_password: false })
-        .eq('id', user!.id);
-      if (profileError) {
-        // 여기까지 왔으면 비밀번호는 이미 바뀌었다. 실패를 뭉뚱그리면 사용자가 옛 비밀번호로 다시 로그인하려 든다.
-        showToast({
-          type: 'error',
-          msg: `새 비밀번호는 저장됐지만 변경 완료 표시를 기록하지 못했습니다. 잠시 후 다시 시도해 주세요. ${profileError.message}`,
-        });
-        return;
       }
 
       await logAudit(recovery ? 'PASSWORD_RESET' : 'PASSWORD_CHANGED', 'profiles', user!.id, {
         reason: recovery ? 'RESET_LINK' : 'FIRST_LOGIN',
       });
       onChanged();
+    } catch (err) {
+      showToast({ type: 'error', msg: errorMessage(err, '비밀번호를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.') });
     } finally {
       setSaving(false);
     }

@@ -326,6 +326,16 @@ Pages는 하위 경로에서 서빙되므로 워크플로가 `GITHUB_PAGES=true`
 
 ### 2-2. Supabase Edge Function secrets (Supabase 대시보드 → Edge Functions → Secrets)
 
+| 이름 | 용도 | 없으면 |
+|---|---|---|
+| `PASSWORD_VAULT_KEY` | 비밀번호 보관고의 AES-256-GCM 키. **32바이트 난수의 base64** — `openssl rand -base64 32` | 보관도 열람도 하지 않는다. 계정 발급·비밀번호 변경은 그대로 되고, 관리자 화면의 「비밀번호 확인」만 사유를 돌려준다 |
+
+`PASSWORD_VAULT_KEY` 는 이 저장소에도, DB 에도, 백업에도 없다. **잃어버리면 보관된 값은 영영
+복호되지 않는다** — 그때는 비밀번호를 재발급하면 되고, 그 사고로 계정이 잠기지는 않는다.
+키를 바꾸면 그 이전에 보관된 값은 전부 읽히지 않게 되므로(복호 실패로 사유가 뜬다) 바꿀 이유가
+없으면 두는 편이 낫다.
+
+
 | 이름 | 필요 여부 | 읽는 곳 |
 |---|---|---|
 | `SUPABASE_URL` | **등록 불필요** — 런타임이 자동 주입 | `admin-create-user/index.ts:15`, `send-reminder/index.ts:94` |

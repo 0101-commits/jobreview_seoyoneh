@@ -55,7 +55,7 @@ function toKoreanMessage(raw: unknown, status: number): string {
  */
 type AuditPlan = { action: string; entityId: string | null; meta: Record<string, unknown> };
 
-function planAccountAudit(
+export function planAccountAudit(
   body: Record<string, unknown>,
   data: Record<string, unknown>,
 ): AuditPlan | null {
@@ -89,6 +89,16 @@ function planAccountAudit(
         // 서버가 만든 임시값인지 관리자가 지정한 값인지만 구분한다(값은 남기지 않는다).
         meta: { issued: data.tempPassword ? 'temp' : 'explicit', force_change: data.mustChangePassword === true },
       };
+    /*
+     * 열람은 조작이 아니지만 남긴다. 평문을 사람 눈에 보인 순간이 이 기능의 유일한 위험 지점이라,
+     * "누가 언제 누구 것을 봤나"가 남지 않으면 사고가 났을 때 되짚을 수 없다.
+     * meta 에는 profile id 밖에 없다 — 값도 로그인 ID 도 넣지 않는다(§8 S6).
+     */
+    case 'reveal-password':
+      // 값이 실제로 나오지 않은 호출(보관 없음·stale)은 열람이 아니다.
+      return data.found === true
+        ? { action: 'PASSWORD_VIEWED', entityId: str(body.profileId), meta: {} }
+        : null;
     case 'set-login-id':
       // 바뀐 게 없으면(같은 값 재입력) 기록하지 않는다 — 조회성 호출로 감사 로그를 채우지 않는다.
       return data.unchanged ? null : { action: 'LOGIN_ID_CHANGED', entityId: str(body.profileId), meta: {} };

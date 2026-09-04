@@ -89,6 +89,11 @@ interface SnapshotTable {
  * 뺀 것: auth.users(Supabase 관리 영역이라 이 클라이언트로 읽을 수 없다 — 계정 자체의 복구는
  * Supabase 프로젝트 백업의 일이다), 뷰·함수·정책(마이그레이션 파일이 원천이다).
  */
+/*
+ * 화이트리스트다. 새 표를 자동으로 담지 않는다 — 그래서 account_password_vault(비밀번호 암호문)는
+ * 여기 없고, 앞으로도 넣지 않는다. 스냅샷은 브라우저로 내려받아 파일로 남는 산출물이라,
+ * 그 안에 들어간 값은 DB 권한 바깥으로 나간다.
+ */
 export const SNAPSHOT_TABLES: SnapshotTable[] = [
   // ── 마스터: 업로드로 들어온 원본. 이게 없으면 응답이 무엇에 대한 응답인지 알 수 없다.
   { name: 'companies', columns: '*', orderBy: 'id', note: '계열사 마스터' },
