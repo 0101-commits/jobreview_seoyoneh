@@ -308,6 +308,12 @@ curl -s -o /dev/null -w '%{http_code}\n' -X OPTIONS \
 
 ### 2-1. GitHub Actions variables (저장소 → Settings → Secrets and variables → Actions → Variables)
 
+| 이름 | 용도 | 없으면 |
+|---|---|---|
+| `VITE_SUPPORT_CONTACT` | 로그인 전 화면에 띄울 대표 문의처(메일 주소 또는 전화번호) | 링크 없이 문구만 남는다. 로그인에 실패한 SME 가 앱 안에서 연락할 곳이 0이 된다 |
+| `SUPABASE_PROJECT_REF` | Edge Function 자동 배포 대상(`yktdlcpovntegiwfnied`) | `functions` 잡이 통째로 건너뛰어지고 §1-9 의 수동 배포가 필요하다 |
+
+
 `.github/workflows/deploy.yml`의 build 스텝이 `vars.` 로 읽는다.
 
 | 이름 | 정체 | 비고 |

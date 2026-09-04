@@ -6,6 +6,33 @@ import { resetRedirectUrl, supabase } from '@/lib/supabase';
 // 화면 문구는 copy.ts 한곳에 둔다(문언 단일 원천 — copy.ts 파일 상단 규칙).
 import { LOGIN_PRIVACY_NOTICE } from './sme-review/copy';
 
+/*
+ * 파일럿 계정의 로그인 ID 는 `사번@seoyoneh.local` 이고, 이 도메인은 인터넷으로 라우팅되지 않는다
+ * (Edge Function 의 PILOT_LOGIN_DOMAIN). 그런 주소로 재설정 메일을 보내면 영영 도착하지 않는데
+ * 화면은 "메일을 보냈어요"라고 말한다 — resetPasswordForEmail 이 미등록·수신불가에도 오류를 주지
+ * 않기 때문이다. 그 거짓말을 먼저 끊는다.
+ */
+const UNROUTABLE_DOMAINS = ['.local', '.localhost', '.invalid', '.internal', '.test'];
+
+function isUnroutableLoginId(value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (!v.includes('@')) return true; // 로그인 ID 만 입력한 경우 — 서버가 .local 도메인을 붙인다
+  return UNROUTABLE_DOMAINS.some((d) => v.endsWith(d));
+}
+
+/*
+ * 로그인 전 화면에는 회사가 없어 운영 설정의 문의 담당(inquiry_contact)을 읽을 수 없다.
+ * 그렇다고 "관리자에게 문의해 주세요"만 남기면 문의할 곳이 화면에 하나도 없다 — 못 들어온
+ * 사람이 앱 안에서 쓸 수 있는 창구가 0이 된다. 개인 주소를 번들에 박지 않으면서 해결하려고
+ * 빌드 타임 환경변수로 대표 문의처를 받는다. 값이 없으면 지금과 같은 문구만 남는다.
+ */
+const SUPPORT_CONTACT = (import.meta.env.VITE_SUPPORT_CONTACT as string | undefined)?.trim() || '';
+const SUPPORT_HREF = SUPPORT_CONTACT.includes('@')
+  ? `mailto:${SUPPORT_CONTACT}`
+  : SUPPORT_CONTACT
+    ? `tel:${SUPPORT_CONTACT.replace(/[^0-9+]/g, '')}`
+    : '';
+
 // 로그인 보호(§8 S3) — 연속 실패 5회면 60초 동안 입력·제출을 막는다.
 const MAX_FAIL = 5;
 const LOCK_SECONDS = 60;
@@ -160,7 +187,18 @@ export function Login({
             개인 이메일을 번들에 싣지 않기 위해(S4) 담당자 주소는 로그인 후 화면에서만 보여 준다.
           */}
           <p className="mt-3 text-center t-caption text-foreground-muted">
-            계정 생성 및 권한 변경은 관리자에게 문의해 주세요.
+            계정 생성·권한 변경·비밀번호 재발급은 담당자에게 문의해 주세요.
+            {SUPPORT_HREF && (
+              <>
+                {' '}
+                <a
+                  href={SUPPORT_HREF}
+                  className="font-medium text-primary underline underline-offset-2 hover:text-primary-hover"
+                >
+                  {SUPPORT_CONTACT}
+                </a>
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -188,6 +226,15 @@ function ForgotPasswordForm({ initialEmail, onBack }: { initialEmail: string; on
     }
     if (!supabase) {
       setError('데이터베이스에 연결되어 있지 않아요. 관리자에게 문의해 주세요.');
+      return;
+    }
+    if (isUnroutableLoginId(target)) {
+      // 보내 봐야 도착하지 않는다. "보냈다"고 말하는 대신 실제로 되는 경로를 알려 준다.
+      setError(
+        SUPPORT_CONTACT
+          ? `이 로그인 ID(${target})는 메일을 받을 수 없어요. 담당자(${SUPPORT_CONTACT})에게 비밀번호 재발급을 요청해 주세요.`
+          : `이 로그인 ID(${target})는 메일을 받을 수 없어요. 관리자에게 비밀번호 재발급을 요청해 주세요.`,
+      );
       return;
     }
     setSending(true);

@@ -48,6 +48,8 @@ jobs:
           GITHUB_PAGES: 'true'
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # 로그인 전 화면의 대표 문의처. 비어 있으면 문구만 남는다(선택).
+          VITE_SUPPORT_CONTACT: ${{ vars.VITE_SUPPORT_CONTACT }}
       # BrowserRouter: GitHub Pages는 /jobs/:id 같은 경로에 파일이 없으면 404를 준다.
       # 404.html을 index.html 사본으로 두면 새로고침·직접 링크가 앱으로 들어온다.
       - run: cp dist/index.html dist/404.html
