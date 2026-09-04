@@ -2,12 +2,31 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveLoginEmail } from "./loginEmail.ts";
 
 /*
+ * service_role 클라이언트의 타입.
+ *
+ * 헬퍼들이 오랫동안 `ReturnType<typeof createClient>` 를 파라미터 타입으로 썼는데, 그것은
+ * **제네릭 기본값으로 굳은 타입**(스키마 = never)이라 실제 호출 결과와 다르다. 그 상태에서는
+ * `.from("어떤_표")` 의 입력이 전부 never 로 좁혀져, 새 표에 값을 넣는 코드가 타입 오류가 된다.
+ * 이 파일은 tsconfig include(["src"]) 밖이라 오랫동안 아무도 확인하지 않았고, 2026-09-04 에
+ * CI 에 deno check 를 넣으면서 드러났다.
+ *
+ * 실제 호출을 한 곳에 두고 그 반환 타입을 쓴다 — 인자 셋이 함께 움직이므로 어긋날 수 없다.
+ */
+function makeAdminClient(url: string, key: string) {
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+type AdminClient = ReturnType<typeof makeAdminClient>;
+
+/*
  * auth.admin.listUsers()는 인자를 주지 않으면 첫 50건만 돌려준다(supabase-js 기본 perPage).
  * 그 응답으로 "이 이메일이 이미 있는가"를 판정하면 계정 51번째부터 답이 틀린다(v2 F2).
  * 그래서 이메일로 찾아야 할 때만 이 헬퍼로 전체를 순회하고, id로 찾을 때는 getUserById를 쓴다.
  */
 async function findAuthUserByEmail(
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: AdminClient,
   email: string,
 ): Promise<{ id: string; email?: string } | null> {
   const target = email.trim().toLowerCase();
@@ -28,7 +47,7 @@ async function findAuthUserByEmail(
  * toggle-active · delete · set-role 세 곳에서 같은 값을 본다. 세 곳에 같은 쿼리를 두면
  * 한 곳만 조건이 바뀌어도 방어가 갈리므로 여기 한 번만 적는다.
  */
-async function countActiveAdmins(adminClient: ReturnType<typeof createClient>): Promise<number> {
+async function countActiveAdmins(adminClient: AdminClient): Promise<number> {
   const { count } = await adminClient
     .from("profiles")
     .select("id", { count: "exact", head: true })
@@ -150,7 +169,7 @@ async function decryptSecret(payload: string): Promise<string | null> {
  * 대신 저장 여부를 boolean 으로 돌려주어 응답이 사실대로 말하게 한다.
  */
 async function saveVaultEntry(
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: AdminClient,
   profileId: string,
   plaintext: string,
   source: "admin-create" | "sme-create" | "set-password" | "self-change",
@@ -200,9 +219,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Create admin client with service role key
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const adminClient = makeAdminClient(supabaseUrl, serviceRoleKey);
 
     // Get the caller's JWT to verify they are an admin
     const authHeader = req.headers.get("Authorization");
@@ -949,9 +966,7 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      const reauthClient = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
+      const reauthClient = makeAdminClient(supabaseUrl, serviceRoleKey);
       const { error: reauthErr } = await reauthClient.auth.signInWithPassword({
         email: callerUser.user.email as string,
         password: reauthPassword,

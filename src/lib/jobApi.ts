@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { type JobMaster } from './uploadUtils';
+import { logAudit } from './auditApi';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -317,7 +318,11 @@ export async function fetchGroupSeriesOptionsResult(companyId?: string | null): 
 
 // ── Check for duplicate job (same company+group+series+name, different id) ──
 
-export async function checkDuplicateJob(groupId: string, seriesId: string, name: string, excludeJobId: string, companyId?: string | null): Promise<boolean> {
+/**
+ * excludeJobId 는 "고치는 중인 그 직무는 빼고 센다"는 뜻이라 신규 등록에는 없다.
+ * 빈 값을 그대로 .neq() 에 넣으면 uuid 파싱 오류가 나므로 있을 때만 건다.
+ */
+export async function checkDuplicateJob(groupId: string, seriesId: string, name: string, excludeJobId: string | null, companyId?: string | null): Promise<boolean> {
   if (!supabase) return false;
   let query = supabase
     .from('jobs')
@@ -325,8 +330,8 @@ export async function checkDuplicateJob(groupId: string, seriesId: string, name:
     .eq('group_id', groupId)
     .eq('series_id', seriesId)
     .eq('name', name)
-    .eq('active', true)
-    .neq('id', excludeJobId);
+    .eq('active', true);
+  if (excludeJobId) query = query.neq('id', excludeJobId);
   if (companyId) query = query.eq('company_id', companyId);
   const { count, error } = await query;
   if (error) { console.error(`[jobApi] 직무 중복 확인 실패: ${error.message}`); return false; }
@@ -353,6 +358,126 @@ export async function hasSkillFeedback(skillId: string): Promise<boolean> {
   const { count, error } = await supabase.from('skill_feedback').select('id', { count: 'exact', head: true }).eq('skill_id', skillId);
   if (error) { console.error(`[jobApi] Skill 검토이력 확인 실패: ${error.message}`); return true; }
   return (count ?? 0) > 0;
+}
+
+/* ── 직무 한 건 등록·비활성 (기획서 docs/PLAN_2026-09-04_IMPROVEMENT.md P2) ──────
+ *
+ * 지금까지 jobs 에 행을 넣는 경로는 통합 업로드뿐이었다. 직무 하나를 더하려면 엑셀을 다시
+ * 만들어 올려야 했고, replace 모드는 그 회사 직무 전체를 갈아엎는다. 빼는 것도 마찬가지라
+ * jobs.active 를 토글하는 코드가 앱 어디에도 없었다(SQL Editor 가 유일한 경로였다).
+ *
+ * RLS 는 이미 관리자에게 열려 있다(jobs_admin_insert · jobs_admin_update, 20260812084909).
+ * 그래서 새 정책도 Edge Function 도 필요 없다 — 화면에서 바로 쓴다.
+ */
+
+export interface CreateJobInput {
+  companyId: string | null;
+  groupId: string;
+  seriesId: string;
+  name: string;
+  definition: string;
+  userId: string;
+}
+
+/** 직군을 새로 만든다. 같은 회사에 같은 이름이 있으면 그 id 를 그대로 돌려준다(중복 생성 방지). */
+export async function createJobGroup(companyId: string | null, name: string): Promise<ApiResult<{ id: string; name: string }>> {
+  if (!supabase) return fail('직군 등록', NO_DB);
+  const trimmed = name.trim();
+  if (!trimmed) return fail('직군 등록', '직군 이름을 입력해 주세요.');
+
+  let dup = supabase.from('job_groups').select('id, name').eq('name', trimmed).eq('active', true);
+  if (companyId) dup = dup.eq('company_id', companyId);
+  const { data: found } = await dup.maybeSingle();
+  if (found) return ok({ id: (found as Record<string, unknown>).id as string, name: trimmed });
+
+  const { data, error } = await supabase
+    .from('job_groups')
+    .insert({ name: trimmed, company_id: companyId })
+    .select('id, name')
+    .single();
+  if (error) return fail('직군 등록', error.message);
+  return ok({ id: (data as Record<string, unknown>).id as string, name: trimmed });
+}
+
+/** 직렬을 새로 만든다. 같은 직군에 같은 이름이 있으면 그 id 를 그대로 돌려준다. */
+export async function createJobSeries(
+  companyId: string | null,
+  groupId: string,
+  name: string,
+): Promise<ApiResult<{ id: string; name: string }>> {
+  if (!supabase) return fail('직렬 등록', NO_DB);
+  const trimmed = name.trim();
+  if (!trimmed) return fail('직렬 등록', '직렬 이름을 입력해 주세요.');
+  if (!groupId) return fail('직렬 등록', '직군을 먼저 골라 주세요.');
+
+  const { data: found } = await supabase
+    .from('job_series')
+    .select('id, name')
+    .eq('group_id', groupId)
+    .eq('name', trimmed)
+    .eq('active', true)
+    .maybeSingle();
+  if (found) return ok({ id: (found as Record<string, unknown>).id as string, name: trimmed });
+
+  const { data, error } = await supabase
+    .from('job_series')
+    .insert({ name: trimmed, group_id: groupId, company_id: companyId })
+    .select('id, name')
+    .single();
+  if (error) return fail('직렬 등록', error.message);
+  return ok({ id: (data as Record<string, unknown>).id as string, name: trimmed });
+}
+
+/**
+ * 직무 한 건 등록. 과업·Skill·수행요건은 여기서 만들지 않는다 —
+ * 등록 직후 상세 화면으로 보내 기존 편집 경로(saveJobEdits)로 채우게 한다.
+ * 같은 회사·직군·직렬에 같은 이름이 이미 있으면 거절한다. DB 의 unique 제약이
+ * source_version 까지 포함해 느슨하므로, 사람이 읽을 수 있는 사유는 여기서 만든다.
+ */
+export async function createJob(input: CreateJobInput): Promise<ApiResult<string>> {
+  if (!supabase) return fail('직무 등록', NO_DB);
+  const name = input.name.trim();
+  const definition = input.definition.trim();
+  if (!input.groupId || !input.seriesId) return fail('직무 등록', '직군과 직렬을 골라 주세요.');
+  if (!name) return fail('직무 등록', '직무명을 입력해 주세요.');
+  if (!definition) return fail('직무 등록', '직무 정의를 입력해 주세요.');
+
+  const duplicated = await checkDuplicateJob(input.groupId, input.seriesId, name, null, input.companyId);
+  if (duplicated) return fail('직무 등록', `같은 직군·직렬에 「${name}」 직무가 이미 있어요.`);
+
+  const { data, error } = await supabase
+    .from('jobs')
+    .insert({
+      company_id: input.companyId,
+      group_id: input.groupId,
+      series_id: input.seriesId,
+      name,
+      definition,
+      created_by: input.userId,
+    })
+    .select('id')
+    .single();
+  if (error) return fail('직무 등록', error.message);
+
+  const jobId = (data as Record<string, unknown>).id as string;
+  await logAudit('JOB_CREATED', 'jobs', jobId, { company_id: input.companyId });
+  return ok(jobId);
+}
+
+/**
+ * 직무를 목록에서 내리거나 되돌린다. 지우지 않는다 —
+ * job_tasks·reviews·review_assignments 가 이 행을 참조하므로 하드 삭제는 응답을 함께 끊는다.
+ * 목록 조회는 이미 active = true 만 읽으므로(fetchAllJobsResult) 끄면 화면에서 사라진다.
+ */
+export async function setJobActive(jobId: string, active: boolean): Promise<ApiResult<null>> {
+  if (!supabase) return fail('직무 상태 변경', NO_DB);
+  const { error } = await supabase
+    .from('jobs')
+    .update({ active, updated_at: new Date().toISOString() })
+    .eq('id', jobId);
+  if (error) return fail('직무 상태 변경', error.message);
+  await logAudit(active ? 'JOB_ACTIVATED' : 'JOB_DEACTIVATED', 'jobs', jobId, {});
+  return ok(null);
 }
 
 // ── Save job detail edits ───────────────────────────────────────────
