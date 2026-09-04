@@ -7,7 +7,9 @@ import {
   ArrowUp,
   ChevronsUpDown,
   Download,
+  EyeOff,
   FileSpreadsheet,
+  Plus,
   RotateCw,
   Search,
 } from 'lucide-react';
@@ -16,13 +18,17 @@ import {
   fetchAllJobsResult,
   fetchReviewStatusResult,
   mapReviewStatus,
+  setJobActive,
   type JobListItem,
 } from '@/lib/jobApi';
+import { JobCreateModal } from '@/components/modals/JobCreateModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Toast, useToast } from '@/components/ui/Toast';
 import { fetchCompanies, type Company } from '@/lib/jobApi';
 import { JobDetailPage } from '@/components/JobDetailPage';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
 import { Button } from '@/components/ui/Button';
-import { DataTable } from '@/components/ui/DataTable';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 // shared/StatusBadge는 검토 상태(Status)로 타입이 좁혀져 있어 '미배정'이 들어가지 않는다.
 // 사전은 ui/StatusBadge 한 곳이므로 여기서는 그것을 직접 쓴다(색·라벨은 같다).
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -84,6 +90,11 @@ export function JobsPage({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'name', asc: true });
   const [internalJobId, setInternalJobId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  /** 목록에서 내릴 직무. 확인 창을 거친다 — 되돌릴 수는 있지만 SME 화면에서 바로 사라진다. */
+  const [deactivating, setDeactivating] = useState<JobRow | null>(null);
+  const [deactivateBusy, setDeactivateBusy] = useState(false);
+  const { toast, showToast, dismiss } = useToast();
 
   // 'all'은 전 회사다(회사 없이 조회하면 서버가 전체를 준다).
   const companyId = companyFilter === 'all' ? null : companyFilter;
@@ -194,6 +205,9 @@ export function JobsPage({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <CompanyFilterDropdown companies={companies} value={companyFilter} onChange={setCompanyFilter} />
+          <Button onClick={() => setShowCreate(true)} disabled={loading}>
+            <Plus size={16} aria-hidden="true" /> 직무 추가
+          </Button>
           <Button variant="secondary" onClick={() => exportAllJobsToExcel(companyId)} disabled={loading}>
             <Download size={16} aria-hidden="true" /> 전체 직무정보 다운로드
           </Button>
@@ -245,11 +259,11 @@ export function JobsPage({
               description={
                 query
                   ? '검색어를 바꾸거나 회사 필터를 확인해 주세요.'
-                  : "'직무정보 업로드'에서 Excel 파일로 직무를 등록할 수 있어요."
+                  : "위 「직무 추가」로 한 건씩 등록하거나, '직무정보 업로드'에서 Excel 파일로 한꺼번에 올릴 수 있어요."
               }
             />
           }
-          columns={SORT_COLUMNS.map((col) => {
+          columns={(SORT_COLUMNS.map((col): Column<JobRow> => {
             const activeSort = sort.key === col.key;
             const Icon = !activeSort ? ChevronsUpDown : sort.asc ? ArrowUp : ArrowDown;
             const header = (
@@ -291,7 +305,65 @@ export function JobsPage({
               header,
               cell: (j: JobRow) => (col.key === 'group_name' ? j.group_name : j.series_name),
             };
-          })}
+          }) as Column<JobRow>[]).concat([
+            {
+              key: 'manage',
+              header: <span>관리</span>,
+              cell: (j: JobRow) => (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  // 행 클릭은 상세로 들어가는 동작이라, 이 버튼에서는 그 전파를 끊는다.
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeactivating(j);
+                  }}
+                >
+                  <EyeOff size={14} aria-hidden="true" /> 목록에서 내리기
+                </Button>
+              ),
+            },
+          ])}
+        />
+      )}
+
+      <Toast toast={toast} onDismiss={dismiss} />
+
+      {showCreate && (
+        <JobCreateModal
+          userId={userId}
+          companies={companies}
+          defaultCompanyId={companyId}
+          onClose={() => setShowCreate(false)}
+          onCreated={(jobId) => {
+            setShowCreate(false);
+            showToast({ type: 'success', msg: '직무를 등록했어요. 과업과 Skill을 이어서 채워 주세요.' });
+            void load();
+            selectJob(jobId);
+          }}
+        />
+      )}
+
+      {deactivating && (
+        <ConfirmDialog
+          title="이 직무를 목록에서 내릴까요?"
+          body={`「${deactivating.name}」이(가) 직무 목록과 SME 배정 화면에서 사라집니다. 지우는 것이 아니라 숨기는 것이라, 이미 작성된 검토 응답은 그대로 남습니다.`}
+          confirmLabel="목록에서 내리기"
+          tone="negative"
+          busy={deactivateBusy}
+          onCancel={() => setDeactivating(null)}
+          onConfirm={async () => {
+            setDeactivateBusy(true);
+            const res = await setJobActive(deactivating.id, false);
+            setDeactivateBusy(false);
+            setDeactivating(null);
+            if (!res.ok) {
+              showToast({ type: 'error', msg: `내리지 못했어요. ${res.error}` });
+              return;
+            }
+            showToast({ type: 'success', msg: '직무를 목록에서 내렸어요.' });
+            void load();
+          }}
         />
       )}
     </>
