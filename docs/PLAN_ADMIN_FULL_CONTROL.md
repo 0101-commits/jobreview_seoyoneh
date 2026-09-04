@@ -78,7 +78,7 @@
 | 기능 | 무엇 | 어디 |
 |---|---|---|
 | **F1** | 비밀번호 임시 재발급 — 서버 생성값 1회 표시 | SME·관리자 관리 모달 |
-| **F2** | 비밀번호 직접 지정 — 10자 이상 + 영문 + 숫자 | SME·관리자 관리 모달 |
+| **F2** | 비밀번호 직접 지정 — 8자 이상 + 영문 + 숫자 | SME·관리자 관리 모달 |
 | **F3** | 재발급/지정 시 `must_change_password` 걸기(기본 켬, 끌 수 있음) | 같은 블록의 체크박스 |
 | **F4** | 로그인 ID(이메일) 변경 — Auth·profiles 동시 갱신, 중복 검사 | SME·관리자 관리 모달 |
 | **F5** | 역할 변경 SME ↔ 관리자 — 마지막 관리자 방어 포함 | SME·관리자 관리 모달 |
@@ -87,15 +87,23 @@
 | **F8** | 관리자 계정의 회사·조직·직급·사번 수정 | 관리자 관리 모달 |
 | **F9** | 계열사 관리 — 추가 · 이름/코드/표시순서 수정 · 활성 토글 | 운영 설정(`/settings`) 안의 새 섹션 |
 | **F10** | 위 조작 전부 `audit_logs`에 남긴다 | `src/lib/auditApi.ts` 경유 |
-| **F11** | 비밀번호 정책을 서버 한 곳으로 통일(10자 이상 + 영문 + 숫자) | Edge Function |
+| **F11** | 비밀번호 정책을 서버 한 곳으로 통일(8자 이상 + 영문 + 숫자) | Edge Function |
 
 ### F11 — 정책 숫자가 지금 두 개다
 
-`ChangePasswordPage`는 **10자**(`src/pages/ChangePasswordPage.tsx:15` `MIN_LENGTH = 10`),
-Edge Function의 관리자 생성은 **8자**를 요구한다(`index.ts` 기본 분기). 관리자가 8자로 지정한
-비밀번호는 본인이 바꾸려는 순간 "10자 이상" 요구를 받는다 — 같은 시스템이 같은 값을 두 기준으로
-판정한다. **10자로 통일한다**(느슨한 쪽으로 맞추지 않는다). §8 S2의 "길이 10+ 권장"이 기준이다.
-영향: 앞으로 관리자 계정을 8~9자 비밀번호로는 만들 수 없다. 기존 계정은 영향 없다.
+`ChangePasswordPage`는 **10자**, Edge Function의 관리자 생성은 **8자**를 요구했다. 관리자가 8자로
+지정한 비밀번호는 본인이 바꾸려는 순간 "10자 이상" 요구를 받았다 — 같은 시스템이 같은 값을 두
+기준으로 판정했다. **한 곳으로 통일한다.**
+
+- 화면 쪽 사본: `src/lib/passwordPolicy.ts` (`PASSWORD_MIN_LENGTH`·`passwordPolicyError`·`PASSWORD_POLICY_HINT`).
+  계정 생성·계정 조작 패널·비밀번호 변경·오류 문구 네 자리가 전부 이 파일만 본다.
+- 최종 판정자: `supabase/functions/admin-create-user/index.ts` 의 `passwordPolicyError`.
+  Deno 런타임이라 위 모듈을 import 할 수 없으므로 같은 규칙을 그쪽에도 적어 둔다 — **숫자는 두 곳을 함께 바꾼다.**
+
+**2026-09-04 결정 — 숫자는 8이다.** 처음에는 10으로 통일했으나, 운영 관리자 계정에 9자
+비밀번호(`admin0123`)를 쓰기로 하면서 8로 내렸다(`supabase/APPLY_2026-09-04_admin_account.sql`).
+영향: 앞으로 발급되는 모든 계정에 8자 기준이 적용된다. 기존 계정은 영향 없다.
+같은 변경으로 **비밀번호 변경 화면도 영문+숫자를 요구하게 됐다** — 예전에는 길이만 봤다.
 
 ### 화면 배치 — 새 메뉴를 만들지 않는다
 
@@ -117,7 +125,7 @@ Edge Function의 관리자 생성은 **8자**를 요구한다(`index.ts` 기본 
 
 | 모드 | 입력 | 하는 일 | 방어 |
 |---|---|---|---|
-| `set-password` | `profileId`, `password?`, `forceChange?` | `password`가 있으면 그 값으로, 없으면 서버가 임시값을 만들어 `auth.admin.updateUserById`. 그다음 `profiles.must_change_password = forceChange ?? true` | 정책 검사(10자 + 영문 + 숫자). 대상 auth 계정이 없으면 404로 명시한다 — 프로필만 있는 고아 계정(`check-auth`가 보여 주는 그 상태)에서 "성공"으로 답하면 관리자가 없는 비밀번호를 전달한다 |
+| `set-password` | `profileId`, `password?`, `forceChange?` | `password`가 있으면 그 값으로, 없으면 서버가 임시값을 만들어 `auth.admin.updateUserById`. 그다음 `profiles.must_change_password = forceChange ?? true` | 정책 검사(8자 + 영문 + 숫자). 대상 auth 계정이 없으면 404로 명시한다 — 프로필만 있는 고아 계정(`check-auth`가 보여 주는 그 상태)에서 "성공"으로 답하면 관리자가 없는 비밀번호를 전달한다 |
 | `set-login-id` | `profileId`, `email` | `resolveLoginEmail`로 정규화 → `profiles`·`auth.users` 중복 검사 → `auth.admin.updateUserById({email, email_confirm:true})` → `profiles.email` 갱신 | 정규화 결과가 비면 400, 중복이면 400. **Auth를 먼저 바꾸고 profiles를 나중에** 바꾼다 — 반대로 하면 profiles만 바뀌고 실제 로그인 ID는 그대로여서 화면이 거짓말을 한다 |
 | `set-role` | `profileId`, `role` | `profiles.role` 갱신 | `admin`·`sme`만 허용. 자기 자신은 강등 불가. 마지막 활성 관리자 강등 불가(`toggle-active`·`delete`와 같은 카운트 방어). `sme`로 내릴 때 `company_id`가 없으면 400 — 회사 없는 SME는 배정이 만들어지지 않는다 |
 | `set-flags` | `profileId`, `must_change_password?`, `reset_guide?` | 넘어온 것만 갱신. `reset_guide`면 `guide_completed_at = null` | 둘 다 안 넘어오면 400(빈 호출을 성공으로 답하지 않는다) |
@@ -183,7 +191,7 @@ Edge Function에는 이미 같은 방어가 두 곳에 있어(`index.ts:299` `to
       CORS 분기가 살아 있다는 뜻이다.
 - 아래 항목은 **실제 Supabase에 붙여 확인해야 하는 것들이다. 아직 하나도 확인하지 않았다.**
 - [ ] SME 관리 모달에서 임시 비밀번호 재발급 → 표시된 값으로 그 SME 로그인 → 비밀번호 변경 화면이 뜬다
-- [ ] 비밀번호 직접 지정 9자 입력 → 저장 거절 + 사유 표기, 10자 → 통과
+- [ ] 비밀번호 직접 지정 7자 입력 → 저장 거절 + 사유 표기, 8자 이상(영문+숫자) → 통과
 - [ ] `must_change_password` 체크를 풀고 재발급 → 그 값으로 로그인해 바로 검토 화면에 들어간다
 - [ ] 로그인 ID를 이미 있는 값으로 변경 → 거절 + "이미 등록된 로그인 ID" 문구
 - [ ] 로그인 ID 변경 후 **새 ID로 로그인된다**(기존 ID로는 안 된다)

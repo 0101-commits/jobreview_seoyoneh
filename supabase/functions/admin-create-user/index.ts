@@ -59,12 +59,14 @@ function generateTempPassword(): string {
 }
 
 /*
- * 비밀번호 정책 한 곳(기획서 §3 F11).
- * 예전에는 이 파일이 8자, 화면(ChangePasswordPage MIN_LENGTH)이 10자를 요구해서
- * 관리자가 8자로 만들어 준 비밀번호를 본인이 바꾸려는 순간 "10자 이상"으로 거절당했다.
- * 같은 값을 두 기준으로 판정하던 것을 10자로 통일한다(§8 S2 "길이 10+ 권장" 쪽으로 맞춘다).
+ * 비밀번호 정책 한 곳(기획서 §3 F11) — 이 파일이 최종 판정자다.
+ * 예전에는 이 파일이 8자, 화면(ChangePasswordPage)이 10자를 요구해서 관리자가 만들어 준
+ * 비밀번호를 본인이 바꾸려는 순간 거절당했다. 지금은 화면 쪽 사본이 `src/lib/passwordPolicy.ts`
+ * 한 곳에 있다. **숫자를 바꿀 때는 그 파일과 함께 바꾼다** — Deno 런타임이라 import 할 수 없다.
+ *
+ * 2026-09-04: 10 → 8. 파일럿 운영 계정에 9자 비밀번호를 쓰기로 한 결정에 맞춘다.
  */
-const PASSWORD_MIN_LENGTH = 10;
+const PASSWORD_MIN_LENGTH = 8;
 
 /** 정책 위반 사유를 한국어로 돌려준다. 통과하면 null. */
 function passwordPolicyError(password: unknown): string | null {

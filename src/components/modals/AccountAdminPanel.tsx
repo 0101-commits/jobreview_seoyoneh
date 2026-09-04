@@ -20,9 +20,7 @@ import { AlertTriangle, BookOpen, KeyRound, ShieldCheck, UserCog } from 'lucide-
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { callAdminFn, errorMessage } from './edgeApi';
-
-/** 화면에서도 같은 정책을 먼저 걸러 준다. 서버(passwordPolicyError)가 최종 판정자다. */
-const PASSWORD_MIN_LENGTH = 10;
+import { PASSWORD_POLICY_HINT, passwordPolicyError } from '@/lib/passwordPolicy';
 
 export type AccountAdminTarget = {
   id: string;
@@ -92,12 +90,8 @@ export function AccountAdminPanel({
 
   // ── 비밀번호 ──────────────────────────────────────────────────────
   const explicitPassword = newPassword.length > 0;
-  const passwordLocalError =
-    explicitPassword && newPassword.length < PASSWORD_MIN_LENGTH
-      ? `비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상이어야 해요. 지금 ${newPassword.length}자예요.`
-      : explicitPassword && (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword))
-        ? '비밀번호에 영문과 숫자를 함께 넣어 주세요.'
-        : '';
+  // 비워 두면 서버가 임시값을 만든다 — 그때는 화면에서 정책을 따지지 않는다.
+  const passwordLocalError = explicitPassword ? (passwordPolicyError(newPassword) ?? '') : '';
 
   function submitPassword() {
     if (passwordLocalError) return;
@@ -180,7 +174,7 @@ export function AccountAdminPanel({
 
         <Field
           label="새 비밀번호 (선택)"
-          description={`직접 지정할 때만 입력해 주세요. ${PASSWORD_MIN_LENGTH}자 이상, 영문과 숫자를 포함합니다.`}
+          description={`직접 지정할 때만 입력해 주세요. ${PASSWORD_POLICY_HINT}`}
           error={passwordLocalError}
           type="text"
           value={newPassword}

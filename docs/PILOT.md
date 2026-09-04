@@ -105,7 +105,7 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 ### A. 계정 발급
 
 - [ ] (관리자) `/users` 「SME 계정 관리」 → 개별 추가로 SME 2명을 만든다. 회사·조직·직급·사번·이름·이메일·비밀번호를 모두 넣는다 → "SME 계정 추가" 성공, 목록에 `● 활성`으로 표시 (근거: `src/pages/SmeUsersPage.tsx:233`, `src/components/modals/SmeSingleCreateModal.tsx:43-50`)
-- [ ] (관리자) 초기 비밀번호를 7자로 넣어 본다 → `비밀번호는 8자 이상이며 영문과 숫자를 포함해 주세요.` (근거: `src/components/modals/SmeSingleCreateModal.tsx:49-50`)
+- [ ] (관리자) 초기 비밀번호를 7자로 넣어 본다 → `비밀번호는 8자 이상이어야 합니다. 지금 7자입니다.` (근거: `src/lib/passwordPolicy.ts`)
 - [ ] (관리자) 같은 이메일로 한 번 더 만들어 본다 → `이미 등록된 이메일이에요. 다른 이메일을 쓰거나 기존 계정을 수정해 주세요.` (근거: `src/components/modals/edgeApi.ts:24`)
 - [ ] (실시자) SQL로 `SELECT email, must_change_password FROM public.profiles WHERE role='sme';`를 확인한다 → 방금 만든 두 계정이 **true** (근거: §8 S2, `supabase/APPLY_2026-09-01_phase0.sql` must_change_password 기본값)
 - [ ] (실시자) SQL로 `SELECT count(*) FROM public.review_assignments WHERE sme_id = '<새 SME id>';`를 센다 → **대상 회사의 활성 직무 수와 같다**(골라 배정되지 않는다는 사실 확인) (근거: `supabase/APPLY_2026-08-28.sql:510-518`)
@@ -115,9 +115,9 @@ Supabase 대시보드 → 대상 프로젝트 → SQL Editor → New query에 �
 
 - [ ] (SME) 발급받은 계정으로 로그인한다 → 사이드바가 있는 화면 대신 **「비밀번호 변경」 화면만** 뜬다. 문구: `처음 로그인하셨습니다. 계속하기 전에 비밀번호를 변경해 주세요.` (근거: §10 P0 DoD ②, `src/App.tsx:269-275`, `src/pages/ChangePasswordPage.tsx:105-110`)
 - [ ] (SME) 주소창에 `/assignments`, `/guide`, `/dashboard`를 직접 친다 → **어느 것도 열리지 않고 계속 비밀번호 변경 화면**. (라우터 자체를 띄우지 않으므로 화면이 한 번 그려졌다 사라지는 일도 없어야 한다) (근거: `src/App.tsx:267-275` 주석)
-- [ ] (SME) 9자 비밀번호를 넣고 제출한다 → `비밀번호는 10자 이상이어야 합니다. 지금 9자입니다.` (근거: §8 S2, `src/pages/ChangePasswordPage.tsx:14,43`)
+- [ ] (SME) 7자 비밀번호를 넣고 제출한다 → `비밀번호는 8자 이상이어야 합니다. 지금 7자입니다.` (근거: `src/lib/passwordPolicy.ts`)
 - [ ] (SME) 확인란에 다른 값을 넣는다 → `두 번 입력한 비밀번호가 서로 다릅니다. 다시 확인해 주세요.` (근거: `src/pages/ChangePasswordPage.tsx:50`)
-- [ ] (SME) 10자 이상으로 변경하고 「비밀번호 변경하고 시작하기」를 누른다 → 화면이 넘어간다 (근거: `src/pages/ChangePasswordPage.tsx:140`)
+- [ ] (SME) 8자 이상 + 영문·숫자로 변경하고 「비밀번호 변경하고 시작하기」를 누른다 → 화면이 넘어간다 (근거: `src/pages/ChangePasswordPage.tsx`)
 - [ ] (SME) 로그아웃 후 **옛 비밀번호**로 로그인해 본다 → 실패한다 (근거: §8 S2 「관리자가 발급한 초기 비밀번호는 더 이상 사용할 수 없습니다」 `src/pages/ChangePasswordPage.tsx:110`)
 - [ ] (SME) 일부러 5회 연속 틀린다 → `로그인 시도가 5회 연속 실패했습니다. 60초 후에 다시 시도해 주세요. (남은 시간 N초)`가 뜨고 카운트가 줄어든다 (근거: §8 S3, `src/pages/LoginPage.tsx:6-7,122-123`)
 

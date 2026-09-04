@@ -11,9 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Toast, useToast } from '@/components/ui/Toast';
 import type { User } from '@/types';
-
-/** 최소 길이 정책(§8 S2 "길이 10+ 권장"). */
-const MIN_LENGTH = 10;
+import { PASSWORD_MIN_LENGTH, passwordPolicyError } from '@/lib/passwordPolicy';
 
 export function ChangePasswordPage({
   user,
@@ -45,9 +43,7 @@ export function ChangePasswordPage({
     ? ''
     : password.length === 0
       ? '새 비밀번호를 입력해 주세요.'
-      : password.length < MIN_LENGTH
-        ? `비밀번호는 ${MIN_LENGTH}자 이상이어야 합니다. 지금 ${password.length}자입니다.`
-        : '';
+      : (passwordPolicyError(password) ?? '');
   const confirmError = !shown(confirm)
     ? ''
     : confirm.length === 0
@@ -59,7 +55,7 @@ export function ChangePasswordPage({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitted(true);
-    if (password.length < MIN_LENGTH || confirm !== password) return;
+    if (passwordPolicyError(password) || confirm !== password) return;
     if (!supabase) {
       showToast({ type: 'error', msg: '데이터베이스에 연결되어 있지 않습니다. 관리자에게 문의해 주세요.' });
       return;
@@ -143,7 +139,7 @@ export function ChangePasswordPage({
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
             <Field
               label="새 비밀번호"
-              description={`${MIN_LENGTH}자 이상으로 정해 주세요.`}
+              description={`${PASSWORD_MIN_LENGTH}자 이상, 영문과 숫자를 포함해 정해 주세요.`}
               value={password}
               onChange={setPassword}
               type="password"
