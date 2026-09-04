@@ -13,9 +13,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { TermHint } from '@/components/ui/TermHint';
+import type { TermId } from './glossary';
 import { newSuggestion, type SuggestionInput } from '@/lib/reviewApi';
 import type { Feedback, Suitability } from '@/types';
-import { NOTE_REQUIRED_HINT, REQUIRED_MARK_SR } from './copy';
+import { HINT_NEW_SUGGESTION_OPTIONAL, NOTE_REQUIRED_HINT, REQUIRED_MARK_SR } from './copy';
 import { BP, useMediaQuery } from '@/lib/useMediaQuery';
 
 type Choice = Exclude<Suitability, ''>;
@@ -226,21 +228,27 @@ export function FeedbackNotes({
   return (
     <>
       <label>
-        <span className="label">개선 필요사항 {needsComment && <RequiredMark />}</span>
+        <span className="label">
+          개선 필요사항 {needsComment && <RequiredMark />}
+          <TermHint id="comment" />
+        </span>
         <AutoTextarea
           value={feedback.comment}
           onChange={(v) => onChange({ comment: v })}
-          placeholder="의견을 입력해 주세요."
+          placeholder="의견을 적어 주세요."
           minRows={minRows}
           aria-describedby={needsComment ? hintId : undefined}
         />
       </label>
       <label>
-        <span className="label">{suggestionLabel}</span>
+        <span className="label">
+          {suggestionLabel}
+          <TermHint id="suggestion" />
+        </span>
         <AutoTextarea
           value={feedback.suggestion}
           onChange={(v) => onChange({ suggestion: v })}
-          placeholder="수정안을 입력해 주세요."
+          placeholder="수정안을 적어 주세요."
           minRows={minRows}
           aria-describedby={needsComment ? hintId : undefined}
         />
@@ -335,7 +343,10 @@ export function ReviewItemCard({
       {details}
       <div className="mt-5 grid gap-4 border-t border-border pt-4 lg:grid-cols-[260px_1fr_1fr]">
         <div>
-          <span className="label">적합성 평가</span>
+          <span className="label">
+            적합성 평가
+            <TermHint id="suitability" />
+          </span>
           <SuitabilityControl
             value={feedback.suitability}
             onChange={(v) => onChange({ suitability: v })}
@@ -344,15 +355,19 @@ export function ReviewItemCard({
             label={`${title} 적합성 평가`}
           />
           {removeLabel && (
-            <label className="mt-3 flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
-              <input
-                type="checkbox"
-                checked={!!feedback.remove}
-                onChange={(e) => onChange({ remove: e.target.checked })}
-                className="h-4 w-4 accent-[rgb(var(--destructive))]"
-              />
-              {removeLabel}
-            </label>
+            <div className="mt-3 flex min-h-11 items-center gap-1">
+              {/* 물음표는 라벨 밖에 둔다 — 안에 두면 눌렀을 때 체크박스가 함께 켜진다. */}
+              <label className="flex items-center gap-2 t-caption text-foreground-muted">
+                <input
+                  type="checkbox"
+                  checked={!!feedback.remove}
+                  onChange={(e) => onChange({ remove: e.target.checked })}
+                  className="h-4 w-4 accent-[rgb(var(--destructive))]"
+                />
+                {removeLabel}
+              </label>
+              <TermHint id="remove" />
+            </div>
           )}
         </div>
         <FeedbackNotes feedback={feedback} onChange={onChange} suggestionLabel={suggestionLabel} />
@@ -361,14 +376,27 @@ export function ReviewItemCard({
   );
 }
 
-/** 섹션 제목 + "12개 중 8개 평가함" 진행 표시. */
-export function SectionHeading({ title, done, total }: { title: string; done: number; total: number }) {
+/** 섹션 제목 + "12개 중 8개 완료" 진행 표시. term을 주면 제목 옆에 용어 물음표가 붙는다(v4 G1). */
+export function SectionHeading({
+  title,
+  done,
+  total,
+  term,
+}: {
+  title: string;
+  done: number;
+  total: number;
+  term?: TermId;
+}) {
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-      <h3 className="t-headline text-foreground">{title}</h3>
+      <h3 className="t-headline text-foreground">
+        {title}
+        {term && <TermHint id={term} />}
+      </h3>
       {total > 0 && (
         <span className={`t-caption ${done === total ? 'text-success' : 'text-foreground-muted'}`}>
-          {total}개 중 {done}개 평가함
+          {total}개 중 {done}개 완료
         </span>
       )}
     </div>
@@ -398,7 +426,7 @@ export function ListControls({
           onChange={(e) => setOnlyUnrated(e.target.checked)}
           className="h-4 w-4 accent-[rgb(var(--primary))]"
         />
-        미평가만 보기
+        남은 항목만 보기
       </label>
       <label className="flex min-h-11 items-center gap-2 t-caption text-foreground-muted">
         <input
@@ -407,10 +435,10 @@ export function ListControls({
           onChange={(e) => setCollapseDone(e.target.checked)}
           className="h-4 w-4 accent-[rgb(var(--primary))]"
         />
-        평가 완료 항목 접기
+        고른 항목 접기
       </label>
       {onlyUnrated && hiddenCount > 0 && (
-        <span className="t-caption text-foreground-subtle">평가한 {hiddenCount}개는 숨겨져 있어요.</span>
+        <span className="t-caption text-foreground-subtle">고른 {hiddenCount}개는 숨겨져 있습니다.</span>
       )}
     </div>
   );
@@ -466,7 +494,7 @@ export function SuggestionEditor({
                     className="input"
                     value={item.name}
                     onChange={(e) => patch(i, { name: e.target.value })}
-                    placeholder={`추가할 ${kind}명을 입력해 주세요.`}
+                    placeholder={`추가할 ${kind}명을 적어 주세요.`}
                     aria-describedby={item.name.trim() ? undefined : warnId(i)}
                   />
                 </label>
@@ -492,7 +520,7 @@ export function SuggestionEditor({
                   {/* 색(주황)만으로 경고를 알리지 않도록 아이콘을 함께 둔다. */}
                   <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>
-                    {kind}명이 비어 있으면 저장되지 않아요. 이름을 입력하거나 이 제안을 삭제해 주세요.
+                    {kind}명이 비어 있으면 저장되지 않습니다. 이름을 적거나 이 제안을 지워 주세요.
                   </span>
                 </p>
               )}
@@ -500,6 +528,11 @@ export function SuggestionEditor({
           ))}
         </ul>
       )}
+      {/* 비워 두어도 된다는 사실을 버튼 앞에 밝힌다 — 빈 칸을 보면 채워야 한다고 느낀다(v4 G6). */}
+      <p className="mb-2 flex items-center gap-1 t-caption text-foreground-subtle">
+        {HINT_NEW_SUGGESTION_OPTIONAL}
+        <TermHint id="new-suggestion" />
+      </p>
       <Button
         variant="secondary"
         onClick={() => onChange([...items, newSuggestion()])}

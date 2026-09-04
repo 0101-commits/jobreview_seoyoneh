@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AlertCircle, ArrowLeft, Loader2, Lock, RefreshCw, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { TermHint } from '@/components/ui/TermHint';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { Snackbar, useSnackbar } from '@/components/ui/Snackbar';
@@ -59,10 +60,10 @@ import {
 } from './sme-review/wizard';
 import {
   FTE_NEXT_BLOCKED_BUTTON,
+  HINT_STEP1_PICK_ONE,
   NEXT_STEP_BUTTON,
   PREV_STEP_BUTTON,
-  STEP_GUIDES,
-  STEP_GUIDE_SUMMARY,
+  SUBMIT_NOTICE,
   TASK_EXAMPLES,
   TASK_EXAMPLE_INTRO,
   TASK_EXAMPLE_SUMMARY,
@@ -71,7 +72,8 @@ import {
   stepBarTitle,
 } from './sme-review/copy';
 import type { FteRow, FteTarget, StepNo } from './sme-review/wizardTypes';
-import { Disclosure, ErrorPanel, SubmitSummary } from './sme-review/summary';
+import { Disclosure, ErrorPanel, StepGuideBox, SubmitSummary } from './sme-review/summary';
+import { FirstVisitNotice } from './sme-review/coachmarks';
 
 const STATUS_LABEL: Record<ReviewStatus, string> = {
   NOT_STARTED: '미시작',
@@ -84,7 +86,7 @@ const STATUS_LABEL: Record<ReviewStatus, string> = {
 const EMPTY_FEEDBACK: Feedback = { suitability: '', comment: '', suggestion: '' };
 
 const errMsg = (e: unknown) =>
-  e instanceof Error && e.message ? e.message : '알 수 없는 오류로 처리하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  e instanceof Error && e.message ? e.message : '알 수 없는 오류로 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
 const hhmm = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -156,6 +158,14 @@ export function ReviewWorkspace({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [missing, setMissing] = useState<MissingItem[]>([]);
   const [showGate, setShowGate] = useState(false);
+
+  /*
+    검토 화면 첫 진입 안내(v4 G4). 서버 기록(user.coach_completed_at)이 진실이고, 이 상태는
+    "방금 닫았다"만 기억한다 — 닫자마자 사라져야 하는데 서버 값은 이 화면에서 갱신되지 않는다.
+    컬럼이 없는 DB에서는 값이 undefined라 안내가 아예 뜨지 않는다(기록할 곳이 없으면 매번 뜬다).
+  */
+  const [coachDone, setCoachDone] = useState(false);
+  const showCoach = user.coach_completed_at === null && !coachDone;
 
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [onlyUnrated, setOnlyUnrated] = useState(false);
@@ -602,7 +612,7 @@ export function ReviewWorkspace({
       revRef.current += 1;
       setSaveState('saved');
       setSaveError('');
-      showToast({ type: 'success', msg: '검토를 제출했어요. 관리자가 확인한 뒤 결과가 반영됩니다.' });
+      showToast({ type: 'success', msg: '검토를 제출하셨습니다. 담당자가 확인한 뒤 결과가 반영됩니다.' });
     } catch (e) {
       showSnackbar({ type: 'error', msg: errMsg(e), duration: 0 });
     } finally {
@@ -638,6 +648,7 @@ export function ReviewWorkspace({
           </button>
           <p className="mb-1 mt-1 t-label text-foreground-muted">
             SME 검토 · {statusLabel}
+            <TermHint id="review-status" />
             {user.company_name && <span className="ml-2 text-primary">· {user.company_name}</span>}
           </p>
           {/* 직무는 배정으로 정해진다. 화면에서는 바꿀 수 없고 읽기 전용으로만 보여 준다. */}
@@ -694,12 +705,16 @@ export function ReviewWorkspace({
               >
                 {stepBarTitle(jobDetail.name, step)}
               </h3>
-              <SaveStatusChip
-                state={saveState}
-                error={saveError}
-                savedAt={review?.last_saved_at || null}
-                onRetry={() => void runSave()}
-              />
+              {/* 물음표는 aria-live 영역 밖에 둔다 — 안에 넣으면 저장 상태가 바뀔 때마다 함께 읽힌다. */}
+              <div className="flex items-center gap-1">
+                <SaveStatusChip
+                  state={saveState}
+                  error={saveError}
+                  savedAt={review?.last_saved_at || null}
+                  onRetry={() => void runSave()}
+                />
+                <TermHint id="autosave" />
+              </div>
             </div>
 
             {reviewError && (
@@ -707,7 +722,7 @@ export function ReviewWorkspace({
                 <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p>{reviewError}</p>
-                  <p className="mt-1 t-caption">검토 내용을 저장할 수 없어 입력이 잠겨 있어요.</p>
+                  <p className="mt-1 t-caption">검토 내용을 저장할 수 없어 입력이 잠겨 있습니다.</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => setDetailReload((n) => n + 1)}>
                   <RefreshCw size={14} aria-hidden="true" /> 다시 시도
@@ -718,9 +733,10 @@ export function ReviewWorkspace({
               <div className="mb-5 flex items-start gap-2 rounded-element border border-primary-border bg-primary-subtle px-4 py-3 t-label text-primary">
                 <Lock size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <p>
-                  이미 제출한 검토라 수정할 수 없어요
+                  이미 제출하신 검토라 수정하실 수 없습니다
                   {review.submitted_at ? ` (제출 ${hhmm(review.submitted_at)})` : ''}. 수정이 필요하면 관리자에게
                   재검토를 요청해 주세요.
+                  <TermHint id="lock" />
                 </p>
               </div>
             )}
@@ -737,14 +753,22 @@ export function ReviewWorkspace({
             {/* 문의 답변 도착 배너(§6-3 ⓒ). 이동 경로가 없으면(라우터가 안 넘기면) 띄우지 않는다. */}
             {onOpenInquiries && <AnsweredInquiryBanner inquiries={answeredInquiries} onOpen={onOpenInquiries} />}
 
-            {/* §6-1 핵심 동작 — 각 단계 상단의 축약 가이드. 접이식이라 익숙해진 뒤에는 접어 둘 수 있다. */}
-            <Disclosure summary={STEP_GUIDE_SUMMARY}>{STEP_GUIDES[step - 1]}</Disclosure>
+            {showCoach && <FirstVisitNotice userId={user.id} onDone={() => setCoachDone(true)} />}
+
+            {/*
+              §6-1 핵심 동작 — 각 단계 상단의 축약 가이드.
+              v4에서 「하실 일 · 이 정도면 충분합니다 · 안 하셔도 됩니다」 세 줄 구조가 되었고,
+              그 세션에서 처음 여는 단계에서는 펼친 채로 시작한다(G5).
+            */}
+            <StepGuideBox step={step} />
 
             <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
               {step === 1 && (
                 <div className="space-y-10">
                   <FeedbackSection
                     title="A. 직무명 검토"
+                    term="job"
+                    hint={HINT_STEP1_PICK_ONE}
                     current={jobDetail.name}
                     feedback={feedback.name || EMPTY_FEEDBACK}
                     update={(v) => update('name', v)}
@@ -754,6 +778,7 @@ export function ReviewWorkspace({
                   />
                   <FeedbackSection
                     title="B. 직무정의 검토"
+                    term="job-definition"
                     current={jobDetail.definition}
                     feedback={feedback.definition || EMPTY_FEEDBACK}
                     update={(v) => update('definition', v)}
@@ -897,6 +922,9 @@ export function ReviewWorkspace({
                   )}{' '}
                   임시저장
                 </Button>
+                <span className="flex items-center">
+                  <TermHint id="save-vs-submit" />
+                </span>
                 {step < 5 ? (
                   // 게이트에 걸려도 버튼은 살려 둔다 — 비활성 버튼은 "왜 못 넘어가는지"를 말해 주지 못한다.
                   // 누르면 그 자리에서 사유(GateNotice)를 띄운다. STEP 3만 라벨로도 이유를 밝힌다(그림 6-A).
@@ -937,7 +965,6 @@ export function ReviewWorkspace({
       {confirmOpen && (
         <ModalShell
           title="검토를 제출할까요?"
-          description="최종 제출 후에는 관리자가 재검토를 요청하기 전까지 수정할 수 없어요."
           onClose={() => setConfirmOpen(false)}
           // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
           hideClose
@@ -954,13 +981,19 @@ export function ReviewWorkspace({
             </>
           }
         >
+          {/* 제출의 결과를 먼저 말한다(v4 G7). 지금까지는 "수정할 수 없다" 한 줄뿐이었다. */}
+          <ul className="mb-4 space-y-1 t-label-reading text-foreground">
+            {SUBMIT_NOTICE.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
           <ul className="space-y-1.5 t-label text-foreground-muted">
             <li>
-              평가한 항목 {done}/{total}개
+              고른 항목 {done}/{total}개
             </li>
             <li>투입 비중 합계 {fteSum}%</li>
             {total - done > 0 && (
-              <li className="text-warning">아직 평가하지 않은 항목이 {total - done}개 있어요.</li>
+              <li className="text-warning">아직 고르지 않은 항목이 {total - done}개 있습니다.</li>
             )}
           </ul>
         </ModalShell>

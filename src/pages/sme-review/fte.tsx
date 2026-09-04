@@ -18,6 +18,7 @@
 import { type KeyboardEvent, useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Info, Minus, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { TermHint } from '@/components/ui/TermHint';
 import { ModalShell } from '@/components/ui/ModalShell';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import type { JobDetail } from '@/lib/jobApi';
@@ -29,6 +30,7 @@ import {
   FTE_EQUAL_SPLIT_BUTTON,
   FTE_INPUT_HINT,
   FTE_INTRO,
+  HINT_STEP3_START,
   FTE_MOONLIGHTING_NOTE,
   FTE_NEXT_BLOCKED_BUTTON,
   FTE_PERIOD_BASIS,
@@ -413,7 +415,7 @@ export function FteStep({
       total > 0 &&
       !(await confirm({
         title: '균등하게 다시 배분할까요?',
-        body: '이미 입력한 비중이 지워지고 과업 수에 맞춰 고르게 나눠집니다.',
+        body: '이미 적으신 비중이 지워지고 과업 수에 맞춰 고르게 나눠집니다.',
         confirmLabel: '다시 배분',
         tone: 'negative',
       }))
@@ -468,7 +470,12 @@ export function FteStep({
         <span className="t-caption leading-5 text-foreground-muted">{FTE_MOONLIGHTING_NOTE}</span>
       </div>
 
-      <p className="mb-5 t-label-reading text-foreground-muted">{FTE_INTRO}</p>
+      <p className="mb-2 t-label-reading text-foreground-muted">
+        {FTE_INTRO}
+        <TermHint id="fte" />
+      </p>
+      {/* 백지 공포 대응 — 시작점을 손가락으로 가리켜 준다(v4 G6). */}
+      <p className="mb-5 t-caption text-foreground-subtle">{HINT_STEP3_START}</p>
 
       {/* 입력 칸 공통 안내. 그림 6-A에 이 문장을 놓을 자리가 없어 화면에는 감추고 보조기기에만 읽힌다
           (모든 입력 칸이 aria-describedby로 이 한 문장을 가리킨다). */}
@@ -481,7 +488,7 @@ export function FteStep({
           {targets.length === 0 ? (
             // 배분할 과업이 하나도 없는 경우 — 문구는 기획안에 없어 새로 씀.
             <p className="rounded-element bg-muted px-4 py-6 text-center t-label text-foreground-muted">
-              배분할 과업이 없어요.{' '}
+              배분할 과업이 없습니다.{' '}
               <button
                 type="button"
                 onClick={() => goToStep(2)}
@@ -862,7 +869,10 @@ function TargetEditor({
       {/* 세부활동 — 배분 단위가 아니라 의견 단위다(결정 D2 · 계약 E3 과업 단위 유지). */}
       {target.activities.length > 0 && (
         <div className="mt-4 border-t border-border pt-4">
-          <p className="t-label-2 font-semibold text-foreground">{ACTIVITY_SECTION_LABEL}</p>
+          <p className="t-label-2 font-semibold text-foreground">
+            {ACTIVITY_SECTION_LABEL}
+            <TermHint id="activity" />
+          </p>
           <p className="mt-1 t-caption text-foreground-muted">{ACTIVITY_NOTE_HINT}</p>
           <ul className="mt-3 space-y-3">
             {target.activities.map((act) => {

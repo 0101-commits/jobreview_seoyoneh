@@ -9,6 +9,10 @@
  *  1. 기획안에 있는 문장은 글자 단위로 옮긴다. 요약·의역 금지. 상수 위에 §번호와 착수보고 면수를 남긴다.
  *  2. 기획안에 없는 문구는 반드시 "기획안에 없어 새로 씀"이라고 표시한다. 표시 없는 문장은
  *     기획안 원문이라는 뜻이므로, 표시를 빠뜨리면 다음 사람이 원문으로 오인한다.
+ *  3. 새로 쓰는 문장은 문체 규칙을 지킨다(기획서 GUIDE v4 §4-1 P8).
+ *     경어체 통일(`~합니다`·`~하세요`·`~해 주세요`, `~어요/~예요` 금지) · 할 일이 먼저 ·
+ *     안내 한 줄은 1문장 · 게이트가 실패 시점에 말해 주는 조건은 가이드에서 되풀이하지 않는다.
+ *     고정 문언은 이 규칙의 대상이 아니다 — 원문 그대로 둔다.
  *
  * 런타임 의존이 없다(타입 한 개만 type-only import). 어느 단계 컴포넌트에서 불러도 안전하다.
  */
@@ -51,6 +55,15 @@ export interface GuideCard {
   body: string;
   steps?: readonly string[];
   emphasis?: readonly string[];
+  /** 카드 ⑤ 화면 미리보기(v4)에만 있다. 있으면 화면이 축소 그림과 번호 말풍선을 그린다. */
+  preview?: readonly PreviewNote[];
+}
+
+/** 카드 ⑤의 번호 말풍선 한 개. n은 축소 그림 위의 번호와 짝이다. */
+export interface PreviewNote {
+  n: number;
+  label: string;
+  note: string;
 }
 
 /**
@@ -102,13 +115,53 @@ export function expectedMinutesLine(minutes: number | null): string {
   return `예상 소요는 직무당 약 ${minutes}분이며, ${tail}`;
 }
 
-/** 가이드 4장 카드. 관리자 설정 소요 시간을 넣어 부른다. */
+/**
+ * 카드 ⓪ 왜 저에게 왔는지 — 기획서 GUIDE v4 §5 G3. 기획안에 없어 새로 씀.
+ *
+ * 고정 문언 4장 앞에 선다. 카드 ①이 "무엇을 하는 조사인지"를 말하기 전에, 처음 온 응답자가
+ * 실제로 먼저 갖는 물음("왜 나인가 · 틀리면 어떻게 되나 · 중간에 그만둬도 되나")에 답한다.
+ * 확인되지 않은 약속은 적지 않는다 — 인사평가 반영 여부는 고객 TF 확인 전까지 쓰지 않는다(D2 보류).
+ */
+export const GUIDE_CARD_WHY_YOU: GuideCard = {
+  title: '왜 저에게 왔나요',
+  body:
+    '이 직무를 실제로 하고 계셔서, 초안이 맞는지 봐 주실 분으로 모셨습니다. 직무마다 1~2분께만 부탁드립니다. ' +
+    '정답을 맞히는 조사가 아니니 지금 하고 계신 일을 있는 그대로 알려 주시면 됩니다. ' +
+    '중간에 그만두셔도 적으신 내용은 그대로 남아 있습니다.',
+  emphasis: ['정답을 맞히는 조사가 아니니'],
+};
+
+/**
+ * 카드 ⑤ 화면 미리보기 — 기획서 GUIDE v4 §5 G3. 기획안에 없어 새로 씀.
+ *
+ * 고정 문언 4장 뒤에 선다. 목적은 설명이 아니라 이름 붙이기다 — 검토 화면에서 처음 마주칠 네
+ * 요소에 미리 이름을 달아 두면, 화면에 들어섰을 때 "저게 뭔지 모르겠는" 것이 넷 줄어든다.
+ * 캡처 이미지가 아니라 축소 마크업으로 그린다(이미지는 화면이 바뀌는 순간 거짓말이 된다).
+ */
+export const GUIDE_CARD_SCREEN: GuideCard = {
+  title: '화면 미리보기',
+  body: '검토 화면에서 이 넷만 알고 계시면 됩니다.',
+  preview: [
+    { n: 1, label: '단계 목록', note: '지금 몇 번째인지, 어디까지 끝났는지 보여 줍니다.' },
+    { n: 2, label: '저장 표시', note: '직접 저장을 누르지 않으셔도 자동으로 저장됩니다.' },
+    { n: 3, label: '적합성 3버튼', note: '한 항목에서 하실 일은 여기서 하나 고르는 것입니다.' },
+    { n: 4, label: '문의하기', note: '막히면 여기로 남겨 주십시오. 답이 오면 알려 드립니다.' },
+  ],
+};
+
+/**
+ * 가이드 6장 카드(v4). 관리자 설정 소요 시간을 넣어 부른다.
+ *
+ * 가운데 넷은 §6-1 고정 문언이라 순서도 문장도 건드리지 않는다. 앞뒤로만 한 장씩 더했다.
+ */
 export function guideCards(expectedMinutes: number | null): GuideCard[] {
   return [
+    GUIDE_CARD_WHY_YOU,
     GUIDE_CARD_PURPOSE,
     GUIDE_CARD_PREVIEW,
     GUIDE_CARD_FTE,
     { title: GUIDE_CARD_NOTICE_TITLE, body: expectedMinutesLine(expectedMinutes) },
+    GUIDE_CARD_SCREEN,
   ];
 }
 
@@ -155,7 +208,7 @@ export const FTE_NEXT_BLOCKED_BUTTON = '다음 단계 (100% 필요)';
  * 초과 안내 — §6-2 합계 게이지 "초과 시 초과분 적색 표시".
  * 문장 자체는 기획안에 없어 새로 씀.
  */
-export const fteOverLine = (over: number) => `${over}% 초과됐어요. 합계가 100%가 되도록 줄여 주세요`;
+export const fteOverLine = (over: number) => `${over}% 초과되었습니다. 합계가 100%가 되도록 줄여 주세요`;
 
 /**
  * 삭제 제안 제외 안내 — 그림 6-A "삭제 제안 1건은 배분 대상에서 제외되었습니다".
@@ -180,7 +233,7 @@ export const FTE_REOPEN_BUTTON = '다시 보기';
 export const FTE_REOPEN_CLOSE_BUTTON = '닫기';
 
 /** 펼침 안쪽 안내 — 여기서 고친 내용이 STEP 2와 같은 저장임을 밝힌다. */
-export const FTE_REOPEN_NOTE = '여기서 고친 내용은 STEP 2와 같은 저장이에요(같은 항목, 같은 자동 저장).';
+export const FTE_REOPEN_NOTE = '여기서 고친 내용은 STEP 2와 같은 저장입니다(같은 항목, 같은 자동 저장).';
 
 /** 목록 하단 — 과업을 이 화면에서 바로 추가한다. */
 export const FTE_ADD_TASK_BUTTON = '과업 추가 제안';
@@ -188,15 +241,15 @@ export const FTE_ADD_TASK_BUTTON = '과업 추가 제안';
 /** 삭제 제안으로 빠진 행 안내 + 되살리기. 이전 비중이 잔여로 돌아왔다는 사실까지 말한다. */
 export const fteExcludedRestoreLine = (count: number, pct: number) =>
   pct > 0
-    ? `삭제 제안 ${count}건은 배분 대상에서 제외되었습니다 · 이전 비중 ${pct}%가 잔여로 돌아왔어요`
+    ? `삭제 제안 ${count}건은 배분 대상에서 제외되었습니다 · 이전 비중 ${pct}%가 잔여로 돌아왔습니다`
     : `삭제 제안 ${count}건은 배분 대상에서 제외되었습니다`;
 export const FTE_RESTORE_BUTTON = '되살리기';
 
 /** 세부활동 의견(결정 D2) — 배분 단위가 아니라 의견 단위임을 라벨에서 밝힌다. */
 export const ACTIVITY_SECTION_LABEL = '세부활동';
-export const ACTIVITY_NOTE_HINT = '세부활동은 비중 배분 대상이 아니에요. 고칠 점이 있으면 의견만 남겨 주세요.';
+export const ACTIVITY_NOTE_HINT = '세부활동은 비중 배분 대상이 아닙니다. 고칠 점이 있으면 의견만 남겨 주세요.';
 export const activityCommentLabel = (name: string) => `${name} 의견`;
-export const ACTIVITY_REMOVE_LABEL = '이 세부활동은 삭제가 필요해요';
+export const ACTIVITY_REMOVE_LABEL = '이 세부활동은 삭제가 필요합니다';
 
 /** §6-2 입력 방식 — 행별 ±5% 스텝퍼의 증감 폭. 안내 문구가 이 값을 인용하므로 여기 둔다. */
 export const FTE_STEP_PCT = 5;
@@ -206,10 +259,10 @@ export const FTE_STEP_PCT = 5;
  * 제목과 버튼 라벨은 기획안에 없어 새로 씀.
  */
 export const FTE_SINGLE_100_MODAL = {
-  title: '한 과업에 100%를 배분했어요',
+  title: '한 과업에 100%를 배분하셨습니다',
   body: '이 직무의 시간이 사실상 한 과업에 쓰인다는 의미입니다. 맞습니까?',
   confirm: '맞습니다',
-  cancel: '다시 배분할게요',
+  cancel: '다시 배분하겠습니다',
 } as const;
 
 /**
@@ -217,14 +270,14 @@ export const FTE_SINGLE_100_MODAL = {
  * 문장은 기획안에 없어 새로 씀. "허용은 하되"가 원칙이라 차단 어조를 쓰지 않는다.
  */
 export const fteZeroPctNote = (count: number) =>
-  `투입 비중이 0%인 과업이 ${count}건 있어요. 그대로 제출할 수 있지만, 실제로 수행하지 않는 과업인지 한 번만 확인해 주세요.`;
+  `투입 비중이 0%인 과업이 ${count}건 있습니다. 그대로 제출하셔도 되지만, 실제로 하지 않는 과업인지 한 번만 확인해 주세요.`;
 
 /**
  * 품질 가드 ⓒ — 5% 미만 다수 분산 시 안내 문구.
  * 문장은 기획안에 없어 새로 씀. 이것도 차단이 아니라 안내다.
  */
 export const fteTooManySmallNote = (count: number) =>
-  `${FTE_STEP_PCT}% 미만으로 배분한 과업이 ${count}건이에요. 비슷한 과업을 묶으면 비중을 읽기 쉬워집니다.`;
+  `${FTE_STEP_PCT}% 미만으로 배분한 과업이 ${count}건입니다. 비슷한 과업을 묶으면 비중을 읽기 쉬워집니다.`;
 
 // ── 단계 게이트 실패 문구 (§6-2 표 "다음 단계 이동 게이트") ─────────
 //
@@ -233,30 +286,30 @@ export const fteTooManySmallNote = (count: number) =>
 // (조건 자체를 바꾸면 안 된다 — 서버 submit_review가 같은 조건을 재검증한다.)
 
 /** STEP 1 — "적합성 1건 선택 필수". */
-export const GATE_STEP1_SUITABILITY = '적합성을 1건 선택해 주세요.';
+export const GATE_STEP1_SUITABILITY = '적합성을 골라 주세요.';
 
 /** STEP 1 — "'부적합/일부 수정' 선택 시 의견 또는 수정안 필수". */
 export const GATE_STEP1_NOTE_REQUIRED =
-  "'부적합' 또는 '일부 수정 필요'를 고르셨어요. 의견이나 수정안 중 하나는 적어 주셔야 다음 단계로 넘어갈 수 있어요.";
+  "'개선 필요사항'과 '수정 제안' 중 하나는 적어 주셔야 다음 단계로 넘어갑니다.";
 
 /** STEP 2 — "모든 Task 평가 완료". */
-export const gateStep2Unrated = (count: number) => `아직 평가하지 않은 과업이 ${count}건 있어요. 모두 평가해 주세요.`;
+export const gateStep2Unrated = (count: number) => `아직 고르지 않은 과업이 ${count}건 있습니다. 모두 골라 주세요.`;
 
 /** STEP 2 — "신규 Task는 명칭 필수". */
-export const GATE_STEP2_NEW_TASK_NAME = '추가하신 신규 과업의 명칭을 입력해 주세요.';
+export const GATE_STEP2_NEW_TASK_NAME = '추가하신 신규 과업의 이름을 적어 주세요.';
 
 /** STEP 3 — "합계 = 100% (서버에서 재검증)". */
 export const gateStep3Total = (total: number) =>
-  `배분 합계가 100%가 되어야 다음 단계로 넘어갈 수 있어요. 지금은 ${total}%예요.`;
+  `배분 합계가 100%가 되어야 다음 단계로 넘어갑니다. 지금은 ${total}%입니다.`;
 
 /** STEP 4 — "모든 항목 평가 완료". */
-export const gateStep4Unrated = (count: number) => `아직 평가하지 않은 항목이 ${count}건 있어요. 모두 평가해 주세요.`;
+export const gateStep4Unrated = (count: number) => `아직 고르지 않은 항목이 ${count}건 있습니다. 모두 골라 주세요.`;
 
 /** STEP 5 — 서버 RPC submit_review가 돌려준 부족 항목 안내. */
 export const gateStep5Missing = (count: number) =>
   count > 0
-    ? `아직 제출할 수 없어요. 채워야 할 항목이 ${count}개 있어요. 아래 항목을 눌러 해당 단계로 이동해 주세요.`
-    : '아직 제출할 수 없어요. 채우지 않은 항목이 남아 있어요.';
+    ? `아직 제출할 수 없습니다. 채워야 할 항목이 ${count}개 있습니다. 아래 항목을 눌러 해당 단계로 이동해 주세요.`
+    : '아직 제출할 수 없습니다. 채우지 않은 항목이 남아 있습니다.';
 
 /**
  * 게이트에 걸렸을 때 단계 공통으로 앞세우는 한 줄. 세부 사유는 이어서 목록으로 보여 준다.
@@ -280,13 +333,13 @@ export const savedMinutesAgo = (minutes: number) => `${minutes}분 전`;
 export const savedHoursAgo = (hours: number) => `${hours}시간 전`;
 
 /** 저장 실패 — 기획안에 없어 새로 씀. 자동 저장은 실패를 알리지 않으면 사용자가 저장된 줄 안다. */
-export const SAVE_CHIP_ERROR = '저장하지 못했어요';
+export const SAVE_CHIP_ERROR = '저장하지 못했습니다';
 export const SAVE_CHIP_RETRY = '다시 저장';
 
 /** 저장 중 · 입력 중 · 최초 상태 — 기획안에 없어 새로 씀. */
 export const SAVE_CHIP_SAVING = '저장 중…';
 export const SAVE_CHIP_DIRTY = '입력 중 · 잠시 후 자동 저장';
-export const SAVE_CHIP_IDLE = '아직 입력한 내용이 없어요.';
+export const SAVE_CHIP_IDLE = '아직 입력한 내용이 없습니다.';
 
 // ── StepChecklist 부속 문언 ─────────────────────────────────────────
 
@@ -305,12 +358,55 @@ export const STEP_COMPLETE_SR = '완료';
 /** 접이식 가이드를 여는 줄. 인덱스 = step - 1인 아래 본문과 짝이다. */
 export const STEP_GUIDE_SUMMARY = '이 단계에서 할 일';
 
-export const STEP_GUIDES = [
-  "직무명과 직무정의가 실제 업무와 맞는지 확인해 주세요. 적합성을 고르고, '부적합'이나 '일부 수정 필요'를 고르셨다면 의견이나 수정안 중 하나를 적어 주셔야 다음 단계로 넘어갑니다.",
-  '과업마다 적합성을 고르고, 고칠 부분은 의견·수정안으로, 빠진 과업은 신규 제안으로, 실제로 하지 않는 과업은 삭제 제안으로 남겨 주세요. 신규 과업은 명칭이 있어야 저장됩니다.',
-  '지난 1년 기준으로 이 직무에 들어간 시간의 비중을 과업별로 나눠 주세요. 합계가 100%가 되어야 다음 단계로 넘어갑니다.',
-  '필요 Skill(Hard·Soft)과 수행요건이 실제 업무와 맞는지 확인해 주세요. 빠진 Skill은 신규 제안으로 남길 수 있습니다.',
-  '단계별 완료 현황과 제안 요약, 투입 비중 상위 과업을 확인한 뒤 제출해 주세요. 제출 후에는 관리자가 재검토를 요청하기 전까지 수정할 수 없어요.',
+/**
+ * 단계 가이드 한 장 — 세 줄 고정(GUIDE v4 §5 G5).
+ *
+ * 예전에는 단계마다 2~3문장짜리 통문장이었다. 조건·예외·게이트 사유가 한 문단에 뭉쳐 있어,
+ * 정작 "무엇을 하면 되는지"가 문장 중간에 묻혔다. 세 줄로 자리를 정해 둔다.
+ *   do     — 이 단계에서 할 동작 하나
+ *   enough — 이 정도만 적어도 된다는 예시
+ *   skip   — 하지 않아도 되는 일 (처음 오는 응답자는 과잉 입력을 두려워한다)
+ * 게이트 조건은 여기서 되풀이하지 않는다. 막히는 순간 GATE_* 문구가 사유를 말한다.
+ */
+export interface StepGuide {
+  do: string;
+  enough: string;
+  skip: string;
+}
+
+/** 세 줄의 이름표. 화면이 이 라벨로 세 줄을 구분해 그린다. */
+export const STEP_GUIDE_LABELS = {
+  do: '하실 일',
+  enough: '이 정도면 충분합니다',
+  skip: '안 하셔도 됩니다',
+} as const;
+
+export const STEP_GUIDES: readonly StepGuide[] = [
+  {
+    do: '직무명과 직무정의를 읽고 적합성을 고르십시오.',
+    enough: '"이름은 맞는데 정의에 품질 점검이 빠져 있습니다."',
+    skip: '문장을 다듬어 주실 필요는 없습니다.',
+  },
+  {
+    do: '과업마다 적합성을 고르십시오.',
+    enough: '"이 과업은 저희가 아니라 품질팀에서 합니다."',
+    skip: '표현을 고쳐 적으실 필요는 없습니다. 사실만 알려 주세요.',
+  },
+  {
+    do: '지난 1년 기준으로 과업마다 비중을 나눠 합계 100%를 맞추십시오.',
+    enough: '큰 것부터 30 · 25 · 25 · 20처럼 어림수로 적으시면 됩니다.',
+    skip: '시간을 재거나 계산하실 필요는 없습니다.',
+  },
+  {
+    do: 'Skill과 수행요건을 읽고 적합성을 고르십시오.',
+    enough: '"이 일에는 엑셀보다 도면 보는 능력이 더 필요합니다."',
+    skip: '빠진 Skill이 없으면 추가하지 않으셔도 됩니다.',
+  },
+  {
+    do: '요약을 확인하고 제출하십시오.',
+    enough: '아래에 빨간 표시가 없으면 그대로 제출하셔도 됩니다.',
+    skip: '처음부터 다시 읽어 보실 필요는 없습니다.',
+  },
 ] as const;
 
 // ── STEP 2 직군별 작성 예시 팝오버 (§6-2 STEP 2 "직군별 작성 예시 팝오버") ──
@@ -365,12 +461,12 @@ export const fteInputLabel = (taskName: string) => `${taskName} 투입 비중`;
  * 화살표 키 조작은 화면에 단서가 없어 이 문장이 유일한 안내다.
  */
 export const FTE_INPUT_HINT =
-  `단위는 %이고 0에서 100 사이 정수만 입력할 수 있어요. 위·아래 화살표 키로 ${FTE_STEP_PCT}%씩, ` +
-  `Shift와 함께 누르거나 Page Up·Page Down으로 ${FTE_STEP_PCT * 10}%씩 조절할 수 있어요. ` +
-  'Home은 0%, End는 100%예요.';
+  `단위는 %이고 0에서 100 사이 정수만 입력할 수 있습니다. 위·아래 화살표 키로 ${FTE_STEP_PCT}%씩, ` +
+  `Shift와 함께 누르거나 Page Up·Page Down으로 ${FTE_STEP_PCT * 10}%씩 조절할 수 있습니다. ` +
+  'Home은 0%, End는 100%입니다.';
 
 /** 합계 100% 도달 안내. 색(초록)만으로 알리지 않도록 문구·아이콘을 함께 둔다. */
-export const FTE_DONE_LINE = '배분을 마쳤어요';
+export const FTE_DONE_LINE = '배분을 마쳤습니다';
 
 /**
  * 합계 게이지의 aria-valuetext.
@@ -388,7 +484,7 @@ export const fteGaugeValueText = (total: number) =>
  * 무엇이 잘못됐는지(사유)는 서버 메시지가, 무엇을 하면 되는지는 이 문장이 맡는다.
  */
 export const SAVE_CHIP_ERROR_HELP =
-  "입력하신 내용은 화면에 그대로 남아 있어요. 네트워크 연결을 확인한 뒤 '다시 저장'을 눌러 주세요.";
+  "입력하신 내용은 화면에 그대로 남아 있습니다. 연결을 확인한 뒤 '다시 저장'을 눌러 주세요.";
 
 /** 필수 입력 표시(*)를 보조기기에 읽어 줄 문구. 별표는 색·기호라 낭독되지 않는다. */
 export const REQUIRED_MARK_SR = '필수 입력';
@@ -403,12 +499,15 @@ export const GUIDE_SAVE_NO_DB = '서버 연결 설정이 없어 기록을 저장
  * 항목 옆 별표(필수)의 뜻을 문장으로 밝히는 안내. 기획안에 없어 새로 씀.
  *
  * GATE_STEP1_NOTE_REQUIRED와 문장이 비슷하지만 끝맺음이 다르다. 저쪽은 STEP 1 게이트 문구라
- * "다음 단계로 넘어갈 수 있어요"이고, 이 문장은 과업·Skill 항목에도 함께 붙는다.
+ * "다음 단계로 넘어갑니다"이고, 이 문장은 과업·Skill 항목에도 함께 붙는다.
  * 과업·Skill은 의견이 없어도 다음 단계로는 넘어가고 제출에서 막히므로(서버 submit_review가
  * job·task·skill 세 갈래 모두 같은 조건으로 재검증한다) 여기서는 "제출"로 적어야 사실과 맞는다.
+ *
+ * 무엇을 고르셨는지는 되풀이하지 않는다(v4 P8). 이 안내는 '적합'이 아닌 것을 고른 뒤에만
+ * 나타나고 바로 위에 그 선택이 보이므로, 앞부분을 지워도 할 일은 그대로 전달된다.
  */
 export const NOTE_REQUIRED_HINT =
-  "'부적합' 또는 '일부 수정 필요'를 고르셨어요. 의견이나 수정안 중 하나는 적어 주셔야 제출할 수 있어요.";
+  '아래 두 칸 중 하나는 적어 주셔야 제출됩니다.';
 
 /**
  * 로그인 화면 하단의 수집·이용 안내 한 문장(§8 S6 "로그인 화면에 수집·이용 안내 1문장").
@@ -421,3 +520,48 @@ export const NOTE_REQUIRED_HINT =
  */
 export const LOGIN_PRIVACY_NOTICE =
   '이 도구는 업무조사와 SME 검증에 필요한 성명·이메일·조직·직급만 수집하며, 주민등록번호와 연락처는 수집하지 않습니다.';
+
+// ── v4 안내 문구 (기획서 GUIDE v4 §5 G6·G7 · §5 G4) ─────────────────
+//
+// 아래는 전부 기획안에 없어 새로 씀. 문체 규칙(파일 상단 규칙 3)을 지킨다 —
+// 한 자리에 한 문장이고, 두 문장이 필요하면 그건 마이크로카피가 아니라 용어집(glossary.ts)으로 간다.
+
+/** STEP 1 적합성 위 — 첫 항목 앞에서 멈추는 사람에게 "이것만 하면 끝"임을 알린다. */
+export const HINT_STEP1_PICK_ONE = '셋 중 하나만 고르시면 이 항목은 끝납니다.';
+
+/** STEP 3 목록 위 — 백지 공포 대응. 시작점을 손가락으로 가리켜 준다. */
+export const HINT_STEP3_START = "어디서부터 할지 모르시겠으면 '균등 배분으로 시작'을 누르고 큰 것부터 올리십시오.";
+
+/** STEP 4 Skill·수행요건 위 — 가장 흔한 오해(내 스펙을 적는 칸)를 미리 막는다. */
+export const HINT_STEP4_WHO = '지금 하시는 분이 아니라 새로 맡을 사람 기준으로 봐 주십시오.';
+
+/** 신규 제안 편집기 — 비워 두어도 된다는 사실을 밝힌다(과잉 입력 방지). */
+export const HINT_NEW_SUGGESTION_OPTIONAL = '빠진 것이 없으면 비워 두셔도 됩니다.';
+
+/**
+ * 제출 확인 모달 본문 3줄(§5 G7).
+ * 지금까지는 "제출 후에는 수정할 수 없다" 한 줄뿐이라, 무엇이 어떻게 되는지 모른 채 눌러야 했다.
+ * 세 번째 줄은 0% 과업 안내(fteZeroPctNote)와 같은 결이다 — 허용은 하되 인지시킨다.
+ */
+export const SUBMIT_NOTICE = [
+  '제출하시면 담당자가 확인합니다.',
+  "제출 후에는 수정하실 수 없습니다. 고칠 곳이 생기면 '문의하기'로 알려 주십시오.",
+  '비어 있는 항목이 있어도 제출은 됩니다.',
+] as const;
+
+/**
+ * 검토 화면 첫 진입 안내(§5 G4). 카드 ⑤와 같은 넷을 같은 문장으로 짚는다 —
+ * 가이드에서 한 번 읽은 말을 화면에서 다시 만나야 이름이 붙는다.
+ *
+ * where가 자리를 말한다. 요소를 실제로 가리키는 스포트라이트를 쓰지 않기 때문이다(coachmarks.tsx 주석).
+ */
+export const COACH_STEPS = [
+  { where: '왼쪽 위', label: '단계 목록', note: '지금 몇 번째인지, 어디까지 끝났는지 보여 줍니다.' },
+  { where: '오른쪽 위', label: '저장 표시', note: '직접 저장을 누르지 않으셔도 자동으로 저장됩니다.' },
+  { where: '항목마다', label: '적합성 3버튼', note: '한 항목에서 하실 일은 여기서 하나 고르는 것입니다.' },
+  { where: '오른쪽 아래', label: '문의하기', note: '막히면 여기로 남겨 주십시오. 답이 오면 알려 드립니다.' },
+] as const;
+
+export const COACH_TITLE = '이 화면 보는 법';
+export const COACH_INTRO = '넷만 알고 계시면 됩니다.';
+export const COACH_DONE = '알겠습니다';

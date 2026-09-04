@@ -21,6 +21,7 @@ import {
   Clock3,
   Download,
   FileSpreadsheet,
+  HelpCircle,
   Inbox,
   LayoutDashboard,
   LayoutGrid,
@@ -50,6 +51,7 @@ import { ReviewWorkspace } from '@/pages/SmeReviewPage';
 import { HistoryPage } from '@/pages/ReviewHistoryPage';
 import { MyAssignmentsPage } from '@/pages/MyAssignmentsPage';
 import { GuidePage } from '@/pages/GuidePage';
+import { GlossaryPage } from '@/pages/GlossaryPage';
 import { MyInquiriesPage } from '@/pages/MyInquiriesPage';
 import { ProgressMatrixPage } from '@/pages/ProgressMatrixPage';
 import { WorkbenchPage } from '@/pages/WorkbenchPage';
@@ -59,6 +61,7 @@ import { FteAnalyticsPage } from '@/pages/FteAnalyticsPage';
 import { ExportsPage } from '@/pages/ExportsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { GUIDE_REOPEN_LINK } from '@/pages/sme-review/copy';
+import { GLOSSARY_TITLE } from '@/pages/sme-review/glossary';
 import type { StepNo } from '@/pages/sme-review/wizardTypes';
 import type { Role, User } from '@/types';
 
@@ -135,7 +138,10 @@ const smeNav: NavGroup[] = [
     items: [
       { to: '/inquiries', label: '내 문의', sub: '문의하고 답변을 확인하세요', Icon: MessageSquareText, short: '문의' },
       // 가이드는 최초 1회 필수 통과 뒤에도 여기서 상시 다시 볼 수 있다(§6-1).
-      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen, short: '가이드' },
+      { to: '/guide', label: GUIDE_REOPEN_LINK, sub: '조사 취지와 5단계 안내', Icon: BookOpen, short: '도움말' },
+      // 용어 설명은 사이드바·드로어에만 둔다(short 없음). 하단 내비는 네 칸을 지킨다 —
+      // 390px에서 다섯 칸은 라벨이 잘린다(v4 결정 D1).
+      { to: '/glossary', label: GLOSSARY_TITLE, sub: '화면에 나오는 말 모음', Icon: HelpCircle },
     ],
   },
 ];
@@ -163,6 +169,7 @@ const titles: [string, string][] = [
   ['/review', '직무정보 검토'],
   ['/history', '검토 이력'],
   ['/guide', '시작 가이드'],
+  ['/glossary', GLOSSARY_TITLE],
   ['/inquiries', '내 문의'],
 ];
 
@@ -282,6 +289,9 @@ async function loadUser(authUserId: string): Promise<User> {
     // 컬럼이 없는 DB(Phase 1 마이그레이션 미적용)에서는 undefined가 되어 가이드 게이트가 꺼진다.
     // 통과 시각을 기록할 곳이 없는데 가이드를 강제하면 SME가 앱에 영영 들어오지 못한다.
     guide_completed_at: 'guide_completed_at' in profile ? profile.guide_completed_at || null : undefined,
+    // 검토 화면 첫 진입 안내(v4 G4). 컬럼이 없으면 undefined가 되고 안내 자체를 띄우지 않는다
+    // — 기록할 곳이 없으면 검토를 열 때마다 같은 안내가 되풀이된다.
+    coach_completed_at: 'coach_completed_at' in profile ? profile.coach_completed_at || null : undefined,
   };
 }
 
@@ -483,7 +493,8 @@ function Shell({
    * 하단에 이전/다음을 그린다 — 세 겹이 겹치면 아무것도 누를 수 없다.
    */
   const smeBottomNav = !isAdmin && !pathname.startsWith('/review/');
-  const bottomNavItems = smeBottomNav ? navGroups.flatMap((g) => g.items) : [];
+  // short를 준 항목만 하단 내비에 올린다(v4 D1). 나머지는 사이드바·드로어에서만 보인다.
+  const bottomNavItems = smeBottomNav ? navGroups.flatMap((g) => g.items).filter((it) => it.short) : [];
 
   /*
    * 브라우저 탭 제목(v3 T6).
@@ -705,6 +716,7 @@ function Shell({
                   <Route path="/review" element={<Navigate to={smeHome} replace />} />
                   <Route path="/review/:jobId" element={<ReviewRoute user={user} />} />
                   <Route path="/guide" element={<GuideRoute user={user} />} />
+                  <Route path="/glossary" element={<GlossaryPage />} />
                   <Route path="/inquiries" element={<MyInquiriesPage user={user} />} />
                   <Route path="/history" element={<HistoryPage user={user} />} />
                 </>

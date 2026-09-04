@@ -4,7 +4,18 @@
 // 화면 문구는 이 파일에 적지 않는다 — §6-1 고정 문언은 전부 sme-review/copy.ts에 있다.
 // (아래 PREV_CARD·NEXT_CARD·CLOSE_BUTTON 세 개만 예외다. 이유는 상수 주석에 적었다.)
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, BookOpen, ChevronLeft, ChevronRight, ClipboardCheck, Clock, ListChecks, PieChart } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  Clock,
+  ListChecks,
+  MonitorSmartphone,
+  PieChart,
+  UserCheck,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { logAudit } from '@/lib/auditApi';
 import { fetchSurveySettings } from '@/lib/surveyApi';
@@ -21,8 +32,62 @@ const PREV_CARD = '이전';
 const NEXT_CARD = '다음';
 const CLOSE_BUTTON = '닫기';
 
-/** 카드 순서와 짝을 맞춘 장식 아이콘(§6-1 카드 ①~④). 새 그래픽을 만들지 않고 lucide 것만 쓴다. */
-const CARD_ICONS = [BookOpen, ListChecks, PieChart, Clock];
+/**
+ * 카드 순서와 짝을 맞춘 장식 아이콘. 새 그래픽을 만들지 않고 lucide 것만 쓴다.
+ * v4에서 카드가 6장이 되었다 — 앞의 ⓪(왜 저에게)과 뒤의 ⑤(화면 미리보기)가 더해졌다.
+ */
+const CARD_ICONS = [UserCheck, BookOpen, ListChecks, PieChart, Clock, MonitorSmartphone];
+
+/**
+ * 카드 ⑤ 화면 미리보기의 축소 그림(GUIDE v4 §5 G3).
+ *
+ * 캡처 이미지를 쓰지 않는다 — 이미지는 화면이 바뀌는 순간 거짓말이 되고, 다크·라이트 두 벌이
+ * 필요하며, 확대해도 글자가 읽히지 않는다. 실제 마크업을 줄여 그리면 셋 다 저절로 해결된다.
+ * 뜻은 옆 목록이 말하므로 그림 자체는 보조기기에서 감춘다.
+ */
+function ScreenMock() {
+  const marker = 'grid h-4 w-4 place-items-center rounded-full bg-primary t-caption-2 font-semibold text-primary-foreground';
+  return (
+    <div
+      aria-hidden="true"
+      className="relative rounded-element border border-border bg-background p-3 shadow-1"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <span className={marker}>1</span>
+          <span className="h-1.5 w-6 rounded-full bg-primary" />
+          <span className="h-1.5 w-4 rounded-full bg-border" />
+          <span className="h-1.5 w-4 rounded-full bg-border" />
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="rounded-inner bg-success-muted px-1.5 py-0.5 t-caption-2 text-success">저장됨</span>
+          <span className={marker}>2</span>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-inner border border-border bg-card p-2.5">
+        <span className="block h-1.5 w-20 rounded-full bg-foreground-subtle opacity-40" />
+        <div className="mt-2 flex items-center gap-1">
+          <span className="rounded-inner border border-success px-1.5 py-0.5 t-caption-2 text-success">적합</span>
+          <span className="rounded-inner border border-border px-1.5 py-0.5 t-caption-2 text-foreground-subtle">
+            일부 수정
+          </span>
+          <span className="rounded-inner border border-border px-1.5 py-0.5 t-caption-2 text-foreground-subtle">
+            부적합
+          </span>
+          <span className={marker}>3</span>
+        </div>
+      </div>
+
+      <div className="mt-3 flex justify-end">
+        <span className="inline-flex items-center gap-1 rounded-element bg-primary px-2 py-1 t-caption-2 text-primary-foreground">
+          문의하기
+        </span>
+        <span className={`${marker} ml-1`}>4</span>
+      </div>
+    </div>
+  );
+}
 
 /**
  * copy.ts가 emphasis로 표시한 구간만 <strong>으로 감싼다(§6-1 원문의 굵은 글씨).
@@ -236,6 +301,25 @@ export function GuidePage({ user, onDone }: GuidePageProps) {
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* 카드 ⑤ — 축소 그림과 번호 말풍선(v4 G3). 첫 화면에서 마주칠 넷에 미리 이름을 붙인다. */}
+          {card.preview && (
+            <div className="mt-4">
+              <ScreenMock />
+              <ul className="mt-4 space-y-2.5">
+                {card.preview.map((p) => (
+                  <li key={p.n} className="flex items-start gap-2 t-label leading-relaxed text-foreground-muted">
+                    <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary t-caption-2 font-semibold text-primary-foreground">
+                      {p.n}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="font-semibold text-foreground">{p.label}</span> — {p.note}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
 

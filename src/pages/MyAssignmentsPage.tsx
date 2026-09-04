@@ -12,6 +12,7 @@ import { fetchMyAssignments, type MyAssignment } from '@/lib/reviewApi';
 import { fetchSurveySettings } from '@/lib/surveyApi';
 import { mapReviewStatus } from '@/lib/jobApi';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { TermHint } from '@/components/ui/TermHint';
 import { Button } from '@/components/ui/Button';
 import { FallbackView } from '@/components/ui/FallbackView';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -22,7 +23,7 @@ import { STEP_LABELS } from '@/pages/sme-review/copy';
 import type { User } from '@/types';
 
 function formatSavedAt(value: string | null) {
-  if (!value) return '아직 저장한 내용이 없어요';
+  if (!value) return '아직 저장한 내용이 없습니다';
   return `마지막 저장 ${new Date(value).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' })}`;
 }
 
@@ -100,7 +101,7 @@ export function MyAssignmentsPage({ user }: { user: User }) {
 
       {overdueCount > 0 && (
         <SectionMessage variant="cautionary" className="mb-5">
-          마감일이 지났어요. 아직 제출하지 않은 직무가 {overdueCount}건 있어요. 늦더라도 제출하면 반영됩니다.
+          마감일이 지났습니다. 아직 제출하지 않으신 직무가 {overdueCount}건 있습니다. 늦더라도 제출하시면 반영됩니다.
         </SectionMessage>
       )}
 
@@ -109,7 +110,7 @@ export function MyAssignmentsPage({ user }: { user: User }) {
       ) : error ? (
         <FallbackView
           kind="error"
-          heading="배정된 직무를 불러오지 못했어요"
+          heading="배정된 직무를 불러오지 못했습니다"
           description="네트워크 상태를 확인한 뒤 다시 시도해 주세요. 계속 실패하면 관리자에게 문의해 주세요."
           action={
             <Button variant="secondary" size="sm" onClick={() => void load()}>
@@ -119,7 +120,7 @@ export function MyAssignmentsPage({ user }: { user: User }) {
         />
       ) : rows.length === 0 ? (
         <FallbackView
-          heading="배정된 직무가 없어요"
+          heading="배정된 직무가 없습니다"
           description="관리자가 직무를 배정하면 여기에 나타나요. 오래 비어 있으면 관리자에게 문의해 주세요."
         />
       ) : (
@@ -136,6 +137,7 @@ export function MyAssignmentsPage({ user }: { user: User }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold text-foreground">{r.job_name}</h3>
                       <StatusBadge status={mapReviewStatus(r.status)} />
+                      <TermHint id="review-status" />
                     </div>
                     <p className="mt-1 truncate t-label text-foreground-muted">
                       {r.group_name} · {r.series_name}

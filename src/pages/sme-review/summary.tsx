@@ -5,11 +5,18 @@
  * 이 표시 조각들이 한 파일에 있어서, 제출 요약 문구를 고칠 때도 자동저장 로직을 지나야 했다
  * (기획안 §7 D5). 상태를 들지 않는 조각만 이 파일로 옮겼다.
  */
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { fteZeroTargets } from './fte';
-import { STEP_TITLES, fteZeroPctNote, gateStep5Missing } from './copy';
+import {
+  STEP_GUIDES,
+  STEP_GUIDE_LABELS,
+  STEP_GUIDE_SUMMARY,
+  STEP_TITLES,
+  fteZeroPctNote,
+  gateStep5Missing,
+} from './copy';
 import { SectionHeading } from './controls';
 import type { MissingItem } from '@/lib/reviewApi';
 import type { Feedback } from '@/types';
@@ -26,14 +33,84 @@ const toStepNo = (n: number): StepNo => (n >= 1 && n <= 5 ? (n as StepNo) : 5);
  * <details>를 그대로 쓴다 — 열고 닫기·키보드 조작·보조기기 노출을 브라우저가 이미 한다
  * (fieldset disabled 안에서도 폼 컨트롤이 아니라 그대로 열린다).
  */
-export function Disclosure({ summary, children }: { summary: string; children: ReactNode }) {
+export function Disclosure({
+  summary,
+  children,
+  defaultOpen = false,
+}: {
+  summary: string;
+  children: ReactNode;
+  /** 처음 여는 자리에서만 펼친 채로 시작한다(v4 G5). 접으면 그 뒤로는 접힌 상태를 지킨다. */
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <details className="mb-5 rounded-element border border-border bg-muted">
+    <details
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className="mb-5 rounded-element border border-border bg-muted"
+    >
       <summary className="min-h-11 cursor-pointer px-4 py-3 t-label font-medium text-foreground-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
         {summary}
       </summary>
       <div className="border-t border-border px-4 py-3 t-label-reading text-foreground-muted">{children}</div>
     </details>
+  );
+}
+
+/*
+ * 이 세션에서 그 단계를 처음 여는지 — 단계 가이드를 펼친 채로 보여 줄지 판단한다(v4 G5).
+ *
+ * 서버에 두지 않는다. "이번에 한 번 봤다"는 사실은 세션을 넘겨 기억할 만한 값이 아니고,
+ * 다음 접속에서 다시 펼쳐 주는 편이 오히려 맞다(직무마다 며칠 간격으로 들어오는 화면이다).
+ *
+ * lastAsk는 React StrictMode(개발)에서 같은 단계로 두 번 물어 오는 것을 흡수한다.
+ * 없으면 두 번째 물음이 "이미 봤다"가 되어, 정작 처음 온 화면에서 가이드가 접힌 채로 열린다.
+ */
+const STEP_GUIDE_SEEN_KEY = 'sme.stepGuideSeen';
+let lastAsk: { step: number; answer: boolean } | null = null;
+
+export function markStepGuideSeen(step: number): boolean {
+  if (lastAsk?.step === step) return lastAsk.answer;
+  let answer = true;
+  try {
+    const seen: number[] = JSON.parse(sessionStorage.getItem(STEP_GUIDE_SEEN_KEY) || '[]');
+    answer = !seen.includes(step);
+    if (answer) sessionStorage.setItem(STEP_GUIDE_SEEN_KEY, JSON.stringify([...seen, step]));
+  } catch {
+    // 저장소를 못 쓰는 브라우저(사생활 보호 모드 등)에서는 늘 펼친다. 접는 것보다 낫다.
+    answer = true;
+  }
+  lastAsk = { step, answer };
+  return answer;
+}
+
+/**
+ * 단계 가이드 상자(v4 G5) — 「하실 일 · 이 정도면 충분합니다 · 안 하셔도 됩니다」 세 줄.
+ *
+ * 그 세션에서 그 단계를 처음 열었으면 펼친 채로 시작한다. 처음 온 사람은 접힌 상자를 열지 않는데,
+ * 이 세 줄이 정확히 그 사람을 위한 문장이라 접혀 있으면 아무 일도 하지 않는 장치가 된다.
+ * key={step} — 단계가 바뀌면 상자를 새로 만든다(펼침 여부를 그 단계 기준으로 다시 정해야 한다).
+ */
+export function StepGuideBox({ step }: { step: StepNo }) {
+  const guide = STEP_GUIDES[step - 1];
+  const firstVisit = useMemo(() => markStepGuideSeen(step), [step]);
+  const rows: [string, string][] = [
+    [STEP_GUIDE_LABELS.do, guide.do],
+    [STEP_GUIDE_LABELS.enough, guide.enough],
+    [STEP_GUIDE_LABELS.skip, guide.skip],
+  ];
+  return (
+    <Disclosure key={step} summary={STEP_GUIDE_SUMMARY} defaultOpen={firstVisit}>
+      <dl className="space-y-2">
+        {rows.map(([label, value], i) => (
+          <div key={label} className="sm:flex sm:gap-3">
+            <dt className="shrink-0 t-caption font-semibold text-foreground sm:w-36">{label}</dt>
+            <dd className={`m-0 t-label-reading ${i === 0 ? 'text-foreground' : 'text-foreground-muted'}`}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Disclosure>
   );
 }
 
@@ -166,7 +243,7 @@ export function SubmitSummary({
       <h4 className="mb-3 font-semibold text-foreground">투입 비중 상위 과업 (합계 {fteTotal}%)</h4>
       {top3.length === 0 ? (
         <p className="mb-8 rounded-element bg-muted px-4 py-3 t-label text-foreground-muted">
-          아직 투입 비중을 배분하지 않았어요.
+          아직 투입 비중을 배분하지 않으셨습니다.
         </p>
       ) : (
         <ol className="mb-8 space-y-2">

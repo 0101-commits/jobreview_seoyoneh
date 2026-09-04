@@ -9,6 +9,7 @@
 // 토큰을 쓴다. 대신 문구·아이콘으로 할 일을 분명히 말한다(색만으로 알리지 않기).
 import { MessageSquareText, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { TermHint } from '@/components/ui/TermHint';
 import type { Inquiry } from '@/lib/surveyApi';
 import { STEP_TITLES } from './copy';
 
@@ -49,10 +50,13 @@ export function RecheckBanner({
     >
       <RotateCw size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium">관리자가 재검토를 요청했어요{at && ` (${at})`}</p>
+        <p className="font-medium">
+          담당자가 재검토를 요청했습니다{at && ` (${at})`}
+          <TermHint id="rereview" />
+        </p>
         {/* 사유는 손대지 않고 그대로 보여 준다 — 줄바꿈까지 관리자가 쓴 대로 읽혀야 한다. */}
         <p className="mt-1 whitespace-pre-line leading-6">
-          {reason.trim() || '반려 사유가 함께 저장되지 않았어요. 관리자에게 확인해 주세요.'}
+          {reason.trim() || '사유가 함께 저장되지 않았습니다. 담당자에게 확인해 주세요.'}
         </p>
         <p className="mt-1 t-caption leading-5">
           {step ? `${stepTitle(step)} 단계를 다시 확인한 뒤 ` : '내용을 고친 뒤 '}
@@ -103,7 +107,7 @@ export function AnsweredInquiryBanner({
     >
       <MessageSquareText size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
       <p className="min-w-0 flex-1">
-        문의 {inquiries.length}건에 답변이 등록되었어요{at && ` (최근 ${at})`}.
+        문의 {inquiries.length}건에 답변이 등록되었습니다{at && ` (최근 ${at})`}.
       </p>
       <Button size="sm" variant="secondary" className="shrink-0" onClick={onOpen}>
         내 문의에서 확인
