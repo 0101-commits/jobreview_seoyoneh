@@ -447,7 +447,7 @@ select action, entity, entity_id, actor_id, created_at
 | --- | --- | --- | --- |
 | 1 | `supabase/APPLY_2026-09-02_v2_phaseA.sql` | profiles GRANT 축소(S1) · `request_rereview` REVOKE(F8) | 먼저 적용해도 무해 |
 | 2 | `supabase/APPLY_2026-09-02_v2_phaseB.sql` | `client_key` · `save_review_draft(p_fte, p_activities)` · `submit_review` · `activity_feedback` · 구조 편집 잠금 트리거 | **함께 적용해야 한다**(함수 시그니처가 바뀐다 — 옛 화면은 6인자 호출을 찾지 못한다) |
-| 3 | `supabase/APPLY_2026-09-02_v2_phaseD.sql` | `reviews.last_step` | 미적용이어도 화면은 동작(이어하기만 꺼짐) |
+| 3 | `supabase/APPLY_2026-09-02_v2_phaseD.sql` | `reviews.last_step` | **미적용이면 SME 배정 목록 자체가 실패한다.** `fetchMyAssignments` 의 select 에 `last_step` 이 들어 있어 PostgREST 가 요청 전체를 `42703` 으로 떨어뜨린다(`src/lib/reviewApi.ts:298-301`, 2026-09-03 실측 정정 — 「이어하기만 꺼짐」이 아니다) |
 | 4 | `supabase/APPLY_2026-09-02_v2_phaseE.sql` | `save_org_units` · `link_sme_roster_audited` | **함께 적용해야 한다**(업로드 시트 ③④ 경로가 이 함수를 부른다) |
 
 2·4를 적용하지 않은 채 새 화면을 배포하면 각각 SME 저장·제출과 조직/명부 업로드가 PGRST202로 실패한다.

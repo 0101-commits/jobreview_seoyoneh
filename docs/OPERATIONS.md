@@ -45,8 +45,16 @@
 | 7 | `supabase/APPLY_2026-09-02_followup.sql` | `submit_review`·`request_rereview`·`save_integrated_job_data` 세 함수를 **감사 기록 한 줄씩만 얹어** 재정의(`REVIEW_SUBMITTED`/`REVIEW_RESUBMITTED` · `REVIEW_REREVIEW_REQUESTED` · `JOB_DATA_UPLOADED`). 표·컬럼·정책·상태머신·함수 시그니처는 건드리지 않는다 | **반드시 1·3 이후.** 그 두 파일이 만든 최신 정의 위에 얹는 것이라 순서를 뒤집으면 나중에 실행된 파일이 감사 블록을 지운다. 화면 배포와는 무관하다 — 적용 전에도 화면은 그대로 돌고 기록만 계속 빠진다. 1-8 참조 |
 | 8 | `supabase/APPLY_2026-09-02_assignment_guard.sql` | 배정 해제 안전장치를 서버로 내린다 — `review_assignments` 해제 잠금 트리거(제출된 응답이 있으면 `active = false` UPDATE를 42501로 거절) + `submit_review` 재정의(상태 전이 앞에서 배정이 살아 있는지 확인). 표·컬럼·행·정책·상태머신·함수 시그니처는 건드리지 않는다 | **반드시 7 이후.** 7이 만든 `submit_review` 정의 위에 배정 확인만 얹는 것이라 순서를 뒤집으면 나중에 실행된 파일이 그 확인을 지운다(오류 없이 조용히). 화면 배포와는 무관하다 — 화면은 지금도 같은 판정을 하고 있고 이 SQL은 화면을 거치지 않는 해제·제출까지 막는다. 1-8 참조 |
 
+| 9 | `supabase/APPLY_2026-09-02_v2_phaseA.sql` | v2 Phase A — 계정 복구(`profiles` 컬럼 단위 GRANT 재정비: `REVOKE UPDATE` 후 `name`·`must_change_password`·`guide_completed_at` 만 다시 부여) | **13보다 먼저.** 이 파일이 `profiles` 의 UPDATE 권한을 통째로 다시 깔기 때문에, 뒤에 컬럼을 더하는 파일을 먼저 실행하면 그 권한이 사라진다 |
+| 10 | `supabase/APPLY_2026-09-02_v2_phaseB.sql` | v2 Phase B — FTE 연결(`activity_feedback` 등) | **프런트 v2 배포와 동시.** 미적용이면 SME 저장·제출이 `PGRST204`로 실패한다 |
+| 11 | `supabase/APPLY_2026-09-02_v2_phaseD.sql` | v2 Phase D — `reviews.last_step`(이어하기) | **프런트 v2 배포보다 먼저.** 미적용은 「이어하기만 꺼짐」이 **아니다** — `fetchMyAssignments` 의 select 에 `last_step` 이 들어 있어 PostgREST 가 요청 전체를 `42703` 으로 떨어뜨린다. 즉 **SME 배정 목록 자체가 오류 화면이 된다**(`src/lib/reviewApi.ts:298-301`, 2026-09-03 실측) |
+| 12 | `supabase/APPLY_2026-09-02_v2_phaseE.sql` | v2 Phase E — 감사 래퍼(`link_sme_roster_audited` 등) | **9 이후.** 화면 배포와 동시 |
+| 13 | `supabase/APPLY_2026-09-03_v4_coach.sql` | v4 — `profiles.coach_completed_at` 컬럼 + 본인 UPDATE 권한(검토 화면 첫 진입 안내) | **9 이후**(phaseA 가 GRANT 를 다시 깔기 때문). 미적용이면 안내가 **오류도 경고도 없이 한 번도 뜨지 않는다** |
+
 전부 `IF NOT EXISTS` / `CREATE OR REPLACE` / `DROP POLICY IF EXISTS` / `ON CONFLICT DO UPDATE`로만 되어 있어
-여러 번 실행해도 안전하다. 각 파일 끝의 `NOTIFY pgrst, 'reload schema';`는 PostgREST가 새 함수·컬럼을
+여러 번 실행해도 안전하다. **다만 9번(phaseA)만은 순서가 있다** — 그 파일은 `profiles` 의 UPDATE 권한을
+통째로 회수한 뒤 세 컬럼만 다시 부여하므로, 뒤에 컬럼을 더하는 13번보다 **먼저** 실행해야 하고
+9번을 다시 돌리면 13번도 다시 돌려야 한다(안 그러면 첫 진입 안내가 조용히 죽는다). 각 파일 끝의 `NOTIFY pgrst, 'reload schema';`는 PostgREST가 새 함수·컬럼을
 바로 알아보게 하는 것이니 지우지 말 것(생략하면 `PGRST202`/`PGRST204`가 한동안 계속 난다).
 
 ### 1-2. 실행 방법(모든 APPLY 파일 공통)
