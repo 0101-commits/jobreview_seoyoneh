@@ -85,6 +85,11 @@ const STATUS_LABEL: Record<ReviewStatus, string> = {
 
 const EMPTY_FEEDBACK: Feedback = { suitability: '', comment: '', suggestion: '' };
 
+/** 자동 저장 대기(ms). 동시 응답자 수 × 이 빈도가 곧 서버 쓰기 부하다. */
+const AUTOSAVE_DELAY_MS = 6000;
+/** 같은 순간에 시작한 사람들이 같은 순간에 저장하지 않도록 더하는 흔들림(ms). */
+const AUTOSAVE_JITTER_MS = 2000;
+
 const errMsg = (e: unknown) =>
   e instanceof Error && e.message ? e.message : '알 수 없는 오류로 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
@@ -360,12 +365,23 @@ export function ReviewWorkspace({
     while (inflightRef.current) await inflightRef.current;
   }, []);
 
-  // 자동 저장 — 입력이 2.5초 멈추면 보낸다. 저장 중에는 타이머가 잡히지 않는다(saveState 가드).
+  /*
+   * 자동 저장 — 입력이 멈추면 보낸다. 저장 중에는 타이머가 잡히지 않는다(saveState 가드).
+   *
+   * 대기 시간이 2.5초였다. 한 사람만 보면 문제가 없지만, 동시 응답자가 늘면 이 값이 그대로
+   * 서버 쓰기 빈도가 된다 — 한 번의 저장이 다섯 표의 행을 지웠다 다시 넣는 RPC 라
+   * (save_review_draft) 사람 수 × 빈도만큼 쓰기가 증폭된다. 6초로 늘리면 타이핑 경험은
+   * 거의 그대로인데(저장 표시가 몇 초 늦게 뜬다) 최대 쓰기 빈도는 절반 이하가 된다.
+   * 흔들림을 더해 같은 순간에 시작한 사람들이 같은 순간에 저장하지 않게 한다.
+   *
+   * 잃을 수 있는 입력이 늘지는 않는다 — 단계 이동·제출 전에 waitForSave 가 진행 중인 저장을
+   * 기다리고, beforeunload 가 저장 안 된 상태로 나가는 것을 막는다.
+   */
   useEffect(() => {
     if (saveState !== 'dirty') return;
     const timer = setTimeout(() => {
       void runSave();
-    }, 2500);
+    }, AUTOSAVE_DELAY_MS + Math.random() * AUTOSAVE_JITTER_MS);
     return () => clearTimeout(timer);
   }, [saveState, feedback, newTasks, newSkills, rows, runSave]);
 

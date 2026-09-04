@@ -493,10 +493,37 @@ function toState(data: unknown, what: string): ReviewState {
 }
 
 /** 임시저장. 한 트랜잭션에서 피드백 3종과 신규 제안 2종을 함께 저장한다. */
+/*
+ * 혼잡으로 실패한 저장만 다시 보낸다.
+ *
+ * 개시 직후에는 수십 명이 같은 시간대에 같은 화면을 쓴다. 그때 나오는 실패는 대부분
+ * 일시적인 것(429 rate limit · 503/504 · 커넥션 부족)이고, 몇 초 뒤면 그냥 된다.
+ * 그런데 지금은 첫 실패가 그대로 화면의 「저장하지 못했어요」가 되고, 사용자는 그 순간
+ * 같은 버튼을 연타한다 — 혼잡할 때 부하를 더 얹는 정확히 반대 행동이다.
+ *
+ * 권한 오류(401/403)·검증 오류처럼 다시 보내도 같은 답이 올 실패는 재시도하지 않는다.
+ * 대기 시간에 흔들림(jitter)을 준다. 같은 순간에 실패한 50명이 같은 순간에 다시 오면
+ * 그 자체가 두 번째 폭주가 된다.
+ */
+const RETRYABLE = /rate limit|too many|timeout|timed out|fetch failed|network|502|503|504|429|connection/i;
+
+function retryDelay(attempt: number): number {
+  const base = 800 * Math.pow(2, attempt); // 800ms → 1.6s
+  return base + Math.random() * base;
+}
+
 export async function saveReviewDraft(reviewId: string, payload: ReviewDraftPayload): Promise<ReviewState> {
-  const { data, error } = await client().rpc('save_review_draft', rpcArgs(reviewId, payload));
-  if (error) fail('검토 내용을 저장하지', error.message);
-  return toState(data, '검토 내용을 저장하지');
+  const args = rpcArgs(reviewId, payload);
+  let lastMessage = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await client().rpc('save_review_draft', args);
+    if (!error) return toState(data, '검토 내용을 저장하지');
+    lastMessage = error.message;
+    const status = (error as { code?: string }).code ?? '';
+    if (attempt === 2 || !(RETRYABLE.test(error.message) || status === '429' || status.startsWith('5'))) break;
+    await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
+  }
+  fail('검토 내용을 저장하지', lastMessage);
 }
 
 /** 서버가 준 부족 항목 배열을 화면이 그대로 쓸 수 있는 모양으로 정리한다. 개수는 서버가 준 그대로 보존한다. */

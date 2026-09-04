@@ -53,6 +53,7 @@
 | 14 | `supabase/APPLY_2026-09-04_password_vault.sql` | 비밀번호 보관 표(`account_password_vault`) + RLS + anon·authenticated 권한 회수 | 순서 제약 없음. **적용 후 Edge Function 시크릿 `PASSWORD_VAULT_KEY` 등록**(§2-2). 미적용이면 「비밀번호 확인」만 꺼진다 |
 | 15 | `supabase/APPLY_2026-09-04_permission_hardening.sql` | `set_profile_role` 실행 권한 회수 · `review_history` INSERT 소유 검사 · 기반 19표 TRUNCATE 회수 | 순서 제약 없음. 화면 동작이 바뀌지 않는다(이 경로를 부르는 클라이언트 코드가 없다) |
 | 16 | `supabase/APPLY_2026-09-04_admin_account.sql` | 운영 관리자 계정 로그인 ID·비밀번호 지정 | 필요할 때만. 여러 번 실행해도 안전하다 |
+| 17 | `supabase/APPLY_2026-09-04_sample_hr_job.sql` | 예시 직무 「인사운영」(과업 6·세부활동 20·Skill 8·수행요건) + 김과장 배정. 김과장 계정이 없으면 SME 계정도 함께 만든다 | 필요할 때만. **운영 데이터가 아니다** — 파일럿 확인이 끝나면 직무 목록에서 내린다 |
 
 전부 `IF NOT EXISTS` / `CREATE OR REPLACE` / `DROP POLICY IF EXISTS` / `ON CONFLICT DO UPDATE`로만 되어 있어
 여러 번 실행해도 안전하다. **다만 9번(phaseA)만은 순서가 있다** — 그 파일은 `profiles` 의 UPDATE 권한을
