@@ -3,6 +3,7 @@
 // 실패하면 항상 "원인 + 다음 행동"이 담긴 한국어 Error를 throw 한다(영어 원문은 노출하지 않는다).
 import { supabase } from '@/lib/supabase';
 import { logAudit } from '@/lib/auditApi';
+import { PASSWORD_POLICY_HINT } from '@/lib/passwordPolicy';
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`;
 
@@ -23,7 +24,7 @@ function toKoreanMessage(raw: unknown, status: number): string {
   const lower = msg.toLowerCase();
   if (lower.includes('already registered') || lower.includes('already been registered') || lower.includes('duplicate'))
     return '이미 등록된 이메일이에요. 다른 이메일을 쓰거나 기존 계정을 수정해 주세요.';
-  if (lower.includes('password')) return '비밀번호 조건을 만족하지 않아요. 8자 이상, 영문과 숫자를 포함해 주세요.';
+  if (lower.includes('password')) return `비밀번호 조건을 만족하지 않아요. ${PASSWORD_POLICY_HINT}`;
   if (lower.includes('email')) return '이메일 형식이 올바르지 않아요. 주소를 다시 확인해 주세요.';
   if (status === 401 || status === 403) return '권한이 없거나 로그인이 만료됐어요. 다시 로그인한 뒤 시도해 주세요.';
   if (status === 404) return '서버 기능을 찾을 수 없어요. 관리자에게 배포 상태 확인을 요청해 주세요.';
@@ -54,7 +55,7 @@ function toKoreanMessage(raw: unknown, status: number): string {
  */
 type AuditPlan = { action: string; entityId: string | null; meta: Record<string, unknown> };
 
-function planAccountAudit(
+export function planAccountAudit(
   body: Record<string, unknown>,
   data: Record<string, unknown>,
 ): AuditPlan | null {
@@ -88,6 +89,16 @@ function planAccountAudit(
         // 서버가 만든 임시값인지 관리자가 지정한 값인지만 구분한다(값은 남기지 않는다).
         meta: { issued: data.tempPassword ? 'temp' : 'explicit', force_change: data.mustChangePassword === true },
       };
+    /*
+     * 열람은 조작이 아니지만 남긴다. 평문을 사람 눈에 보인 순간이 이 기능의 유일한 위험 지점이라,
+     * "누가 언제 누구 것을 봤나"가 남지 않으면 사고가 났을 때 되짚을 수 없다.
+     * meta 에는 profile id 밖에 없다 — 값도 로그인 ID 도 넣지 않는다(§8 S6).
+     */
+    case 'reveal-password':
+      // 값이 실제로 나오지 않은 호출(보관 없음·stale)은 열람이 아니다.
+      return data.found === true
+        ? { action: 'PASSWORD_VIEWED', entityId: str(body.profileId), meta: {} }
+        : null;
     case 'set-login-id':
       // 바뀐 게 없으면(같은 값 재입력) 기록하지 않는다 — 조회성 호출로 감사 로그를 채우지 않는다.
       return data.unchanged ? null : { action: 'LOGIN_ID_CHANGED', entityId: str(body.profileId), meta: {} };

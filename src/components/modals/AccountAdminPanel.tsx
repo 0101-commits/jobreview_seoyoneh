@@ -10,19 +10,18 @@
  *   부모가 모달이라, 모달 뒤 토스트로 보내면 사실상 보이지 않는다(기존 관례).
  *   임시 비밀번호는 특히 그렇다 — 한 번 사라지면 다시 볼 수 없으므로 모달을 닫지 않고 여기 남긴다.
  *
- * ▣ 평문 열람은 없다
- *   비밀번호는 Supabase Auth에 해시로만 있어 볼 수 없다(기획서 §2). 여기 있는 것은 '재발급'과
- *   '직접 지정'이고, 둘 다 기본값으로 대상 계정에 must_change_password를 다시 걸어
- *   최종 비밀번호는 본인만 알게 둔다.
+ * ▣ 평문 열람 (2026-09-04, docs/PLAN_2026-09-04_IMPROVEMENT.md §2)
+ *   Supabase Auth 는 해시만 갖고 있으므로 '지금 걸려 있는 값'을 Auth 에서 읽어 올 수는 없다.
+ *   대신 앱을 지나는 모든 설정값을 서버가 암호문으로 보관하고(account_password_vault),
+ *   여기서 재인증을 거쳐 다시 보여 준다. 앱을 지나지 않은 변경이 있었던 계정은 값 대신 사유가 뜬다.
+ *   열람 1회는 audit_logs 에 PASSWORD_VIEWED 한 줄로 남는다(값·로그인 ID 는 남기지 않는다).
  */
 import { useState } from 'react';
-import { AlertTriangle, BookOpen, KeyRound, ShieldCheck, UserCog } from 'lucide-react';
+import { AlertTriangle, BookOpen, Eye, EyeOff, KeyRound, ShieldCheck, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { callAdminFn, errorMessage } from './edgeApi';
-
-/** 화면에서도 같은 정책을 먼저 걸러 준다. 서버(passwordPolicyError)가 최종 판정자다. */
-const PASSWORD_MIN_LENGTH = 10;
+import { PASSWORD_POLICY_HINT, passwordPolicyError } from '@/lib/passwordPolicy';
 
 export type AccountAdminTarget = {
   id: string;
@@ -38,7 +37,7 @@ export type AccountAdminTarget = {
   companyId?: string | null;
 };
 
-type Section = 'password' | 'loginId' | 'role' | 'active' | 'guide';
+type Section = 'password' | 'reveal' | 'loginId' | 'role' | 'active' | 'guide';
 
 export function AccountAdminPanel({
   target,
@@ -67,6 +66,13 @@ export function AccountAdminPanel({
   const [issued, setIssued] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // 비밀번호 확인(열람)
+  const [revealOpen, setRevealOpen] = useState(false);
+  const [reauth, setReauth] = useState('');
+  const [revealed, setRevealed] = useState('');
+  const [revealNote, setRevealNote] = useState('');
+  const [revealCopied, setRevealCopied] = useState(false);
+
   // 로그인 ID
   const [loginId, setLoginId] = useState(target.email);
 
@@ -92,12 +98,8 @@ export function AccountAdminPanel({
 
   // ── 비밀번호 ──────────────────────────────────────────────────────
   const explicitPassword = newPassword.length > 0;
-  const passwordLocalError =
-    explicitPassword && newPassword.length < PASSWORD_MIN_LENGTH
-      ? `비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상이어야 해요. 지금 ${newPassword.length}자예요.`
-      : explicitPassword && (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword))
-        ? '비밀번호에 영문과 숫자를 함께 넣어 주세요.'
-        : '';
+  // 비워 두면 서버가 임시값을 만든다 — 그때는 화면에서 정책을 따지지 않는다.
+  const passwordLocalError = explicitPassword ? (passwordPolicyError(newPassword) ?? '') : '';
 
   function submitPassword() {
     if (passwordLocalError) return;
@@ -122,6 +124,32 @@ export function AccountAdminPanel({
             ? ' 이 계정은 다음 로그인에서 비밀번호를 반드시 바꿉니다.'
             : ' 첫 로그인 변경 강제는 걸지 않았어요.';
         return (temp ? '임시 비밀번호를 새로 발급했어요.' : '비밀번호를 지정한 값으로 바꿨어요.') + tail;
+      },
+    );
+  }
+
+  // ── 비밀번호 확인(열람) ────────────────────────────────────────────
+  /*
+   * 값은 눌러서 열 때만, 그것도 15초만 보여 준다. 관리자 화면은 회의실 스크린에 그대로 떠 있는
+   * 일이 잦고, 한 번 열면 계속 남아 있는 값은 그 화면을 찍은 사진 한 장으로 새 나간다.
+   */
+  function submitReveal() {
+    setRevealed('');
+    setRevealNote('');
+    setRevealCopied(false);
+    void run(
+      'reveal',
+      { mode: 'reveal-password', profileId: target.id, reauthPassword: reauth },
+      (data) => {
+        setReauth('');
+        if (data.found === true && typeof data.password === 'string') {
+          setRevealed(data.password);
+          window.setTimeout(() => setRevealed(''), 15000);
+          const setAt = typeof data.setAt === 'string' ? new Date(data.setAt).toLocaleString('ko-KR') : '';
+          return setAt ? `${setAt}에 정해진 비밀번호예요. 15초 뒤 다시 가려집니다.` : '비밀번호를 확인했어요. 15초 뒤 다시 가려집니다.';
+        }
+        setRevealNote(typeof data.reason === 'string' ? data.reason : '보관된 비밀번호가 없어요.');
+        return '보관된 비밀번호를 찾지 못했어요.';
       },
     );
   }
@@ -174,13 +202,13 @@ export function AccountAdminPanel({
       <section className="border-t border-border pt-4">
         <h4 className="mb-1.5 t-label font-semibold text-foreground">비밀번호</h4>
         <p className="mb-3 t-caption leading-5 text-foreground-muted">
-          저장된 비밀번호는 암호화되어 있어 관리자도 볼 수 없어요. 대신 여기서 새로 발급하거나 값을 직접 지정할 수
-          있습니다. 비워 두고 「임시 비밀번호 발급」을 누르면 서버가 만들어 이 자리에 한 번만 보여 줘요.
+          앱을 통해 정해진 비밀번호는 아래 「비밀번호 확인」으로 다시 볼 수 있어요. 새로 발급하거나 값을 직접 지정할
+          수도 있습니다. 비워 두고 「임시 비밀번호 발급」을 누르면 서버가 만들어 이 자리에 보여 줘요.
         </p>
 
         <Field
           label="새 비밀번호 (선택)"
-          description={`직접 지정할 때만 입력해 주세요. ${PASSWORD_MIN_LENGTH}자 이상, 영문과 숫자를 포함합니다.`}
+          description={`직접 지정할 때만 입력해 주세요. ${PASSWORD_POLICY_HINT}`}
           error={passwordLocalError}
           type="text"
           value={newPassword}
@@ -247,6 +275,83 @@ export function AccountAdminPanel({
                 {copied ? '복사했어요' : '복사'}
               </Button>
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── 비밀번호 확인(열람) ── */}
+      <section className="border-t border-border pt-4">
+        <h4 className="mb-1.5 t-label font-semibold text-foreground">비밀번호 확인</h4>
+        <p className="mb-3 t-caption leading-5 text-foreground-muted">
+          앱을 통해 마지막으로 정해진 비밀번호를 다시 봅니다. 본인 확인을 위해 관리자 본인의 비밀번호를 한 번 더
+          입력해요. 확인한 사실은 기록에 남습니다.
+        </p>
+
+        {!revealOpen ? (
+          <Button variant="secondary" size="sm" onClick={() => setRevealOpen(true)} disabled={busy}>
+            <Eye size={15} aria-hidden="true" /> 비밀번호 확인
+          </Button>
+        ) : (
+          <div className="space-y-3">
+            <Field
+              label="관리자 본인 비밀번호"
+              description="대상 계정의 비밀번호가 아니라, 지금 로그인한 관리자 본인의 비밀번호예요."
+              type="password"
+              value={reauth}
+              onChange={setReauth}
+              placeholder="본인 비밀번호"
+              autoComplete="current-password"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={submitReveal}
+                loading={running === 'reveal'}
+                disabled={busy || !reauth}
+              >
+                <Eye size={15} aria-hidden="true" /> 확인
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setRevealOpen(false);
+                  setReauth('');
+                  setRevealed('');
+                  setRevealNote('');
+                }}
+                disabled={busy}
+              >
+                <EyeOff size={15} aria-hidden="true" /> 닫기
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {revealNote && (
+          <div className="mt-3 rounded-element border border-warning-border bg-warning-muted px-3.5 py-3 t-label text-warning">
+            {revealNote}
+          </div>
+        )}
+
+        {revealed && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-element border border-border bg-card px-3.5 py-3">
+            <span className="break-all font-mono t-body font-semibold text-foreground">{revealed}</span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(revealed);
+                  setRevealCopied(true);
+                } catch {
+                  setRevealCopied(false);
+                }
+              }}
+            >
+              {revealCopied ? '복사했어요' : '복사'}
+            </Button>
           </div>
         )}
       </section>

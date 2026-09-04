@@ -45,8 +45,16 @@
 | 7 | `supabase/APPLY_2026-09-02_followup.sql` | `submit_review`·`request_rereview`·`save_integrated_job_data` 세 함수를 **감사 기록 한 줄씩만 얹어** 재정의(`REVIEW_SUBMITTED`/`REVIEW_RESUBMITTED` · `REVIEW_REREVIEW_REQUESTED` · `JOB_DATA_UPLOADED`). 표·컬럼·정책·상태머신·함수 시그니처는 건드리지 않는다 | **반드시 1·3 이후.** 그 두 파일이 만든 최신 정의 위에 얹는 것이라 순서를 뒤집으면 나중에 실행된 파일이 감사 블록을 지운다. 화면 배포와는 무관하다 — 적용 전에도 화면은 그대로 돌고 기록만 계속 빠진다. 1-8 참조 |
 | 8 | `supabase/APPLY_2026-09-02_assignment_guard.sql` | 배정 해제 안전장치를 서버로 내린다 — `review_assignments` 해제 잠금 트리거(제출된 응답이 있으면 `active = false` UPDATE를 42501로 거절) + `submit_review` 재정의(상태 전이 앞에서 배정이 살아 있는지 확인). 표·컬럼·행·정책·상태머신·함수 시그니처는 건드리지 않는다 | **반드시 7 이후.** 7이 만든 `submit_review` 정의 위에 배정 확인만 얹는 것이라 순서를 뒤집으면 나중에 실행된 파일이 그 확인을 지운다(오류 없이 조용히). 화면 배포와는 무관하다 — 화면은 지금도 같은 판정을 하고 있고 이 SQL은 화면을 거치지 않는 해제·제출까지 막는다. 1-8 참조 |
 
+| 9 | `supabase/APPLY_2026-09-02_v2_phaseA.sql` | v2 Phase A — 계정 복구(`profiles` 컬럼 단위 GRANT 재정비: `REVOKE UPDATE` 후 `name`·`must_change_password`·`guide_completed_at` 만 다시 부여) | **13보다 먼저.** 이 파일이 `profiles` 의 UPDATE 권한을 통째로 다시 깔기 때문에, 뒤에 컬럼을 더하는 파일을 먼저 실행하면 그 권한이 사라진다 |
+| 10 | `supabase/APPLY_2026-09-02_v2_phaseB.sql` | v2 Phase B — FTE 연결(`activity_feedback` 등) | **프런트 v2 배포와 동시.** 미적용이면 SME 저장·제출이 `PGRST204`로 실패한다 |
+| 11 | `supabase/APPLY_2026-09-02_v2_phaseD.sql` | v2 Phase D — `reviews.last_step`(이어하기) | **프런트 v2 배포보다 먼저.** 미적용은 「이어하기만 꺼짐」이 **아니다** — `fetchMyAssignments` 의 select 에 `last_step` 이 들어 있어 PostgREST 가 요청 전체를 `42703` 으로 떨어뜨린다. 즉 **SME 배정 목록 자체가 오류 화면이 된다**(`src/lib/reviewApi.ts:298-301`, 2026-09-03 실측) |
+| 12 | `supabase/APPLY_2026-09-02_v2_phaseE.sql` | v2 Phase E — 감사 래퍼(`link_sme_roster_audited` 등) | **9 이후.** 화면 배포와 동시 |
+| 13 | `supabase/APPLY_2026-09-03_v4_coach.sql` | v4 — `profiles.coach_completed_at` 컬럼 + 본인 UPDATE 권한(검토 화면 첫 진입 안내) | **9 이후**(phaseA 가 GRANT 를 다시 깔기 때문). 미적용이면 안내가 **오류도 경고도 없이 한 번도 뜨지 않는다** |
+
 전부 `IF NOT EXISTS` / `CREATE OR REPLACE` / `DROP POLICY IF EXISTS` / `ON CONFLICT DO UPDATE`로만 되어 있어
-여러 번 실행해도 안전하다. 각 파일 끝의 `NOTIFY pgrst, 'reload schema';`는 PostgREST가 새 함수·컬럼을
+여러 번 실행해도 안전하다. **다만 9번(phaseA)만은 순서가 있다** — 그 파일은 `profiles` 의 UPDATE 권한을
+통째로 회수한 뒤 세 컬럼만 다시 부여하므로, 뒤에 컬럼을 더하는 13번보다 **먼저** 실행해야 하고
+9번을 다시 돌리면 13번도 다시 돌려야 한다(안 그러면 첫 진입 안내가 조용히 죽는다). 각 파일 끝의 `NOTIFY pgrst, 'reload schema';`는 PostgREST가 새 함수·컬럼을
 바로 알아보게 하는 것이니 지우지 말 것(생략하면 `PGRST202`/`PGRST204`가 한동안 계속 난다).
 
 ### 1-2. 실행 방법(모든 APPLY 파일 공통)
@@ -254,6 +262,17 @@ SELECT column_name, data_type, is_nullable FROM information_schema.columns
 
 ### 1-9. Edge Function 배포
 
+**2026-09-04부터 CI 가 대신 한다.** `main` 에 푸시하면 `.github/workflows/deploy.yml` 의 `functions` 잡이
+`admin-create-user` 와 `send-reminder` 를 배포한다. 아래 두 값이 등록돼 있어야 그 잡이 돈다 —
+없으면 잡이 조용히 건너뛰어지고 예전처럼 수동 배포가 필요하다.
+
+| 어디에 | 이름 | 값 |
+|---|---|---|
+| Actions → Variables | `SUPABASE_PROJECT_REF` | `yktdlcpovntegiwfnied` |
+| Actions → Secrets | `SUPABASE_ACCESS_TOKEN` | Supabase 대시보드 → Account → Access Tokens 에서 발급 |
+
+수동 배포가 필요할 때는 아래를 쓴다(값은 위 표와 같다).
+
 SQL과 별개로, 아래 두 함수는 Supabase CLI로 따로 배포해야 화면이 동작한다.
 
 ```bash
@@ -289,6 +308,12 @@ curl -s -o /dev/null -w '%{http_code}\n' -X OPTIONS \
 
 ### 2-1. GitHub Actions variables (저장소 → Settings → Secrets and variables → Actions → Variables)
 
+| 이름 | 용도 | 없으면 |
+|---|---|---|
+| `VITE_SUPPORT_CONTACT` | 로그인 전 화면에 띄울 대표 문의처(메일 주소 또는 전화번호) | 링크 없이 문구만 남는다. 로그인에 실패한 SME 가 앱 안에서 연락할 곳이 0이 된다 |
+| `SUPABASE_PROJECT_REF` | Edge Function 자동 배포 대상(`yktdlcpovntegiwfnied`) | `functions` 잡이 통째로 건너뛰어지고 §1-9 의 수동 배포가 필요하다 |
+
+
 `.github/workflows/deploy.yml`의 build 스텝이 `vars.` 로 읽는다.
 
 | 이름 | 정체 | 비고 |
@@ -306,6 +331,16 @@ Pages는 하위 경로에서 서빙되므로 워크플로가 `GITHUB_PAGES=true`
 `/jobreview_seoyoneh/`로 맞춘다. 이 값은 워크플로 안에 하드코딩되어 있어 따로 등록할 것이 없다.
 
 ### 2-2. Supabase Edge Function secrets (Supabase 대시보드 → Edge Functions → Secrets)
+
+| 이름 | 용도 | 없으면 |
+|---|---|---|
+| `PASSWORD_VAULT_KEY` | 비밀번호 보관고의 AES-256-GCM 키. **32바이트 난수의 base64** — `openssl rand -base64 32` | 보관도 열람도 하지 않는다. 계정 발급·비밀번호 변경은 그대로 되고, 관리자 화면의 「비밀번호 확인」만 사유를 돌려준다 |
+
+`PASSWORD_VAULT_KEY` 는 이 저장소에도, DB 에도, 백업에도 없다. **잃어버리면 보관된 값은 영영
+복호되지 않는다** — 그때는 비밀번호를 재발급하면 되고, 그 사고로 계정이 잠기지는 않는다.
+키를 바꾸면 그 이전에 보관된 값은 전부 읽히지 않게 되므로(복호 실패로 사유가 뜬다) 바꿀 이유가
+없으면 두는 편이 낫다.
+
 
 | 이름 | 필요 여부 | 읽는 곳 |
 |---|---|---|
@@ -360,7 +395,7 @@ Pages는 하위 경로에서 서빙되므로 워크플로가 `GITHUB_PAGES=true`
    프로필이 이미 있으면 **그 `id`를 그대로 재사용**한다 — 새 `id`로 만들면 `review_assignments.sme_id` 등
    `profiles(id)`를 참조하는 기존 데이터가 전부 끊긴다.
 4. [ ] **새 계정으로 로그인해 본다.** `must_change_password = true`로 시작하므로 첫 로그인에서 비밀번호 변경 화면이 뜬다.
-   새 비밀번호(10자 이상, §8 S2)로 바꾼 뒤 관리자 화면이 열리는지 확인한다.
+   새 비밀번호(8자 이상 + 영문 + 숫자, `src/lib/passwordPolicy.ts`)로 바꾼 뒤 관리자 화면이 열리는지 확인한다.
 5. [ ] **임시 비밀번호를 정리한다.** SQL Editor의 질의 기록에 평문으로 남는다.
    변경을 마친 뒤에는 그 값을 메신저·문서 어디에도 남기지 않는다.
 

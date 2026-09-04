@@ -253,7 +253,14 @@ export function UsersPage({
           </div>
         </div>
 
-        {loading ? (
+        {/*
+          첫 조회에서만 스켈레톤으로 갈아 끼운다. 이미 행이 있는데 표를 통째로 바꾸면
+          행 셀 안에서 열려 있는 SmeManageButton 의 모달까지 unmount 되고, 그 안에 한 번만
+          표시되는 임시 비밀번호가 그대로 사라진다(AccountAdminPanel 은 성공 직후 onRefresh →
+          fetchSmes 를 부른다). DataTable 이 key={rowKey(row)} 로 행을 그리므로 재조회 뒤에도
+          같은 id 의 행은 같은 키를 갖고 모달 상태가 살아남는다.
+        */}
+        {loading && smeList.length === 0 ? (
           <div className="p-5">
             <Skeleton.Table rows={6} cols={6} />
           </div>

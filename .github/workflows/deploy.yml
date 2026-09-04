@@ -28,11 +28,28 @@ jobs:
       # eslint는 오류에서만 실패한다(경고는 exit 0). 지금 남은 경고는 react-refresh 계열뿐이라
       # 배포를 막지 않으면서 새로 들어오는 오류만 잡는다.
       - run: npm run lint
+      # 테스트는 배포를 막는다. 예전에는 이 단계가 없어서 깨진 테스트가 그대로 Pages 로 나갔고,
+      # 기획서 DoD 의 "npm test 통과"는 사람이 로컬에서 한 번 돌린 기록일 뿐 재발 방지 장치가 아니었다.
+      - run: npm test
+      # Edge Function 은 tsconfig 의 include(["src"]) 밖이라 npm run typecheck 가 한 줄도 보지 않는다.
+      # 서버 코드 900여 줄이 타입 검사 없이 배포되던 자리다. Deno 런타임이므로 deno check 로 본다.
+      # loginEmail.test.ts 는 vitest 로 도는 파일이라 대상에서 뺀다.
+      #
+      # continue-on-error 는 임시다. 이 저장소에서 deno check 를 한 번도 돌려 본 적이 없어
+      # 지금 몇 건이 나오는지 모르는 채로 게이트를 걸면 배포가 통째로 막힌다.
+      # 첫 실행 로그로 결과를 보고, 0건이면 이 줄을 지워 게이트로 바꾼다.
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/admin-create-user/index.ts supabase/functions/send-reminder/index.ts
+        continue-on-error: true
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # 로그인 전 화면의 대표 문의처. 비어 있으면 문구만 남는다(선택).
+          VITE_SUPPORT_CONTACT: ${{ vars.VITE_SUPPORT_CONTACT }}
       # BrowserRouter: GitHub Pages는 /jobs/:id 같은 경로에 파일이 없으면 404를 준다.
       # 404.html을 index.html 사본으로 두면 새로고침·직접 링크가 앱으로 들어온다.
       - run: cp dist/index.html dist/404.html
@@ -40,6 +57,33 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+  # Edge Function 은 프런트와 다른 곳에 산다. 예전에는 이 단계가 없어서 서버 코드가 바뀌어도
+  # 사람이 손으로 배포하지 않으면 옛 함수가 그대로 돌았고, 화면은 새 모드를 부르는데 서버는
+  # 모르는 상태가 됐다(그 증상이 "비밀번호 재발급을 눌렀더니 이름을 입력하라고 한다"였다).
+  #
+  # vars.SUPABASE_PROJECT_REF 가 없으면 이 잡은 통째로 건너뛴다 — 시크릿을 등록하기 전까지
+  # 붉은 실패로 남기지 않기 위해서다. 등록 방법은 docs/OPERATIONS.md §1-9 에 있다.
+  functions:
+    runs-on: ubuntu-latest
+    if: ${{ vars.SUPABASE_PROJECT_REF != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # --no-verify-jwt 는 선택이 아니다. 기존 배포본이 verify_jwt: false 이고, 기본값(true)으로
+      # 올리면 CORS preflight(OPTIONS)에 Authorization 헤더가 없어 게이트웨이에서 막힌다 —
+      # 함수의 OPTIONS 분기에 닿지 못해 브라우저가 본 요청을 보내지 않고, 계정 관리 화면 전체가
+      # "서버에 연결하지 못했어요"로 죽는다.
+      - run: supabase functions deploy admin-create-user --project-ref "$PROJECT_REF" --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      - run: supabase functions deploy send-reminder --project-ref "$PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
 
   deploy:
     needs: build

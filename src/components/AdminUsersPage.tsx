@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { callAdminFn, errorMessage } from '@/components/modals/edgeApi';
 import { AccountAdminPanel } from '@/components/modals/AccountAdminPanel';
+import { PASSWORD_POLICY_HINT, passwordPolicyError } from '@/lib/passwordPolicy';
 
 interface User {
   id: string;
@@ -298,8 +299,9 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
       setLocalError('이름, 이메일(또는 로그인 ID), 비밀번호를 모두 입력해 주세요.');
       return;
     }
-    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-      setLocalError('비밀번호는 8자 이상이며 영문과 숫자를 포함해 주세요.');
+    const policyError = passwordPolicyError(password);
+    if (policyError) {
+      setLocalError(policyError);
       return;
     }
 
@@ -354,7 +356,7 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           함수형 children으로 라벨·설명(aria-describedby)·필수 여부의 연결 대상만 입력 칸으로 내렸다.
           (예전에는 Field가 이 div에 id를 달아 라벨이 div를 가리키고, 비밀번호 규칙 설명이 입력 칸에 닿지 않았다.)
         */}
-        <Field label="비밀번호" required description="8자 이상, 영문과 숫자를 포함해 주세요.">
+        <Field label="비밀번호" required description={PASSWORD_POLICY_HINT}>
           {(a11y) => (
             <div className="relative">
               <input

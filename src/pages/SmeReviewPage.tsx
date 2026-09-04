@@ -485,14 +485,21 @@ export function ReviewWorkspace({
     [jobDetail],
   );
   const ratedCount = (keys: string[]) => keys.filter((k) => feedback[k]?.suitability).length;
-  const total = stepKeys.reduce((n, keys) => n + keys.length, 0);
-  const done = stepKeys.reduce((n, keys) => n + ratedCount(keys), 0);
+  /*
+   * STEP 3(투입 비중)은 평가가 아니라 배분이라 stepKeys 로 셀 수 없다. 그렇다고 분모에서 빼 두면
+   * 적합성만 다 고른 사람이 FTE 를 한 번도 배분하지 않고 100% 를 보고, 그 상태에서 제출을 누르면
+   * STEP 3 게이트(합계 100%)에 걸린다 — 화면에서 가장 큰 숫자가 제출 가능 여부를 거꾸로 말한다.
+   * 배분한 과업 수를 따로 세어 분자·분모에 함께 넣는다.
+   */
+  const fteDone = targets.length - fteZeroTargets(targets, rows).length;
+  const total = stepKeys.reduce((n, keys) => n + keys.length, 0) + targets.length;
+  const done = stepKeys.reduce((n, keys) => n + ratedCount(keys), 0) + fteDone;
   const percent = total ? Math.round((done / total) * 100) : 0;
 
   const counts = STEPS.map((s) => {
     // 배분한 과업 수는 rows가 아니라 대상 기준으로 센다. rows에는 STEP 2에서 방금 지워진 과업의
     // 옛 값이 한 렌더 동안 남아 있을 수 있어, 그대로 세면 완료 수가 전체 수를 넘는다.
-    if (s === 3) return { done: targets.length - fteZeroTargets(targets, rows).length, total: targets.length };
+    if (s === 3) return { done: fteDone, total: targets.length };
     if (s === 5) return { done, total };
     return { done: ratedCount(stepKeys[s - 1]), total: stepKeys[s - 1].length };
   });
@@ -660,14 +667,14 @@ export function ReviewWorkspace({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="t-caption text-foreground-muted">평가 진행률</span>
+          <span className="t-caption text-foreground-muted">검토 진행률</span>
           <div
             className="h-2 w-28 rounded-full bg-border"
             role="progressbar"
             aria-valuenow={percent}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="검토 항목 평가 진행률"
+            aria-label="검토 진행률(적합성 평가 + 투입 비중 배분)"
           >
             <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${percent}%` }} />
           </div>

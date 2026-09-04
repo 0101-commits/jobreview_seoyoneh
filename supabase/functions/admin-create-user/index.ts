@@ -59,12 +59,14 @@ function generateTempPassword(): string {
 }
 
 /*
- * 비밀번호 정책 한 곳(기획서 §3 F11).
- * 예전에는 이 파일이 8자, 화면(ChangePasswordPage MIN_LENGTH)이 10자를 요구해서
- * 관리자가 8자로 만들어 준 비밀번호를 본인이 바꾸려는 순간 "10자 이상"으로 거절당했다.
- * 같은 값을 두 기준으로 판정하던 것을 10자로 통일한다(§8 S2 "길이 10+ 권장" 쪽으로 맞춘다).
+ * 비밀번호 정책 한 곳(기획서 §3 F11) — 이 파일이 최종 판정자다.
+ * 예전에는 이 파일이 8자, 화면(ChangePasswordPage)이 10자를 요구해서 관리자가 만들어 준
+ * 비밀번호를 본인이 바꾸려는 순간 거절당했다. 지금은 화면 쪽 사본이 `src/lib/passwordPolicy.ts`
+ * 한 곳에 있다. **숫자를 바꿀 때는 그 파일과 함께 바꾼다** — Deno 런타임이라 import 할 수 없다.
+ *
+ * 2026-09-04: 10 → 8. 파일럿 운영 계정에 9자 비밀번호를 쓰기로 한 결정에 맞춘다.
  */
-const PASSWORD_MIN_LENGTH = 10;
+const PASSWORD_MIN_LENGTH = 8;
 
 /** 정책 위반 사유를 한국어로 돌려준다. 통과하면 null. */
 function passwordPolicyError(password: unknown): string | null {
@@ -86,6 +88,94 @@ function passwordPolicyError(password: unknown): string | null {
  * 그 사고가 구조적으로 막힌다. 운영 전환 때 바꿔야 하면 PILOT_LOGIN_DOMAIN 환경변수로 덮는다.
  */
 const LOGIN_ID_DOMAIN = (Deno.env.get("PILOT_LOGIN_DOMAIN") || "seoyoneh.local").trim().toLowerCase();
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * 비밀번호 보관고 — 관리자 평문 열람(기획서 docs/PLAN_2026-09-04_IMPROVEMENT.md §2)
+ *
+ * 키는 여기(Edge Function 시크릿)에만 있다. DB 에는 암호문만 들어가므로 덤프·백업이 통째로
+ * 새도 값은 읽히지 않는다. RESEND_API_KEY 를 다루는 방식과 같은 규약이다.
+ *
+ * 키가 없으면 보관도 열람도 하지 않는다. 계정 발급 자체는 막지 않는다 — 비밀번호를 못 만들어
+ * 주는 것이 못 보여 주는 것보다 나쁘다. 대신 열람 요청에는 사유를 분명히 돌려준다.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const VAULT_KEY_B64 = (Deno.env.get("PASSWORD_VAULT_KEY") || "").trim();
+
+async function vaultKey(): Promise<CryptoKey | null> {
+  if (!VAULT_KEY_B64) return null;
+  try {
+    const raw = Uint8Array.from(atob(VAULT_KEY_B64), (c) => c.charCodeAt(0));
+    if (raw.length !== 32) {
+      console.error("PASSWORD_VAULT_KEY must decode to 32 bytes, got", raw.length);
+      return null;
+    }
+    return await crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  } catch (err) {
+    console.error("PASSWORD_VAULT_KEY is not valid base64:", err);
+    return null;
+  }
+}
+
+/** 저장 형식: base64(iv 12바이트 ‖ 암호문+태그). 버전은 key_version 컬럼이 따로 들고 있다. */
+async function encryptSecret(plain: string): Promise<string | null> {
+  const key = await vaultKey();
+  if (!key) return null;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder().encode(plain);
+  const buf = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc));
+  const joined = new Uint8Array(iv.length + buf.length);
+  joined.set(iv, 0);
+  joined.set(buf, iv.length);
+  return btoa(String.fromCharCode(...joined));
+}
+
+async function decryptSecret(payload: string): Promise<string | null> {
+  const key = await vaultKey();
+  if (!key) return null;
+  try {
+    const joined = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+    const iv = joined.slice(0, 12);
+    const body = joined.slice(12);
+    const out = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, body);
+    return new TextDecoder().decode(out);
+  } catch (err) {
+    // 키를 바꿨거나 값이 손상된 경우다. 조용히 빈 값을 주면 "비밀번호가 없다"로 오해된다.
+    console.error("vault decrypt failed:", err);
+    return null;
+  }
+}
+
+/**
+ * 보관고에 값을 남긴다. **실패해도 호출자의 작업을 되돌리지 않는다** — 비밀번호는 이미 바뀌었고,
+ * 보관 실패로 400 을 돌려주면 관리자는 "실패했다"고 읽고 같은 조작을 다시 한다.
+ * 대신 저장 여부를 boolean 으로 돌려주어 응답이 사실대로 말하게 한다.
+ */
+async function saveVaultEntry(
+  adminClient: ReturnType<typeof createClient>,
+  profileId: string,
+  plaintext: string,
+  source: "admin-create" | "sme-create" | "set-password" | "self-change",
+  setBy: string | null,
+): Promise<boolean> {
+  const ciphertext = await encryptSecret(plaintext);
+  if (!ciphertext) return false;
+  const { error } = await adminClient
+    .from("account_password_vault")
+    .upsert({
+      profile_id: profileId,
+      ciphertext,
+      key_version: 1,
+      source,
+      stale: false,
+      set_by: setBy,
+      set_at: new Date().toISOString(),
+    }, { onConflict: "profile_id" });
+  if (error) {
+    // 표가 아직 없는 DB(APPLY 미적용)도 여기로 온다. 계정 발급은 그대로 성공시킨다.
+    console.error("vault save failed:", error.message);
+    return false;
+  }
+  return true;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,6 +222,66 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    /*
+     * 본문을 관리자 검증보다 먼저 읽는다. 아래 set-own-password 하나만 관리자가 아니어도
+     * 쓸 수 있어야 하기 때문이다(본인이 자기 비밀번호를 바꾸는 경로).
+     */
+    const body = await req.json();
+    const { name, email, password, mode } = body;
+
+    /*
+     * ── 본인 비밀번호 변경 (기획서 docs/PLAN_2026-09-04_IMPROVEMENT.md §2) ────
+     *
+     * 예전에는 화면이 supabase.auth.updateUser 로 GoTrue 에 직접 쏘았다. 그 경로만 서버를
+     * 지나지 않아서, 관리자가 발급한 값은 첫 로그인 직후 폐기되고 보관고의 값은 그 순간부터
+     * 거짓이 됐다. 신규 계정은 must_change_password 가 걸려 있어 이 일이 예외 없이 일어난다.
+     * 그래서 이 경로를 서버로 끌어온다.
+     *
+     * 관리자 권한을 요구하지 않는다. 대상은 언제나 호출자 자신이고(body 의 값을 쓰지 않는다),
+     * JWT 검증은 이미 위에서 끝났다.
+     */
+    if (mode === "set-own-password") {
+      const ownPassword = body.password;
+      const policyError = passwordPolicyError(ownPassword);
+      if (policyError) {
+        return new Response(
+          JSON.stringify({ error: policyError }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { error: ownErr } = await adminClient.auth.admin.updateUserById(callerUser.user.id, {
+        password: ownPassword as string,
+      });
+      if (ownErr) {
+        console.error("set-own-password failed:", ownErr);
+        return new Response(
+          JSON.stringify({ error: `비밀번호를 변경하지 못했습니다. ${ownErr.message}` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // 변경 완료 표시. 실패해도 비밀번호는 이미 바뀌었으므로 성공을 뒤집지 않고 응답으로 알린다.
+      const { error: ownFlagErr } = await adminClient
+        .from("profiles")
+        .update({ must_change_password: false, updated_at: new Date().toISOString() })
+        .eq("id", callerUser.user.id);
+      if (ownFlagErr) console.error("set-own-password flag update failed:", ownFlagErr);
+
+      const ownVaulted = await saveVaultEntry(
+        adminClient,
+        callerUser.user.id,
+        ownPassword as string,
+        "self-change",
+        callerUser.user.id,
+      );
+
+      return new Response(
+        JSON.stringify({ success: true, flagApplied: !ownFlagErr, vaulted: ownVaulted }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Verify caller is an admin
     const { data: callerProfile } = await adminClient
       .from("profiles")
@@ -145,9 +295,6 @@ Deno.serve(async (req: Request) => {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const body = await req.json();
-    const { name, email, password, mode } = body;
 
     // ── SME batch creation from Excel upload ───────────────────
     if (mode === "create-sme") {
@@ -274,9 +421,12 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // tempPassword는 이 응답에만 있다. 화면은 관리자에게 1회 표시한 뒤 버린다(D1 ⓑ).
+      // 보관고에 남긴다(§2 W1). profiles 행이 이미 있어야 FK 를 만족하므로 여기가 가장 이른 자리다.
+      const smeVaulted = await saveVaultEntry(adminClient, smeUserId, smeTempPassword, "sme-create", callerUser.user.id);
+
+      // tempPassword는 이 응답에도 있다. 화면은 관리자에게 1회 표시하고, 이후에는 보관고에서 다시 읽는다.
       return new Response(
-        JSON.stringify({ success: true, userId: smeUserId, email: normalizedSmeEmail, tempPassword: smeTempPassword }),
+        JSON.stringify({ success: true, userId: smeUserId, email: normalizedSmeEmail, tempPassword: smeTempPassword, vaulted: smeVaulted }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -345,13 +495,34 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      // Prevent deactivating last active admin
+      /*
+       * 마지막 활성 관리자 방어 — 대상이 관리자일 때만 건다.
+       * 예전에는 대상 역할을 보지 않고 active=false 이기만 하면 관리자 수를 셌다. F6 으로
+       * 이 모드를 SME 관리 모달에도 붙이면서, 관리자가 1명인 운영(파일럿이 그렇다)에서는
+       * SME 비활성화 요청이 전부 "최소 1개의 활성 관리자 계정이 필요합니다"로 막혔다.
+       * delete 모드는 처음부터 대상 프로필을 먼저 읽어 역할을 확인한다 — 같은 순서로 맞춘다.
+       */
       if (!active) {
-        if ((await countActiveAdmins(adminClient)) <= 1) {
+        const { data: targetProfile } = await adminClient
+          .from("profiles")
+          .select("role, active")
+          .eq("id", profileId)
+          .maybeSingle();
+
+        if (!targetProfile) {
           return new Response(
-            JSON.stringify({ error: "최소 1개의 활성 관리자 계정이 필요합니다." }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            JSON.stringify({ error: "계정을 찾을 수 없습니다." }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
+        }
+
+        if (targetProfile.role === "admin" && targetProfile.active) {
+          if ((await countActiveAdmins(adminClient)) <= 1) {
+            return new Response(
+              JSON.stringify({ error: "최소 1개의 활성 관리자 계정이 필요합니다." }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
         }
       }
       const { error: toggleErr } = await adminClient
@@ -495,6 +666,9 @@ Deno.serve(async (req: Request) => {
         .eq("id", pwProfileId);
       if (pwFlagErr) console.error("set-password flag update failed:", pwFlagErr);
 
+      // 보관고에 남긴다(§2 W2). 서버 생성값·관리자 지정값 두 갈래가 여기서 합류하므로 한 줄이면 된다.
+      const pwVaulted = await saveVaultEntry(adminClient, pwProfileId as string, nextPassword, "set-password", callerUser.user.id);
+
       // 비밀번호는 이미 바뀌었다 — 플래그 갱신 실패를 오류로 뒤집지 않고 응답으로 알린다.
       // tempPassword 는 서버가 만든 경우에만 넣는다(관리자가 넣은 값을 되돌려줄 이유가 없다).
       return new Response(
@@ -503,6 +677,7 @@ Deno.serve(async (req: Request) => {
           tempPassword: explicit ? null : nextPassword,
           mustChangePassword: force,
           forceChangeApplied: !pwFlagErr,
+          vaulted: pwVaulted,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -733,6 +908,124 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    /*
+     * ── 비밀번호 열람 (기획서 docs/PLAN_2026-09-04_IMPROVEMENT.md §2) ─────────
+     *
+     * 관리자가 "지금 이 계정의 비밀번호"를 다시 본다. 한 번에 한 계정만 받는다 — 목록 일괄
+     * 열람을 만들면 화면 한 번에 전원 평문이 브라우저로 내려오고, 그 화면을 찍은 사진 한 장이
+     * 전 계정 유출이 된다.
+     *
+     * 이 모드는 위의 관리자 검증(JWT → auth.getUser → profiles.role='admin' AND active)을
+     * 이미 지난 자리에 있다. 그 위에 재인증을 한 겹 더 얹는다 — 자리를 비운 사이 열린 탭으로
+     * 남의 비밀번호를 읽어 가는 것이 이 기능의 가장 현실적인 오용이다.
+     *
+     * 응답에는 값과 "언제 설정된 값인지"를 함께 보낸다. 앱을 지나지 않은 변경(재설정 메일 ·
+     * 대시보드 · SQL 직접 UPDATE)이 확인되면 stale 이라 값 대신 사유를 보낸다.
+     */
+    if (mode === "reveal-password") {
+      const { profileId: revealId, reauthPassword } = body;
+
+      if (!revealId || typeof revealId !== "string") {
+        return new Response(
+          JSON.stringify({ error: "대상 계정을 지정해 주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (!VAULT_KEY_B64) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "비밀번호 보관 기능이 아직 켜져 있지 않아요. Edge Function 시크릿에 PASSWORD_VAULT_KEY 를 등록해 주세요(docs/OPERATIONS.md).",
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // 재인증 — 호출자 본인의 비밀번호로 다시 로그인해 본다. 세션은 만들지 않는다.
+      if (typeof reauthPassword !== "string" || !reauthPassword) {
+        return new Response(
+          JSON.stringify({ error: "본인 비밀번호를 입력해 주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const reauthClient = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { error: reauthErr } = await reauthClient.auth.signInWithPassword({
+        email: callerUser.user.email as string,
+        password: reauthPassword,
+      });
+      if (reauthErr) {
+        return new Response(
+          JSON.stringify({ error: "본인 비밀번호가 맞지 않아요." }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { data: vaultRow, error: vaultErr } = await adminClient
+        .from("account_password_vault")
+        .select("ciphertext, source, stale, set_at")
+        .eq("profile_id", revealId)
+        .maybeSingle();
+
+      if (vaultErr) {
+        console.error("vault read failed:", vaultErr);
+        return new Response(
+          JSON.stringify({
+            error:
+              "보관된 비밀번호를 읽지 못했어요. APPLY_2026-09-04_password_vault.sql 이 적용됐는지 확인해 주세요.",
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (!vaultRow) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            found: false,
+            reason:
+              "이 계정의 비밀번호는 보관 기능이 켜지기 전에 정해졌어요. 「임시 비밀번호 발급」으로 새 값을 만들면 그때부터 볼 수 있어요.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (vaultRow.stale) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            found: false,
+            reason:
+              "이 계정은 앱을 지나지 않은 경로로 비밀번호가 바뀌었어요(재설정 메일 · Supabase 대시보드 · SQL). 보관된 값은 더 이상 현재 비밀번호가 아니에요.",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const plain = await decryptSecret(vaultRow.ciphertext as string);
+      if (!plain) {
+        return new Response(
+          JSON.stringify({
+            error: "보관된 값을 복호하지 못했어요. PASSWORD_VAULT_KEY 가 바뀌었을 수 있어요 — 비밀번호를 재발급해 주세요.",
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          found: true,
+          password: plain,
+          source: vaultRow.source,
+          setAt: vaultRow.set_at,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (mode === "check-auth") {
       // 프로필 id로 auth 사용자를 하나씩 확인한다(v2 F2 — listUsers 50건 상한 제거).
       // 이메일 일치는 판정에 쓰지 않는다: 앱의 로그인은 profiles.id = auth.uid()로만 프로필을 찾으므로
@@ -751,6 +1044,26 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ success: true, profiles: result }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    /*
+     * 모르는 모드는 여기서 끊는다.
+     * 이 아래는 "관리자 계정 생성"이고, 모드 분기가 if 나열이라 예전에는 모르는 모드가
+     * 전부 여기로 흘러내렸다. 구버전 함수가 배포된 채로 새 화면이 {mode:'set-password'} 를
+     * 보내면 아는 모드가 없어 여기까지 오고, name·password 가 없으니 "이름, 이메일(또는
+     * 로그인 ID), 비밀번호를 모두 입력해 주세요"를 400 으로 돌려준다 — 관리자는 비밀번호
+     * 재발급을 눌렀는데 이름을 입력하라는 말을 듣고, 배포 문제라는 단서는 어디에도 없다.
+     * 모드를 명시했는데 아는 모드가 아니면 그 사실을 그대로 알린다.
+     */
+    if (typeof mode === "string" && mode.trim()) {
+      return new Response(
+        JSON.stringify({
+          error:
+            `이 서버가 모르는 요청입니다(mode: ${mode}). 서버 기능이 최신 버전으로 배포되지 않았을 수 있어요. ` +
+            `관리자에게 admin-create-user 재배포를 요청해 주세요.`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -849,8 +1162,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // 보관고에 남긴다(§2 W3). 관리자가 타이핑한 평문이 서버 지역변수로 들어오는 유일한 지점이다.
+    const adminVaulted = await saveVaultEntry(adminClient, newUserId, password, "admin-create", callerUser.user.id);
+
     return new Response(
-      JSON.stringify({ success: true, userId: newUserId, email: normalizedEmail }),
+      JSON.stringify({ success: true, userId: newUserId, email: normalizedEmail, vaulted: adminVaulted }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
