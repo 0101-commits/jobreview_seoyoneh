@@ -75,6 +75,35 @@ function planAccountAudit(
     }
     case 'delete':
       return { action: 'ACCOUNT_DELETED', entityId: str(body.profileId), meta: {} };
+    /*
+     * ── 관리자 전권 조작 4종(기획서 §6) ────────────────────────────
+     * 계정 생성·삭제와 같은 등급의 조작이라 함께 남긴다. meta에는 개인정보를 넣지 않는다(§8 S6):
+     * 비밀번호 값은 물론이고 새 로그인 ID도 담지 않는다 — 무엇이 바뀌었는지만 남기고
+     * 누구인지는 entity_id(profile id)로 추적한다. 역할만 값을 남긴다(권한 변동은 값 자체가 증빙이다).
+     */
+    case 'set-password':
+      return {
+        action: 'PASSWORD_RESET_BY_ADMIN',
+        entityId: str(body.profileId),
+        // 서버가 만든 임시값인지 관리자가 지정한 값인지만 구분한다(값은 남기지 않는다).
+        meta: { issued: data.tempPassword ? 'temp' : 'explicit', force_change: data.mustChangePassword === true },
+      };
+    case 'set-login-id':
+      // 바뀐 게 없으면(같은 값 재입력) 기록하지 않는다 — 조회성 호출로 감사 로그를 채우지 않는다.
+      return data.unchanged ? null : { action: 'LOGIN_ID_CHANGED', entityId: str(body.profileId), meta: {} };
+    case 'set-role':
+      return data.unchanged
+        ? null
+        : { action: 'ROLE_CHANGED', entityId: str(body.profileId), meta: { to: str(body.role) } };
+    case 'set-flags':
+      return {
+        action: 'ACCOUNT_FLAGS_CHANGED',
+        entityId: str(body.profileId),
+        meta: {
+          must_change_password: typeof body.must_change_password === 'boolean' ? body.must_change_password : null,
+          guide_reset: body.reset_guide === true,
+        },
+      };
     // 비활성화는 삭제와 같은 결과(로그인 차단)를 내므로 함께 남긴다. 행위 이름으로 둘을 가른다.
     case 'toggle-active':
       return {

@@ -24,6 +24,20 @@ async function findAuthUserByEmail(
 }
 
 /*
+ * 활성 관리자 수. "로그인할 수 있는 마지막 관리자를 잠그지 않는다"는 방어가
+ * toggle-active · delete · set-role 세 곳에서 같은 값을 본다. 세 곳에 같은 쿼리를 두면
+ * 한 곳만 조건이 바뀌어도 방어가 갈리므로 여기 한 번만 적는다.
+ */
+async function countActiveAdmins(adminClient: ReturnType<typeof createClient>): Promise<number> {
+  const { count } = await adminClient
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin")
+    .eq("active", true);
+  return count ?? 0;
+}
+
+/*
  * 임시 비밀번호 생성(v2 S2 / 결정 D1 ⓑ).
  * 관리자가 엑셀 평문 비밀번호를 유통하던 발급 방식을 서버 생성으로 바꾼다.
  * 생성값은 응답으로 한 번만 돌려주고 어디에도 저장하지 않는다(profiles.must_change_password가
@@ -42,6 +56,28 @@ function generateTempPassword(): string {
   const head = [pick(upper, 0), pick(lower, 1), pick(digits, 2)];
   const tail = Array.from({ length: bytes.length - 3 }, (_, k) => pick(all, k + 3));
   return [...head, ...tail].join("");
+}
+
+/*
+ * 비밀번호 정책 한 곳(기획서 §3 F11).
+ * 예전에는 이 파일이 8자, 화면(ChangePasswordPage MIN_LENGTH)이 10자를 요구해서
+ * 관리자가 8자로 만들어 준 비밀번호를 본인이 바꾸려는 순간 "10자 이상"으로 거절당했다.
+ * 같은 값을 두 기준으로 판정하던 것을 10자로 통일한다(§8 S2 "길이 10+ 권장" 쪽으로 맞춘다).
+ */
+const PASSWORD_MIN_LENGTH = 10;
+
+/** 정책 위반 사유를 한국어로 돌려준다. 통과하면 null. */
+function passwordPolicyError(password: unknown): string | null {
+  if (typeof password !== "string" || password.length === 0) {
+    return "비밀번호를 입력해 주세요.";
+  }
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다. 지금 ${password.length}자입니다.`;
+  }
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return "비밀번호에는 영문과 숫자를 함께 넣어 주세요.";
+  }
+  return null;
 }
 
 /*
@@ -245,7 +281,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── Update SME profile (including company assignment) ──────
+    // ── Update profile fields (name·company·organization·title·employee_number) ──
+    //
+    // 이름이 update-sme 지만 role 을 보지 않으므로 관리자 계정에도 그대로 쓴다(기획서 §3 F8).
+    // 모드 이름을 바꾸지 않는 이유: 이미 배포된 Edge Function 과 화면 5곳이 이 문자열을 쓰고 있어
+    // 이름만 바꾸면 배포 순서에 따라 계정 수정이 통째로 실패하는 구간이 생긴다.
     if (mode === "update-sme") {
       const { profileId: updId, name: updName, company_id: updCompanyId, organization: updOrg, title: updTitle, employee_number: updEmpNum } = body;
       if (!updId) {
@@ -307,12 +347,7 @@ Deno.serve(async (req: Request) => {
       }
       // Prevent deactivating last active admin
       if (!active) {
-        const { count } = await adminClient
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "admin")
-          .eq("active", true);
-        if ((count ?? 0) <= 1) {
+        if ((await countActiveAdmins(adminClient)) <= 1) {
           return new Response(
             JSON.stringify({ error: "최소 1개의 활성 관리자 계정이 필요합니다." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -368,12 +403,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (targetProfile.role === "admin" && targetProfile.active) {
-        const { count } = await adminClient
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "admin")
-          .eq("active", true);
-        if ((count ?? 0) <= 1) {
+        if ((await countActiveAdmins(adminClient)) <= 1) {
           return new Response(
             JSON.stringify({ error: "최소 1개의 활성 관리자 계정이 필요합니다." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -401,6 +431,302 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── 비밀번호 재설정 (기획서 §2 · F1~F3) ───────────────────────
+    //
+    // 평문 열람은 만들지 않는다 — Supabase Auth 는 해시만 갖고 있고 앱도 평문을 저장하지 않는다.
+    // 관리자가 실제로 필요했던 것("지금 당장 들어가게 해 준다")은 재발급으로 끝나므로
+    // ⓐ 서버 생성 임시값(응답 1회 표시) ⓑ 관리자 지정값 두 갈래만 둔다.
+    if (mode === "set-password") {
+      const { profileId: pwProfileId, password: newPassword, forceChange } = body;
+      if (!pwProfileId) {
+        return new Response(
+          JSON.stringify({ error: "비밀번호를 바꿀 계정을 지정해 주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // 값을 넣었으면 그 값, 비웠으면 서버가 만든다. 넣은 값은 화면과 같은 정책으로 검사한다.
+      const explicit = typeof newPassword === "string" && newPassword.length > 0;
+      if (explicit) {
+        const policyError = passwordPolicyError(newPassword);
+        if (policyError) {
+          return new Response(
+            JSON.stringify({ error: policyError }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+      const nextPassword = explicit ? (newPassword as string) : generateTempPassword();
+
+      // 로그인 계정(auth)이 없는 프로필에서 updateUserById 는 실패한다. 그 실패를 삼키면
+      // 관리자가 "존재하지 않는 계정의 비밀번호"를 사람에게 전달하게 되므로 먼저 확인해 사유를 가른다.
+      const { data: pwTarget } = await adminClient.auth.admin.getUserById(pwProfileId);
+      if (!pwTarget?.user) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "이 계정에는 로그인 계정(auth)이 없어 비밀번호를 바꿀 수 없습니다. supabase/BOOTSTRAP_2026-09-02_admin.sql 절차로 복구해 주세요.",
+          }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { error: pwErr } = await adminClient.auth.admin.updateUserById(pwProfileId, {
+        password: nextPassword,
+      });
+      if (pwErr) {
+        console.error("set-password failed:", pwErr);
+        return new Response(
+          JSON.stringify({ error: "비밀번호를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // 기본은 "본인이 첫 로그인에서 다시 바꾸게" 한다(§8 S2). 관리자가 명시적으로 false 를 줄 때만 풀린다.
+      const force = forceChange !== false;
+      const { error: pwFlagErr } = await adminClient
+        .from("profiles")
+        .update({ must_change_password: force, updated_at: new Date().toISOString() })
+        .eq("id", pwProfileId);
+      if (pwFlagErr) console.error("set-password flag update failed:", pwFlagErr);
+
+      // 비밀번호는 이미 바뀌었다 — 플래그 갱신 실패를 오류로 뒤집지 않고 응답으로 알린다.
+      // tempPassword 는 서버가 만든 경우에만 넣는다(관리자가 넣은 값을 되돌려줄 이유가 없다).
+      return new Response(
+        JSON.stringify({
+          success: true,
+          tempPassword: explicit ? null : nextPassword,
+          mustChangePassword: force,
+          forceChangeApplied: !pwFlagErr,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── 로그인 ID(이메일) 변경 (기획서 §3 F4) ─────────────────────
+    if (mode === "set-login-id") {
+      const { profileId: idProfileId, email: nextEmailRaw } = body;
+      if (!idProfileId) {
+        return new Response(
+          JSON.stringify({ error: "로그인 ID를 바꿀 계정을 지정해 주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const nextEmail = resolveLoginEmail(nextEmailRaw, null, LOGIN_ID_DOMAIN);
+      if (!nextEmail) {
+        return new Response(
+          JSON.stringify({ error: "로그인 ID에는 영문·숫자와 . _ - 만 쓸 수 있어요. 이메일 주소를 넣어도 됩니다." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { data: idCurrent } = await adminClient
+        .from("profiles")
+        .select("email")
+        .eq("id", idProfileId)
+        .maybeSingle();
+      if (!idCurrent) {
+        return new Response(
+          JSON.stringify({ error: "계정을 찾을 수 없습니다." }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // 같은 값이면 중복 검사에 자기 자신이 걸린다. 바꿀 것이 없으므로 그대로 성공으로 답한다.
+      if (idCurrent.email === nextEmail) {
+        return new Response(
+          JSON.stringify({ success: true, email: nextEmail, unchanged: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { data: dupProfile } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("email", nextEmail)
+        .neq("id", idProfileId)
+        .maybeSingle();
+      if (dupProfile) {
+        return new Response(
+          JSON.stringify({ error: `이미 등록된 로그인 ID입니다. (${nextEmail})` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // auth.users 쪽 중복도 본다(프로필 없는 고아 auth 계정을 걸러낸다 — 전 페이지 순회, F2).
+      const dupAuth = await findAuthUserByEmail(adminClient, nextEmail);
+      if (dupAuth && dupAuth.id !== idProfileId) {
+        return new Response(
+          JSON.stringify({ error: `이미 등록된 로그인 ID입니다. (${nextEmail})` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // Auth 를 먼저 바꾼다. 반대로 하면 목록에는 새 ID 가 보이는데 실제 로그인은 옛 ID 라
+      // 화면이 거짓말을 한다("이 ID로 로그인하세요"가 통하지 않는다).
+      const { error: authIdErr } = await adminClient.auth.admin.updateUserById(idProfileId, {
+        email: nextEmail,
+        email_confirm: true,
+      });
+      if (authIdErr) {
+        console.error("set-login-id auth update failed:", authIdErr);
+        const raw = authIdErr.message || "";
+        const duplicate = raw.includes("already") || raw.includes("exists") || raw.includes("registered");
+        return new Response(
+          JSON.stringify({
+            error: duplicate
+              ? `이미 등록된 로그인 ID입니다. (${nextEmail})`
+              : "로그인 ID를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+          }),
+          { status: duplicate ? 400 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { error: profIdErr } = await adminClient
+        .from("profiles")
+        .update({ email: nextEmail, updated_at: new Date().toISOString() })
+        .eq("id", idProfileId);
+      if (profIdErr) {
+        console.error("set-login-id profile update failed:", profIdErr);
+        // 실제 로그인 ID 는 이미 바뀌었다. 그 사실을 숨기면 관리자가 옛 ID 를 계속 전달한다.
+        return new Response(
+          JSON.stringify({
+            error: `로그인 ID는 ${nextEmail} 로 바뀌었지만 목록 표시를 갱신하지 못했습니다. 새로고침 후 다시 확인해 주세요.`,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, email: nextEmail }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── 역할 변경 SME ↔ 관리자 (기획서 §3 F5) ─────────────────────
+    //
+    // DB 의 set_profile_role RPC 는 쓰지 않는다 — 그 함수에는 "마지막 관리자" 방어가 없다.
+    // 같은 방어가 toggle-active·delete 와 함께 이 파일에서 읽히도록 여기서 처리한다.
+    if (mode === "set-role") {
+      const { profileId: roleProfileId, role: nextRole } = body;
+      if (!roleProfileId) {
+        return new Response(
+          JSON.stringify({ error: "역할을 바꿀 계정을 지정해 주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (nextRole !== "admin" && nextRole !== "sme") {
+        return new Response(
+          JSON.stringify({ error: "역할은 관리자 또는 SME 만 지정할 수 있습니다." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { data: roleTarget } = await adminClient
+        .from("profiles")
+        .select("role, active, company_id")
+        .eq("id", roleProfileId)
+        .maybeSingle();
+      if (!roleTarget) {
+        return new Response(
+          JSON.stringify({ error: "계정을 찾을 수 없습니다." }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (roleTarget.role === nextRole) {
+        return new Response(
+          JSON.stringify({ success: true, unchanged: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (nextRole === "sme") {
+        // 자기 자신을 강등하면 그 즉시 이 화면에서 쫓겨나고 되돌릴 수도 없다.
+        if (roleProfileId === callerUser.user.id) {
+          return new Response(
+            JSON.stringify({ error: "현재 로그인한 계정의 역할은 바꿀 수 없습니다." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        if (roleTarget.active && (await countActiveAdmins(adminClient)) <= 1) {
+          return new Response(
+            JSON.stringify({ error: "최소 1개의 활성 관리자 계정이 필요합니다." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        // 회사 없는 SME 는 배정이 만들어지지 않아 로그인해도 검토할 것이 없다.
+        if (!roleTarget.company_id) {
+          return new Response(
+            JSON.stringify({
+              error: "SME 로 바꾸려면 먼저 이 계정에 회사를 지정해 주세요. 회사가 없으면 검토 배정이 만들어지지 않습니다.",
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+
+      const { error: roleErr } = await adminClient
+        .from("profiles")
+        .update({ role: nextRole, updated_at: new Date().toISOString() })
+        .eq("id", roleProfileId);
+      if (roleErr) {
+        console.error("set-role failed:", roleErr);
+        return new Response(
+          JSON.stringify({ error: "역할을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // 관리자 → SME 로 내렸으면 배정을 만들어 준다(계정 생성 경로와 같은 함수).
+      // 실패해도 역할 변경을 되돌리지 않는다 — 배정은 /assignments-admin 에서 사후 조정할 수 있다.
+      let assignmentsSynced: boolean | null = null;
+      if (nextRole === "sme" && roleTarget.company_id) {
+        const { error: roleSyncErr } = await adminClient.rpc("sync_sme_assignments", {
+          p_sme_id: roleProfileId,
+          p_company_id: roleTarget.company_id,
+        });
+        if (roleSyncErr) console.error("sync_sme_assignments after set-role failed:", roleSyncErr);
+        assignmentsSynced = !roleSyncErr;
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, role: nextRole, assignmentsSynced }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── 계정 게이트 플래그 (기획서 §3 F3·F7) ──────────────────────
+    // must_change_password: 첫 로그인 비밀번호 변경 강제. reset_guide: 시작 가이드를 다시 보게 한다.
+    if (mode === "set-flags") {
+      const { profileId: flagProfileId, must_change_password: mustChange, reset_guide: resetGuide } = body;
+      if (!flagProfileId) {
+        return new Response(
+          JSON.stringify({ error: "변경할 계정을 지정해 주세요." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const flagFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (typeof mustChange === "boolean") flagFields.must_change_password = mustChange;
+      if (resetGuide === true) flagFields.guide_completed_at = null;
+      // 빈 호출을 성공으로 답하면 화면이 "적용했다"고 알리는데 아무것도 바뀌지 않는다.
+      if (Object.keys(flagFields).length === 1) {
+        return new Response(
+          JSON.stringify({ error: "바꿀 항목이 없습니다." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const { error: flagErr } = await adminClient.from("profiles").update(flagFields).eq("id", flagProfileId);
+      if (flagErr) {
+        console.error("set-flags failed:", flagErr);
+        return new Response(
+          JSON.stringify({ error: "계정 설정을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
       return new Response(
         JSON.stringify({ success: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -445,10 +771,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Validate password policy
-    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+    // Validate password policy (정책은 passwordPolicyError 한 곳에만 있다 — 기획서 §3 F11)
+    const createPolicyError = passwordPolicyError(password);
+    if (createPolicyError) {
       return new Response(
-        JSON.stringify({ error: "비밀번호는 8자 이상이며 영문과 숫자를 포함해 주세요." }),
+        JSON.stringify({ error: createPolicyError }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

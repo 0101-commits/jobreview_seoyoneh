@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Eye, EyeOff, KeyRound, Plus, RotateCw, ShieldCheck, Trash2, UserCog } from 'lucide-react';
 import { resetRedirectUrl, supabase } from '@/lib/supabase';
+import { fetchCompaniesResult, type Company } from '@/lib/jobApi';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { ModalShell } from '@/components/ui/ModalShell';
@@ -12,6 +13,7 @@ import { FallbackView } from '@/components/ui/FallbackView';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { callAdminFn, errorMessage } from '@/components/modals/edgeApi';
+import { AccountAdminPanel } from '@/components/modals/AccountAdminPanel';
 
 interface User {
   id: string;
@@ -29,6 +31,11 @@ interface AdminProfile {
   email: string;
   active: boolean;
   created_at: string;
+  /** 관리자도 소속·직급·사번·회사를 가질 수 있다(기획서 §3 F8). 없으면 빈 문자열·null이다. */
+  organization: string;
+  title: string;
+  employee_number: string;
+  company_id: string | null;
   /** undefined = 아직 확인 전. 확인 전에는 '로그인 가능'으로 보수적으로 간주한다. */
   hasAuth?: boolean;
 }
@@ -57,7 +64,12 @@ export function AdminUsersPage({ currentUser }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showRegister, setShowRegister] = useState(false);
-  const [showManage, setShowManage] = useState<AdminProfile | null>(null);
+  /**
+   * 관리 모달의 대상은 id로만 들고 있다. 객체 스냅샷을 들고 있으면 모달 안에서 역할·상태를 바꿔
+   * 목록을 새로고침해도 모달은 예전 값을 계속 보여 준다(기획서 §3 F5·F6이 필요한 그 자리다).
+   */
+  const [manageId, setManageId] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const { toast, showToast, dismiss } = useToast();
 
   const fetchAdmins = useCallback(async () => {
@@ -70,7 +82,7 @@ export function AdminUsersPage({ currentUser }: Props) {
     }
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, email, active, created_at')
+      .select('id, name, email, active, created_at, organization, title, employee_number, company_id')
       .eq('role', 'admin')
       .order('created_at', { ascending: true });
     if (error) {
@@ -80,7 +92,21 @@ export function AdminUsersPage({ currentUser }: Props) {
       setLoading(false);
       return;
     }
-    setAdmins((data || []) as AdminProfile[]);
+    // 컬럼이 NULL인 계정이 있다(관리자는 소속·사번 없이 만들어진다). 빈 문자열로 정규화해
+    // 입력 칸이 value={null}로 비제어 전환되는 것을 막는다.
+    setAdmins(
+      (data || []).map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        name: p.name as string,
+        email: p.email as string,
+        active: p.active as boolean,
+        created_at: (p.created_at as string) || '',
+        organization: (p.organization as string) || '',
+        title: (p.title as string) || '',
+        employee_number: (p.employee_number as string) || '',
+        company_id: (p.company_id as string) || null,
+      })),
+    );
     setLoading(false);
 
     // 로그인 계정(auth) 존재 여부는 Edge Function으로 따로 확인한다.
@@ -99,6 +125,12 @@ export function AdminUsersPage({ currentUser }: Props) {
     fetchAdmins();
   }, [fetchAdmins]);
 
+  // 회사 목록은 관리자 계정의 소속 회사 지정(F8)과 SME 강등 가능 여부 판정에 쓴다.
+  // 실패하면 선택 칸이 비지만 이름·비밀번호 같은 나머지 조작은 그대로 되어야 하므로 화면을 막지 않는다.
+  useEffect(() => {
+    void fetchCompaniesResult().then((res) => setCompanies(res.ok ? res.data : []));
+  }, []);
+
   function formatDate(d: string) {
     try {
       const dt = new Date(d);
@@ -111,8 +143,10 @@ export function AdminUsersPage({ currentUser }: Props) {
   // 로그인 계정이 없는 프로필은 '활성'이어도 실제로는 로그인할 수 없다 — 이 수를 기준으로 막는다.
   const loginableCount = admins.filter((a) => a.active && a.hasAuth !== false).length;
 
+  const manageTarget = manageId ? admins.find((a) => a.id === manageId) : undefined;
+
   function closeManage(msg?: string) {
-    setShowManage(null);
+    setManageId(null);
     if (msg) {
       fetchAdmins();
       showToast({ type: 'success', msg });
@@ -205,7 +239,7 @@ export function AdminUsersPage({ currentUser }: Props) {
               align: 'center',
               mobile: 'trailing',
               cell: (a) => (
-                <Button variant="secondary" size="sm" onClick={() => setShowManage(a)}>
+                <Button variant="secondary" size="sm" onClick={() => setManageId(a.id)}>
                   관리
                 </Button>
               ),
@@ -228,12 +262,16 @@ export function AdminUsersPage({ currentUser }: Props) {
       )}
 
 
-      {showManage && (
+      {manageTarget && (
         <ManageModal
-          admin={showManage}
-          isSelf={showManage.id === currentUser.id}
-          isLastLoginable={showManage.active && showManage.hasAuth !== false && loginableCount <= 1}
+          // key로 대상을 고정한다 — 다른 행의 '관리'를 눌렀을 때 입력 칸이 예전 계정 값을 들고 있지 않게.
+          key={manageTarget.id}
+          admin={manageTarget}
+          companies={companies}
+          isSelf={manageTarget.id === currentUser.id}
+          isLastLoginable={manageTarget.active && manageTarget.hasAuth !== false && loginableCount <= 1}
           onClose={closeManage}
+          onRefresh={fetchAdmins}
         />
       )}
     </div>
@@ -350,74 +388,88 @@ function RegisterModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 
 function ManageModal({
   admin,
+  companies,
   isSelf,
   isLastLoginable,
   onClose,
+  onRefresh,
 }: {
   admin: AdminProfile;
+  companies: Company[];
   isSelf: boolean;
-  /** 이 계정을 비활성화·삭제하면 로그인 가능한 관리자가 0명이 된다. */
+  /** 이 계정을 비활성화·강등·삭제하면 로그인 가능한 관리자가 0명이 된다. */
   isLastLoginable: boolean;
   /** msg를 주면 목록 새로고침 + 성공 토스트, 없으면 조용히 닫는다. */
   onClose: (msg?: string) => void;
+  /** 모달을 닫지 않고 목록만 다시 불러온다(전권 패널이 쓴다). */
+  onRefresh: () => void;
 }) {
   const [editName, setEditName] = useState(admin.name);
+  const [editCompany, setEditCompany] = useState(admin.company_id || '');
+  const [editOrg, setEditOrg] = useState(admin.organization);
+  const [editTitle, setEditTitle] = useState(admin.title);
+  const [editEmpNum, setEditEmpNum] = useState(admin.employee_number);
   const [saving, setSaving] = useState(false);
-  const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // 전권 패널이 요청을 도는 동안 닫기·저장을 잠근다(임시 비밀번호가 화면에 남아 있어야 한다).
+  const [panelBusy, setPanelBusy] = useState(false);
 
-  const nameChanged = editName.trim() !== admin.name;
-  const busy = saving || toggling || deleting || resetting;
-  const blockReason = isSelf
-    ? '현재 로그인한 계정이에요. 비활성화하거나 삭제할 수 없어요.'
+  const dirty =
+    editName.trim() !== admin.name ||
+    editCompany !== (admin.company_id || '') ||
+    editOrg !== admin.organization ||
+    editTitle !== admin.title ||
+    editEmpNum !== admin.employee_number;
+  const busy = saving || deleting || resetting || panelBusy;
+  // 삭제만 이 사유로 막는다. 비활성화·역할 변경은 전권 패널이 같은 규칙으로 스스로 판정한다.
+  const deleteBlockReason = isSelf
+    ? '현재 로그인한 계정이에요. 삭제할 수 없어요.'
     : isLastLoginable
-      ? '로그인할 수 있는 마지막 관리자예요. 다른 관리자를 먼저 활성화한 뒤에 변경해 주세요.'
+      ? '로그인할 수 있는 마지막 관리자예요. 다른 관리자를 먼저 활성화한 뒤에 삭제해 주세요.'
       : '';
 
-  async function handleSaveName() {
+  /** 이름·회사·조직·직급·사번을 한 번에 저장한다(기획서 §3 F8 — 예전에는 이름만 고칠 수 있었다). */
+  async function handleSaveProfile() {
     setError('');
     setNotice('');
     if (!editName.trim()) {
       setError('이름을 입력해 주세요.');
       return;
     }
-    if (!nameChanged) {
-      // 바뀐 게 없으면 "업데이트되었습니다"를 띄우지 않는다.
+    if (!dirty) {
+      // 바뀐 게 없으면 "저장했습니다"를 띄우지 않는다.
       onClose();
       return;
     }
     setSaving(true);
     try {
-      await callAdminFn({ mode: 'update', profileId: admin.id, name: editName.trim() });
-      onClose('관리자 이름을 수정했어요.');
+      // 모드 이름은 update-sme지만 서버가 role을 보지 않아 관리자 계정에도 그대로 쓴다.
+      await callAdminFn({
+        mode: 'update-sme',
+        profileId: admin.id,
+        name: editName.trim(),
+        // 관리자는 회사가 없어도 된다(계열사 전체를 본다). 빈 값은 서버에서 null이 된다.
+        company_id: editCompany,
+        organization: editOrg,
+        title: editTitle,
+        employee_number: editEmpNum,
+      });
+      onClose('관리자 계정 정보를 수정했어요.');
     } catch (err) {
-      setError(errorMessage(err, '이름을 수정하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+      setError(errorMessage(err, '계정 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요.'));
       setSaving(false);
     }
   }
 
-  async function handleToggleActive() {
-    setError('');
-    setNotice('');
-    // 비활성화만 막는다(활성화는 언제든 허용).
-    if (admin.active && blockReason) {
-      setError(blockReason);
-      return;
-    }
-    setToggling(true);
-    try {
-      await callAdminFn({ mode: 'toggle-active', profileId: admin.id, active: !admin.active });
-      onClose(admin.active ? '관리자 계정을 비활성화했어요.' : '관리자 계정을 활성화했어요.');
-    } catch (err) {
-      setError(errorMessage(err, '상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.'));
-      setToggling(false);
-    }
-  }
-
+  /**
+   * 재설정 메일. 관리자가 값을 알 필요가 없을 때(실제 메일 주소가 있는 계정) 이쪽이 낫다.
+   * 다만 파일럿 로그인 ID(@seoyoneh.local)는 메일이 닿지 않으므로 그때는 아래 전권 패널의
+   * 「임시 비밀번호 발급」을 쓴다 — 그 사유를 문구로 적어 둔다.
+   */
   async function handleResetPassword() {
     setError('');
     setNotice('');
@@ -452,65 +504,85 @@ function ManageModal({
   return (
     <ModalShell
       title="관리자 계정 관리"
+      description="소속 정보와 비밀번호·로그인 ID·역할·상태까지 이 창에서 모두 바꿉니다."
       icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
       onClose={() => onClose()}
       // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
       hideClose
       // 여러 필드·목록을 담는 폼이라 large(480px)를 쓴다. montage medium(400px)은 모바일 폭 기준이다.
       size="lg"
-      dirty={nameChanged && !busy}
+      dirty={dirty && !busy}
       closeDisabled={busy}
       footer={
         <>
           <Button variant="secondary" onClick={() => onClose()} disabled={busy}>
             취소
           </Button>
-          <Button onClick={handleSaveName} loading={saving} disabled={busy && !saving}>
+          <Button onClick={handleSaveProfile} loading={saving} disabled={busy && !saving}>
             {saving ? '저장 중...' : '저장'}
           </Button>
         </>
       }
     >
       <div className="space-y-5">
-        {blockReason && <Alert tone="warning">{blockReason}</Alert>}
         {error && <Alert tone="error">{error}</Alert>}
         {notice && <Alert tone="success">{notice}</Alert>}
+        {admin.hasAuth === false && (
+          <Alert tone="warning">
+            이 프로필에는 로그인 계정(auth)이 없어 비밀번호·로그인 ID를 바꿀 수 없어요.
+            supabase/BOOTSTRAP_2026-09-02_admin.sql 절차로 먼저 복구해 주세요.
+          </Alert>
+        )}
 
         <Field label="이름" required value={editName} onChange={setEditName} />
-        <Field
-          label="이메일"
-          description="이메일은 변경할 수 없어요."
-          value={admin.email}
-          onChange={() => {}}
-          disabled
+
+        <Field label="소속 회사 (선택)" description="비워 두면 계열사 전체를 담당하는 관리자입니다.">
+          {(a11y) => (
+            <select
+              {...a11y}
+              value={editCompany}
+              onChange={(e) => setEditCompany(e.target.value)}
+              className="input"
+              disabled={busy}
+            >
+              <option value="">회사 미지정 (전체 담당)</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="조직" value={editOrg} onChange={setEditOrg} placeholder="예: 인사기획팀" />
+          <Field label="직급" value={editTitle} onChange={setEditTitle} placeholder="예: 팀장" />
+        </div>
+        <Field label="사번" value={editEmpNum} onChange={setEditEmpNum} placeholder="사번" />
+
+        {/* 비밀번호 재설정 · 로그인 ID · 역할 · 활성 (기획서 §3 F1~F6).
+            SME 계정 관리 화면과 같은 컴포넌트를 쓴다. */}
+        <AccountAdminPanel
+          target={{
+            id: admin.id,
+            name: admin.name,
+            email: admin.email,
+            role: 'admin',
+            active: admin.active,
+            companyId: admin.company_id,
+          }}
+          isSelf={isSelf}
+          isLastLoginableAdmin={isLastLoginable}
+          onRefresh={onRefresh}
+          onBusyChange={setPanelBusy}
         />
 
-        <div>
-          <span className="mb-1.5 block t-label font-medium text-foreground">상태</span>
-          <div className="flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded-full px-2.5 py-1 t-caption font-medium ${
-                admin.active ? 'bg-success-muted text-success' : 'bg-muted text-foreground-muted'
-              }`}
-            >
-              {admin.active ? '● 활성' : '○ 비활성'}
-            </span>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleToggleActive}
-              loading={toggling}
-              disabled={busy || (admin.active && Boolean(blockReason))}
-            >
-              {admin.active ? '비활성화' : '활성화'}
-            </Button>
-          </div>
-        </div>
-
         <div className="border-t border-border pt-4">
-          <span className="mb-1.5 block t-label font-medium text-foreground">비밀번호</span>
+          <span className="mb-1.5 block t-label font-medium text-foreground">비밀번호 재설정 메일</span>
           <p className="mb-2 t-caption leading-5 text-foreground-muted">
-            비밀번호는 본인만 지정할 수 있어요. 재설정 메일을 보내면 해당 관리자가 링크에서 새 비밀번호를 정합니다.
+            실제 메일 주소를 쓰는 계정이라면 이쪽이 낫습니다 — 본인만 새 비밀번호를 알게 됩니다. 파일럿 로그인
+            ID(@seoyoneh.local)는 메일이 닿지 않으니 위의 「임시 비밀번호 발급」을 써 주세요.
           </p>
           <Button variant="secondary" size="sm" onClick={handleResetPassword} loading={resetting} disabled={busy}>
             <KeyRound size={15} aria-hidden="true" /> 비밀번호 재설정 메일 보내기
@@ -518,12 +590,18 @@ function ManageModal({
         </div>
 
         <div className="border-t border-border pt-4">
+          {deleteBlockReason && <Alert tone="warning">{deleteBlockReason}</Alert>}
           {!confirmDelete ? (
-            <Button variant="danger" onClick={() => setConfirmDelete(true)} disabled={busy || Boolean(blockReason)}>
+            <Button
+              variant="danger"
+              className={deleteBlockReason ? 'mt-3' : undefined}
+              onClick={() => setConfirmDelete(true)}
+              disabled={busy || Boolean(deleteBlockReason)}
+            >
               <Trash2 size={15} aria-hidden="true" /> 관리자 계정 삭제
             </Button>
           ) : (
-            <div className="rounded-element border border-destructive-border bg-destructive-muted p-4">
+            <div className="mt-3 rounded-element border border-destructive-border bg-destructive-muted p-4">
               <div className="flex items-start gap-2 t-label text-destructive">
                 <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <p>관리자 계정을 삭제할까요? 삭제하면 해당 계정으로 더 이상 로그인할 수 없어요.</p>

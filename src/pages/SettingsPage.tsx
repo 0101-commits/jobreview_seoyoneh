@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Building2, CalendarClock, RotateCw, ShieldAlert } from 'lucide-react';
 import { CompanyFilterDropdown } from '@/components/shared/CompanyFilterDropdown';
+import { CompanyAdminSection } from '@/components/settings/CompanyAdminSection';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { FallbackView } from '@/components/ui/FallbackView';
 import { Button } from '@/components/ui/Button';
@@ -144,20 +145,28 @@ function SettingsForm({
   // 되돌릴 수 없는 조작 확인(v2 §6-4) — dialog를 아래에서 반드시 그린다.
   const { confirm, dialog } = useConfirm();
 
-  useEffect(() => {
-    void fetchCompaniesResult().then((res) => {
-      if (res.ok) {
-        setCompanies(res.data);
-        setCompanyError('');
-        // 본인 소속도 공통 필터도 없을 때만 첫 회사로 시작한다.
-        setCompanyId((cur) => cur || res.data[0]?.id || '');
-      } else {
-        // 목록을 비우기만 하면 "계열사가 없다"로 읽힌다. 조회에 실패했다고 적는다(jobApi.ts 상단 원칙).
-        setCompanies([]);
-        setCompanyError('계열사 목록을 불러오지 못했습니다. 회사를 고를 수 없으니 새로고침 후 다시 시도해 주세요.');
-      }
-    });
+  /**
+   * 회사 드롭다운의 원천. 계열사 관리 섹션(F9)에서 회사를 추가·비활성하면 이 목록도 함께 바뀌어야
+   * 하므로 useEffect 안에 두지 않고 다시 부를 수 있게 뺐다.
+   */
+  const loadCompanies = useCallback(async () => {
+    const res = await fetchCompaniesResult();
+    if (res.ok) {
+      setCompanies(res.data);
+      setCompanyError('');
+      // 고른 회사가 목록에 없으면(첫 진입이거나, 방금 비활성으로 바뀐 회사라면) 첫 회사로 옮긴다.
+      // 없는 회사를 계속 붙들고 있으면 이름이 빈 채로 남의 설정을 편집하는 것처럼 보인다.
+      setCompanyId((cur) => (cur && res.data.some((c) => c.id === cur) ? cur : res.data[0]?.id || ''));
+    } else {
+      // 목록을 비우기만 하면 "계열사가 없다"로 읽힌다. 조회에 실패했다고 적는다(jobApi.ts 상단 원칙).
+      setCompanies([]);
+      setCompanyError('계열사 목록을 불러오지 못했습니다. 회사를 고를 수 없으니 새로고침 후 다시 시도해 주세요.');
+    }
   }, []);
+
+  useEffect(() => {
+    void loadCompanies();
+  }, [loadCompanies]);
 
   // 다른 화면에서 계열사 필터를 바꾼 채 들어온 경우를 따라간다('전체 회사'는 대상이 없으므로 무시).
   useEffect(() => {
@@ -563,6 +572,15 @@ function SettingsForm({
           </div>
         </div>
       )}
+
+      {/*
+        계열사 관리(기획서 §3 F9)는 회사 선택 바깥에 둔다 — 위의 폼은 "회사 하나"에만 적용되지만
+        이 섹션은 그 회사 목록 자체를 만드는 자리다. 회사가 0건이면 위 폼은 아예 열리지 않으므로
+        조건 안에 넣으면 첫 회사를 만들 방법이 사라진다.
+      */}
+      <div className="mt-6">
+        <CompanyAdminSection onChanged={() => void loadCompanies()} />
+      </div>
     </>
   );
 }

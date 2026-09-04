@@ -8,6 +8,7 @@ import { ModalShell } from '@/components/ui/ModalShell';
 import type { ToastMessage } from '@/components/ui/Toast';
 import type { SmeListItem } from '@/types';
 import { callAdminFn, errorMessage } from './edgeApi';
+import { AccountAdminPanel } from './AccountAdminPanel';
 
 export function SmeManageButton({
   sme,
@@ -30,6 +31,8 @@ export function SmeManageButton({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
+  // 전권 패널이 요청을 도는 동안 닫기·저장을 잠근다(비밀번호 재발급 중 모달이 닫히면 값이 사라진다).
+  const [panelBusy, setPanelBusy] = useState(false);
 
   const dirty =
     editName !== sme.name ||
@@ -105,19 +108,21 @@ export function SmeManageButton({
       {show && (
         <ModalShell
           title="SME 계정 수정"
-          description="기존 SME 계정 정보를 수정합니다."
+          description="소속 정보와 비밀번호·로그인 ID·역할·상태까지 이 창에서 모두 바꿉니다."
           icon={<UserCog size={18} className="mt-0.5 text-primary" aria-hidden="true" />}
+          // 전권 패널이 들어와 내용이 길어졌다. 관리자 계정 관리 모달과 같은 폭(480px)을 쓴다.
+          size="lg"
           onClose={() => setShow(false)}
           // footer에 취소·닫기가 있어 우상단 [X]를 감춘다(v3 T3 · montage 닫기 중복 금지).
           hideClose
           dirty={dirty && !saving && !deleting}
-          closeDisabled={saving || deleting}
+          closeDisabled={saving || deleting || panelBusy}
           footer={
             <>
-              <Button variant="secondary" onClick={() => setShow(false)} disabled={saving || deleting}>
+              <Button variant="secondary" onClick={() => setShow(false)} disabled={saving || deleting || panelBusy}>
                 닫기
               </Button>
-              <Button onClick={handleSave} loading={saving} disabled={deleting}>
+              <Button onClick={handleSave} loading={saving} disabled={deleting || panelBusy}>
                 {saving ? '저장 중...' : '수정사항 저장'}
               </Button>
             </>
@@ -145,13 +150,8 @@ export function SmeManageButton({
               <Field label="직급" value={editTitle} onChange={setEditTitle} />
             </div>
 
-            <Field
-              label="이메일"
-              description="이메일은 변경할 수 없어요."
-              value={sme.email}
-              onChange={() => {}}
-              disabled
-            />
+            {/* 로그인 ID(이메일)는 아래 전권 패널에서 바꾼다 — 여기에 읽기 전용으로 한 번 더 두면
+                같은 값이 두 곳에 보이면서 한쪽만 편집 가능해 혼동을 만든다. */}
 
             {error && (
               <div
@@ -163,9 +163,31 @@ export function SmeManageButton({
               </div>
             )}
 
+            {/* 비밀번호 재설정 · 로그인 ID · 역할 · 활성 · 가이드 초기화 (기획서 §3 F1~F7).
+                관리자 계정 관리 화면과 같은 컴포넌트를 쓴다. */}
+            <AccountAdminPanel
+              target={{
+                id: sme.id,
+                name: sme.name,
+                email: sme.email,
+                role: 'sme',
+                active: sme.active,
+                companyId: sme.company_id,
+              }}
+              isSelf={false}
+              // SME 계정이라 "마지막 관리자" 방어가 걸릴 일이 없다. 관리자로 올리는 것은 언제나 허용된다.
+              isLastLoginableAdmin={false}
+              onRefresh={onChanged}
+              onBusyChange={setPanelBusy}
+            />
+
             <div className="border-t border-border pt-4">
               {!confirmDelete ? (
-                <Button variant="danger" onClick={() => setConfirmDelete(true)} disabled={saving || deleting}>
+                <Button
+                  variant="danger"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={saving || deleting || panelBusy}
+                >
                   <Trash2 size={15} aria-hidden="true" /> SME 계정 삭제
                 </Button>
               ) : (
