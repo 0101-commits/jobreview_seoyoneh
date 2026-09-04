@@ -347,13 +347,34 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      // Prevent deactivating last active admin
+      /*
+       * 마지막 활성 관리자 방어 — 대상이 관리자일 때만 건다.
+       * 예전에는 대상 역할을 보지 않고 active=false 이기만 하면 관리자 수를 셌다. F6 으로
+       * 이 모드를 SME 관리 모달에도 붙이면서, 관리자가 1명인 운영(파일럿이 그렇다)에서는
+       * SME 비활성화 요청이 전부 "최소 1개의 활성 관리자 계정이 필요합니다"로 막혔다.
+       * delete 모드는 처음부터 대상 프로필을 먼저 읽어 역할을 확인한다 — 같은 순서로 맞춘다.
+       */
       if (!active) {
-        if ((await countActiveAdmins(adminClient)) <= 1) {
+        const { data: targetProfile } = await adminClient
+          .from("profiles")
+          .select("role, active")
+          .eq("id", profileId)
+          .maybeSingle();
+
+        if (!targetProfile) {
           return new Response(
-            JSON.stringify({ error: "최소 1개의 활성 관리자 계정이 필요합니다." }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            JSON.stringify({ error: "계정을 찾을 수 없습니다." }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
+        }
+
+        if (targetProfile.role === "admin" && targetProfile.active) {
+          if ((await countActiveAdmins(adminClient)) <= 1) {
+            return new Response(
+              JSON.stringify({ error: "최소 1개의 활성 관리자 계정이 필요합니다." }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
         }
       }
       const { error: toggleErr } = await adminClient
