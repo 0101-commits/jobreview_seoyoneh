@@ -262,6 +262,17 @@ SELECT column_name, data_type, is_nullable FROM information_schema.columns
 
 ### 1-9. Edge Function 배포
 
+**2026-09-04부터 CI 가 대신 한다.** `main` 에 푸시하면 `.github/workflows/deploy.yml` 의 `functions` 잡이
+`admin-create-user` 와 `send-reminder` 를 배포한다. 아래 두 값이 등록돼 있어야 그 잡이 돈다 —
+없으면 잡이 조용히 건너뛰어지고 예전처럼 수동 배포가 필요하다.
+
+| 어디에 | 이름 | 값 |
+|---|---|---|
+| Actions → Variables | `SUPABASE_PROJECT_REF` | `yktdlcpovntegiwfnied` |
+| Actions → Secrets | `SUPABASE_ACCESS_TOKEN` | Supabase 대시보드 → Account → Access Tokens 에서 발급 |
+
+수동 배포가 필요할 때는 아래를 쓴다(값은 위 표와 같다).
+
 SQL과 별개로, 아래 두 함수는 Supabase CLI로 따로 배포해야 화면이 동작한다.
 
 ```bash

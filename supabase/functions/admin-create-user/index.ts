@@ -777,6 +777,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    /*
+     * 모르는 모드는 여기서 끊는다.
+     * 이 아래는 "관리자 계정 생성"이고, 모드 분기가 if 나열이라 예전에는 모르는 모드가
+     * 전부 여기로 흘러내렸다. 구버전 함수가 배포된 채로 새 화면이 {mode:'set-password'} 를
+     * 보내면 아는 모드가 없어 여기까지 오고, name·password 가 없으니 "이름, 이메일(또는
+     * 로그인 ID), 비밀번호를 모두 입력해 주세요"를 400 으로 돌려준다 — 관리자는 비밀번호
+     * 재발급을 눌렀는데 이름을 입력하라는 말을 듣고, 배포 문제라는 단서는 어디에도 없다.
+     * 모드를 명시했는데 아는 모드가 아니면 그 사실을 그대로 알린다.
+     */
+    if (typeof mode === "string" && mode.trim()) {
+      return new Response(
+        JSON.stringify({
+          error:
+            `이 서버가 모르는 요청입니다(mode: ${mode}). 서버 기능이 최신 버전으로 배포되지 않았을 수 있어요. ` +
+            `관리자에게 admin-create-user 재배포를 요청해 주세요.`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // Default mode: create new admin user
     // 이메일 칸은 로그인 ID 도 받는다('@' 없이 sme01 처럼 넣으면 도메인을 붙인다).
     if (!name || !password || !(typeof email === "string" && email.trim())) {
