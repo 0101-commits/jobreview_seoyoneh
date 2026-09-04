@@ -50,6 +50,9 @@
 | 11 | `supabase/APPLY_2026-09-02_v2_phaseD.sql` | v2 Phase D — `reviews.last_step`(이어하기) | **프런트 v2 배포보다 먼저.** 미적용은 「이어하기만 꺼짐」이 **아니다** — `fetchMyAssignments` 의 select 에 `last_step` 이 들어 있어 PostgREST 가 요청 전체를 `42703` 으로 떨어뜨린다. 즉 **SME 배정 목록 자체가 오류 화면이 된다**(`src/lib/reviewApi.ts:298-301`, 2026-09-03 실측) |
 | 12 | `supabase/APPLY_2026-09-02_v2_phaseE.sql` | v2 Phase E — 감사 래퍼(`link_sme_roster_audited` 등) | **9 이후.** 화면 배포와 동시 |
 | 13 | `supabase/APPLY_2026-09-03_v4_coach.sql` | v4 — `profiles.coach_completed_at` 컬럼 + 본인 UPDATE 권한(검토 화면 첫 진입 안내) | **9 이후**(phaseA 가 GRANT 를 다시 깔기 때문). 미적용이면 안내가 **오류도 경고도 없이 한 번도 뜨지 않는다** |
+| 14 | `supabase/APPLY_2026-09-04_password_vault.sql` | 비밀번호 보관 표(`account_password_vault`) + RLS + anon·authenticated 권한 회수 | 순서 제약 없음. **적용 후 Edge Function 시크릿 `PASSWORD_VAULT_KEY` 등록**(§2-2). 미적용이면 「비밀번호 확인」만 꺼진다 |
+| 15 | `supabase/APPLY_2026-09-04_permission_hardening.sql` | `set_profile_role` 실행 권한 회수 · `review_history` INSERT 소유 검사 · 기반 19표 TRUNCATE 회수 | 순서 제약 없음. 화면 동작이 바뀌지 않는다(이 경로를 부르는 클라이언트 코드가 없다) |
+| 16 | `supabase/APPLY_2026-09-04_admin_account.sql` | 운영 관리자 계정 로그인 ID·비밀번호 지정 | 필요할 때만. 여러 번 실행해도 안전하다 |
 
 전부 `IF NOT EXISTS` / `CREATE OR REPLACE` / `DROP POLICY IF EXISTS` / `ON CONFLICT DO UPDATE`로만 되어 있어
 여러 번 실행해도 안전하다. **다만 9번(phaseA)만은 순서가 있다** — 그 파일은 `profiles` 의 UPDATE 권한을
